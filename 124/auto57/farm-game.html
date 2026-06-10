@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>农场模拟游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #87CEEB 0%, #98FB98 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .game-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+        }
+
+        .main-area {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2d5a27;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        h2 {
+            color: #4a7c44;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 2px solid #8bc34a;
+            padding-bottom: 8px;
+        }
+
+        .weather-display {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .weather-icon {
+            font-size: 32px;
+            margin-right: 10px;
+        }
+
+        .farm-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .plot {
+            aspect-ratio: 1;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            border: 3px solid #8d6e63;
+        }
+
+        .plot:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .plot.empty {
+            background: linear-gradient(135deg, #a1887f, #8d6e63);
+        }
+
+        .plot.planted {
+            background: linear-gradient(135deg, #8d6e63, #6d4c41);
+        }
+
+        .plot.harvested {
+            background: linear-gradient(135deg, #d7ccc8, #bcaaa4);
+        }
+
+        .plot.wet {
+            box-shadow: inset 0 0 20px rgba(66, 165, 245, 0.5);
+        }
+
+        .plot.dry {
+            box-shadow: inset 0 0 20px rgba(244, 67, 54, 0.5);
+        }
+
+        .plot.ready {
+            animation: glow 1.5s ease-in-out infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 10px #ffd700; }
+            50% { box-shadow: 0 0 25px #ffd700, 0 0 35px #ffd700; }
+        }
+
+        .crop-sprite {
+            font-size: 36px;
+            margin-bottom: 5px;
+        }
+
+        .plot-info {
+            font-size: 11px;
+            color: #fff;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        .status-icon {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 14px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4caf50, #388e3c);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: linear-gradient(135deg, #66bb6a, #43a047);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #2196f3, #1976d2);
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: linear-gradient(135deg, #42a5f5, #1e88e5);
+            transform: translateY(-2px);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            color: white;
+        }
+
+        .btn-warning:hover:not(:disabled) {
+            background: linear-gradient(135deg, #ffb74d, #ff9800);
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .gold-display {
+            font-size: 24px;
+            color: #f57c00;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .gold-icon {
+            font-size: 28px;
+        }
+
+        .seed-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .seed-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .seed-item:hover:not(.disabled) {
+            background: #e8f5e9;
+            cursor: pointer;
+        }
+
+        .seed-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .seed-icon {
+            font-size: 24px;
+        }
+
+        .seed-name {
+            font-weight: bold;
+            flex: 1;
+            margin-left: 10px;
+        }
+
+        .seed-price {
+            color: #f57c00;
+            font-weight: bold;
+        }
+
+        .inventory-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .inventory-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            background: #fff3e0;
+            border-radius: 6px;
+        }
+
+        .inventory-count {
+            background: #ff9800;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: bold;
+            margin-left: auto;
+        }
+
+        .day-display {
+            text-align: center;
+            font-size: 18px;
+            color: #5d4037;
+            margin-bottom: 15px;
+        }
+
+        .tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 100;
+        }
+
+        .plot:hover .tooltip {
+            opacity: 1;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #2d5a27;
+        }
+
+        .modal-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .modal-option {
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-option:hover:not(.disabled) {
+            background: #e8f5e9;
+        }
+
+        .modal-option.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .close-modal {
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        .message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            z-index: 2000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .message.success {
+            background: linear-gradient(135deg, #4caf50, #388e3c);
+        }
+
+        .message.error {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+        }
+
+        .message.info {
+            background: linear-gradient(135deg, #2196f3, #1976d2);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="main-area">
+            <h1>🌾 欢乐农场</h1>
+            
+            <div class="weather-display" id="weatherDisplay">
+                <span class="weather-icon">☀️</span>
+                <span id="weatherText">晴天</span>
+            </div>
+
+            <div class="day-display">
+                第 <span id="dayCount">1</span> 天
+            </div>
+
+            <div class="farm-grid" id="farmGrid"></div>
+
+            <div class="controls">
+                <button class="btn btn-primary" id="nextDayBtn">下一天 ⏭️</button>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="panel">
+                <div class="gold-display">
+                    <span class="gold-icon">💰</span>
+                    <span id="goldAmount">100</span> 金币
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>🌱 种子商店</h2>
+                <div class="seed-list" id="seedShop"></div>
+            </div>
+
+            <div class="panel">
+                <h2>🎒 我的库存</h2>
+                <div class="inventory-list" id="inventory"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="plantModal">
+        <div class="modal-content">
+            <h3 class="modal-title">选择要种植的种子</h3>
+            <div class="modal-options" id="plantOptions"></div>
+            <button class="btn btn-warning close-modal" id="closePlantModal">取消</button>
+        </div>
+    </div>
+
+    <script>
+    const CropAPI = (function() {
+        const GrowthStages = {
+            SEED: 0,
+            SPROUT: 1,
+            MATURE: 2
+        };
+
+        function createCropInterface(cropType) {
+            return {
+                getName: function() { throw new Error('必须实现 getName()'); },
+                getGrowthStage: function() { throw new Error('必须实现 getGrowthStage()'); },
+                water: function() { throw new Error('必须实现 water()'); },
+                grow: function(weatherEffect) { throw new Error('必须实现 grow()'); },
+                canHarvest: function() { throw new Error('必须实现 canHarvest()'); },
+                getPrice: function() { throw new Error('必须实现 getPrice()'); },
+                getStageSprite: function() { throw new Error('必须实现 getStageSprite()'); },
+                getDaysSinceWatered: function() { throw new Error('必须实现 getDaysSinceWatered()'); },
+                isWatered: function() { throw new Error('必须实现 isWatered()'); },
+                getCurrentDay: function() { throw new Error('必须实现 getCurrentDay()'); },
+                getTotalDays: function() { throw new Error('必须实现 getTotalDays()'); }
+            };
+        }
+
+        return {
+            GrowthStages,
+            createCropInterface
+        };
+    })();
+    </script>
+
+    <script>
+    const CropTypes = (function(API) {
+        class WheatCrop {
+            constructor() {
+                this.name = '小麦';
+                this.totalDays = 3;
+                this.currentDay = 0;
+                this.daysSinceWatered = 0;
+                this.price = 30;
+                this.watered = false;
+            }
+
+            getName() { return this.name; }
+            getGrowthStage() {
+                if (this.currentDay < 1) return API.GrowthStages.SEED;
+                if (this.currentDay < 3) return API.GrowthStages.SPROUT;
+                return API.GrowthStages.MATURE;
+            }
+            water() { this.watered = true; this.daysSinceWatered = 0; }
+            grow(weatherEffect = 1) {
+                if (this.daysSinceWatered > 2) return false;
+                this.currentDay = Math.min(this.currentDay + weatherEffect, this.totalDays);
+                this.daysSinceWatered++;
+                this.watered = false;
+                return true;
+            }
+            canHarvest() { return this.currentDay >= this.totalDays; }
+            getPrice() { return this.price; }
+            getStageSprite() {
+                const stage = this.getGrowthStage();
+                if (stage === API.GrowthStages.SEED) return '🌱';
+                if (stage === API.GrowthStages.SPROUT) return '🌿';
+                return '🌾';
+            }
+            getDaysSinceWatered() { return this.daysSinceWatered; }
+            isWatered() { return this.watered; }
+            getCurrentDay() { return this.currentDay; }
+            getTotalDays() { return this.totalDays; }
+        }
+
+        class CornCrop {
+            constructor() {
+                this.name = '玉米';
+                this.totalDays = 5;
+                this.currentDay = 0;
+                this.daysSinceWatered = 0;
+                this.price = 50;
+                this.watered = false;
+            }
+
+            getName() { return this.name; }
+            getGrowthStage() {
+                if (this.currentDay < 2) return API.GrowthStages.SEED;
+                if (this.currentDay < 5) return API.GrowthStages.SPROUT;
+                return API.GrowthStages.MATURE;
+            }
+            water() { this.watered = true; this.daysSinceWatered = 0; }
+            grow(weatherEffect = 1) {
+                if (this.daysSinceWatered > 2) return false;
+                this.currentDay = Math.min(this.currentDay + weatherEffect, this.totalDays);
+                this.daysSinceWatered++;
+                this.watered = false;
+                return true;
+            }
+            canHarvest() { return this.currentDay >= this.totalDays; }
+            getPrice() { return this.price; }
+            getStageSprite() {
+                const stage = this.getGrowthStage();
+                if (stage === API.GrowthStages.SEED) return '🌱';
+                if (stage === API.GrowthStages.SPROUT) return '🌿';
+                return '🌽';
+            }
+            getDaysSinceWatered() { return this.daysSinceWatered; }
+            isWatered() { return this.watered; }
+            getCurrentDay() { return this.currentDay; }
+            getTotalDays() { return this.totalDays; }
+        }
+
+        class TomatoCrop {
+            constructor() {
+                this.name = '番茄';
+                this.totalDays = 7;
+                this.currentDay = 0;
+                this.daysSinceWatered = 0;
+                this.price = 80;
+                this.watered = false;
+            }
+
+            getName() { return this.name; }
+            getGrowthStage() {
+                if (this.currentDay < 2) return API.GrowthStages.SEED;
+                if (this.currentDay < 7) return API.GrowthStages.SPROUT;
+                return API.GrowthStages.MATURE;
+            }
+            water() { this.watered = true; this.daysSinceWatered = 0; }
+            grow(weatherEffect = 1) {
+                if (this.daysSinceWatered > 2) return false;
+                this.currentDay = Math.min(this.currentDay + weatherEffect, this.totalDays);
+                this.daysSinceWatered++;
+                this.watered = false;
+                return true;
+            }
+            canHarvest() { return this.currentDay >= this.totalDays; }
+            getPrice() { return this.price; }
+            getStageSprite() {
+                const stage = this.getGrowthStage();
+                if (stage === API.GrowthStages.SEED) return '🌱';
+                if (stage === API.GrowthStages.SPROUT) return '🌿';
+                return '🍅';
+            }
+            getDaysSinceWatered() { return this.daysSinceWatered; }
+            isWatered() { return this.watered; }
+            getCurrentDay() { return this.currentDay; }
+            getTotalDays() { return this.totalDays; }
+        }
+
+        const CropRegistry = {
+            wheat: {
+                name: '小麦',
+                icon: '🌾',
+                seedPrice: 10,
+                harvestPrice: 30,
+                growDays: 3,
+                create: () => new WheatCrop()
+            },
+            corn: {
+                name: '玉米',
+                icon: '🌽',
+                seedPrice: 18,
+                harvestPrice: 50,
+                growDays: 5,
+                create: () => new CornCrop()
+            },
+            tomato: {
+                name: '番茄',
+                icon: '🍅',
+                seedPrice: 28,
+                harvestPrice: 80,
+                growDays: 7,
+                create: () => new TomatoCrop()
+            }
+        };
+
+        return { CropRegistry };
+    })(CropAPI);
+    </script>
+
+    <script>
+    const WeatherSystem = (function() {
+        const WeatherTypes = {
+            SUNNY: { id: 'sunny', name: '晴天', icon: '☀️', growthMultiplier: 1, waterEffect: 0 },
+            RAINY: { id: 'rainy', name: '雨天', icon: '🌧️', growthMultiplier: 1, waterEffect: 1 },
+            DROUGHT: { id: 'drought', name: '干旱', icon: '🏜️', growthMultiplier: 0.5, waterEffect: -1 }
+        };
+
+        function getRandomWeather() {
+            const rand = Math.random();
+            if (rand < 0.6) return WeatherTypes.SUNNY;
+            if (rand < 0.85) return WeatherTypes.RAINY;
+            return WeatherTypes.DROUGHT;
+        }
+
+        return { WeatherTypes, getRandomWeather };
+    })();
+    </script>
+
+    <script>
+    const FarmGame = (function(CropAPI, CropTypes, WeatherSystem) {
+        let gameState = {
+            gold: 100,
+            day: 1,
+            weather: WeatherSystem.WeatherTypes.SUNNY,
+            inventory: {
+                wheat: 2,
+                corn: 1,
+                tomato: 1
+            },
+            plots: []
+        };
+
+        function initPlots() {
+            gameState.plots = [];
+            for (let i = 0; i < 16; i++) {
+                gameState.plots.push({
+                    id: i,
+                    state: 'empty',
+                    crop: null
+                });
+            }
+        }
+
+        function buySeed(cropType) {
+            const cropInfo = CropTypes.CropRegistry[cropType];
+            if (gameState.gold >= cropInfo.seedPrice) {
+                gameState.gold -= cropInfo.seedPrice;
+                gameState.inventory[cropType]++;
+                updateUI();
+                showMessage(`购买了 ${cropInfo.name} 种子！`, 'success');
+                return true;
+            }
+            showMessage('金币不足！', 'error');
+            return false;
+        }
+
+        function plantSeed(plotId, cropType) {
+            const plot = gameState.plots[plotId];
+            if (plot.state !== 'empty') {
+                showMessage('这块地不能种植！', 'error');
+                return false;
+            }
+            if (gameState.inventory[cropType] <= 0) {
+                showMessage('没有该种子！', 'error');
+                return false;
+            }
+
+            gameState.inventory[cropType]--;
+            plot.state = 'planted';
+            plot.crop = CropTypes.CropRegistry[cropType].create();
+            plot.crop.water();
+            updateUI();
+            showMessage(`种植了 ${plot.crop.getName()}！`, 'success');
+            return true;
+        }
+
+        function waterPlot(plotId) {
+            const plot = gameState.plots[plotId];
+            if (plot.state !== 'planted' || !plot.crop) {
+                showMessage('这块地不需要浇水！', 'error');
+                return false;
+            }
+            if (plot.crop.canHarvest()) {
+                showMessage('作物已成熟，无需浇水！', 'info');
+                return false;
+            }
+            if (plot.crop.isWatered()) {
+                showMessage('今天已经浇过水了！', 'info');
+                return false;
+            }
+            plot.crop.water();
+            updateUI();
+            showMessage('浇水成功！', 'success');
+            return true;
+        }
+
+        function harvestPlot(plotId) {
+            const plot = gameState.plots[plotId];
+            if (!plot.crop || !plot.crop.canHarvest()) {
+                showMessage('作物还不能收获！', 'error');
+                return false;
+            }
+            const price = plot.crop.getPrice();
+            gameState.gold += price;
+            plot.state = 'harvested';
+            plot.crop = null;
+            updateUI();
+            showMessage(`收获成功！获得 ${price} 金币！`, 'success');
+            return true;
+        }
+
+        function tillPlot(plotId) {
+            const plot = gameState.plots[plotId];
+            if (plot.state !== 'harvested') {
+                showMessage('这块地不需要翻耕！', 'error');
+                return false;
+            }
+            plot.state = 'empty';
+            updateUI();
+            showMessage('翻耕完成！', 'success');
+            return true;
+        }
+
+        function nextDay() {
+            gameState.day++;
+            gameState.weather = WeatherSystem.getRandomWeather();
+
+            gameState.plots.forEach(plot => {
+                if (plot.state === 'planted' && plot.crop) {
+                    if (gameState.weather.id === 'rainy') {
+                        plot.crop.water();
+                    }
+                    let growthMultiplier = 1;
+                    if (gameState.weather.id === 'drought') {
+                        growthMultiplier = 0.5;
+                        plot.crop.daysSinceWatered += 0.5;
+                    }
+                    
+                    const canGrow = plot.crop.daysSinceWatered <= 2;
+                    if (canGrow) {
+                        if (growthMultiplier === 1) {
+                            plot.crop.grow(1);
+                        } else if (Math.random() < growthMultiplier) {
+                            plot.crop.grow(1);
+                        } else {
+                            plot.crop.daysSinceWatered++;
+                        }
+                    }
+                }
+            });
+
+            updateUI();
+            showWeatherMessage();
+        }
+
+        function showWeatherMessage() {
+            const w = gameState.weather;
+            let effect = '';
+            if (w.id === 'rainy') effect = '（作物自动浇水）';
+            if (w.id === 'drought') effect = '（生长减慢，缺水加速）';
+            showMessage(`第 ${gameState.day} 天 - ${w.name} ${effect}`, 'info');
+        }
+
+        function handlePlotClick(plotId) {
+            const plot = gameState.plots[plotId];
+            
+            if (plot.state === 'empty') {
+                showPlantModal(plotId);
+            } else if (plot.state === 'planted' && plot.crop) {
+                if (plot.crop.canHarvest()) {
+                    harvestPlot(plotId);
+                } else {
+                    waterPlot(plotId);
+                }
+            } else if (plot.state === 'harvested') {
+                tillPlot(plotId);
+            }
+        }
+
+        function showPlantModal(plotId) {
+            const modal = document.getElementById('plantModal');
+            const options = document.getElementById('plantOptions');
+            options.innerHTML = '';
+
+            Object.keys(CropTypes.CropRegistry).forEach(key => {
+                const crop = CropTypes.CropRegistry[key];
+                const count = gameState.inventory[key];
+                const hasSeed = count > 0;
+                
+                const option = document.createElement('div');
+                option.className = `modal-option ${hasSeed ? '' : 'disabled'}`;
+                option.innerHTML = `
+                    <span>
+                        <span class="seed-icon">${crop.icon}</span>
+                        <span class="seed-name">${crop.name}</span>
+                    </span>
+                    <span class="seed-price">库存: ${count}</span>
+                `;
+                
+                if (hasSeed) {
+                    option.onclick = () => {
+                        plantSeed(plotId, key);
+                        modal.classList.remove('active');
+                    };
+                }
+                
+                options.appendChild(option);
+            });
+
+            modal.classList.add('active');
+        }
+
+        function updateUI() {
+            document.getElementById('goldAmount').textContent = gameState.gold;
+            document.getElementById('dayCount').textContent = gameState.day;
+            document.getElementById('weatherDisplay').innerHTML = `
+                <span class="weather-icon">${gameState.weather.icon}</span>
+                <span id="weatherText">${gameState.weather.name}</span>
+            `;
+            
+            renderPlots();
+            renderShop();
+            renderInventory();
+        }
+
+        function renderPlots() {
+            const grid = document.getElementById('farmGrid');
+            grid.innerHTML = '';
+
+            gameState.plots.forEach((plot, index) => {
+                const div = document.createElement('div');
+                div.className = `plot ${plot.state}`;
+                
+                let content = '';
+                let tooltip = '';
+                let statusIcon = '';
+
+                if (plot.state === 'empty') {
+                    content = '<div class="crop-sprite">🕳️</div><div class="plot-info">空地</div>';
+                    tooltip = '点击种植';
+                } else if (plot.state === 'harvested') {
+                    content = '<div class="crop-sprite">🥀</div><div class="plot-info">已收割</div>';
+                    tooltip = '点击翻耕';
+                } else if (plot.crop) {
+                    const isDry = plot.crop.getDaysSinceWatered() > 2;
+                    const isWet = plot.crop.isWatered();
+                    const isReady = plot.crop.canHarvest();
+                    
+                    if (isDry) div.classList.add('dry');
+                    if (isWet) div.classList.add('wet');
+                    if (isReady) div.classList.add('ready');
+                    
+                    if (isDry) statusIcon = '<span class="status-icon">💧</span>';
+                    if (isWet) statusIcon = '<span class="status-icon">💦</span>';
+                    if (isReady) statusIcon = '<span class="status-icon">✨</span>';
+
+                    const stageText = ['种子期', '幼苗期', '成熟期'][plot.crop.getGrowthStage()];
+                    const daysLeft = isReady ? '已成熟' : `${plot.crop.getCurrentDay()}/${plot.crop.getTotalDays()}天`;
+                    
+                    content = `
+                        <div class="crop-sprite">${plot.crop.getStageSprite()}</div>
+                        <div class="plot-info">${plot.crop.getName()}</div>
+                        <div class="plot-info">${daysLeft}</div>
+                    `;
+                    
+                    tooltip = `${plot.crop.getName()} - ${stageText}`;
+                    if (isDry) tooltip += ' [缺水停止生长]';
+                    else if (isWet) tooltip += ' [已浇水]';
+                    if (isReady) tooltip = '点击收获！';
+                    else tooltip += ' - 点击浇水';
+                }
+
+                div.innerHTML = content + statusIcon + `<div class="tooltip">${tooltip}</div>`;
+                div.onclick = () => handlePlotClick(index);
+                grid.appendChild(div);
+            });
+        }
+
+        function renderShop() {
+            const shop = document.getElementById('seedShop');
+            shop.innerHTML = '';
+
+            Object.keys(CropTypes.CropRegistry).forEach(key => {
+                const crop = CropTypes.CropRegistry[key];
+                const canAfford = gameState.gold >= crop.seedPrice;
+                
+                const item = document.createElement('div');
+                item.className = `seed-item ${canAfford ? '' : 'disabled'}`;
+                item.innerHTML = `
+                    <span class="seed-icon">${crop.icon}</span>
+                    <span class="seed-name">${crop.name}</span>
+                    <span class="seed-price">💰${crop.seedPrice}</span>
+                `;
+                
+                if (canAfford) {
+                    item.onclick = () => buySeed(key);
+                }
+                
+                shop.appendChild(item);
+            });
+        }
+
+        function renderInventory() {
+            const inv = document.getElementById('inventory');
+            inv.innerHTML = '';
+
+            Object.keys(CropTypes.CropRegistry).forEach(key => {
+                const crop = CropTypes.CropRegistry[key];
+                const count = gameState.inventory[key];
+                
+                const item = document.createElement('div');
+                item.className = 'inventory-item';
+                item.innerHTML = `
+                    <span class="seed-icon">${crop.icon}</span>
+                    <span class="seed-name">${crop.name}种子</span>
+                    <span class="inventory-count">${count}</span>
+                `;
+                
+                inv.appendChild(item);
+            });
+        }
+
+        function showMessage(text, type = 'info') {
+            const existing = document.querySelector('.message');
+            if (existing) existing.remove();
+
+            const msg = document.createElement('div');
+            msg.className = `message ${type}`;
+            msg.textContent = text;
+            document.body.appendChild(msg);
+
+            setTimeout(() => msg.remove(), 3000);
+        }
+
+        function init() {
+            initPlots();
+            updateUI();
+
+            document.getElementById('nextDayBtn').onclick = nextDay;
+            document.getElementById('closePlantModal').onclick = () => {
+                document.getElementById('plantModal').classList.remove('active');
+            };
+            document.getElementById('plantModal').onclick = (e) => {
+                if (e.target.id === 'plantModal') {
+                    document.getElementById('plantModal').classList.remove('active');
+                }
+            };
+        }
+
+        return { init };
+    })(CropAPI, CropTypes, WeatherSystem);
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            FarmGame.init();
+        });
+    </script>
+</body>
+</html>

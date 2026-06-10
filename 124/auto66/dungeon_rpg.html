@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地牢探险RPG</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .game-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.6);
+            border: 3px solid #4a4a6a;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 0 30px rgba(100, 100, 200, 0.3);
+        }
+
+        .game-title {
+            text-align: center;
+            font-size: 2.5em;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px #000;
+            margin-bottom: 20px;
+        }
+
+        .panel {
+            background: rgba(40, 40, 60, 0.8);
+            border: 2px solid #5a5a7a;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .panel-title {
+            color: #ffd700;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #5a5a7a;
+            padding-bottom: 5px;
+        }
+
+        .character-creation {
+            text-align: center;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #b0b0d0;
+        }
+
+        .input-group input {
+            padding: 10px;
+            width: 250px;
+            border: 2px solid #5a5a7a;
+            border-radius: 5px;
+            background: #2a2a4a;
+            color: #fff;
+            font-size: 1em;
+        }
+
+        .class-selection {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .class-card {
+            background: rgba(60, 60, 90, 0.8);
+            border: 3px solid #6a6a9a;
+            border-radius: 10px;
+            padding: 15px;
+            width: 180px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .class-card:hover, .class-card.selected {
+            border-color: #ffd700;
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(255, 215, 0, 0.3);
+        }
+
+        .class-card h3 {
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+
+        .class-card p {
+            font-size: 0.9em;
+            margin: 5px 0;
+            color: #c0c0e0;
+        }
+
+        .warrior { color: #ff6b6b; }
+        .mage { color: #4ecdc4; }
+        .ranger { color: #95e1a3; }
+
+        .btn {
+            padding: 12px 30px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            color: #1a1a2e;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+        }
+
+        .btn-attack {
+            background: linear-gradient(135deg, #ff4757, #ff6b81);
+            color: #fff;
+        }
+
+        .btn-escape {
+            background: linear-gradient(135deg, #5352ed, #70a1ff);
+            color: #fff;
+        }
+
+        .btn-item {
+            background: linear-gradient(135deg, #2ed573, #7bed9f);
+            color: #1a1a2e;
+            padding: 8px 15px;
+            font-size: 0.9em;
+        }
+
+        .status-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .status-item {
+            background: rgba(50, 50, 70, 0.6);
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .status-label {
+            color: #9090b0;
+            font-size: 0.9em;
+        }
+
+        .status-value {
+            color: #fff;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .hp-bar {
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .hp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4757, #ff6b81);
+            transition: width 0.3s;
+        }
+
+        .exp-bar {
+            height: 12px;
+            background: #333;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .exp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #70a1ff, #5352ed);
+            transition: width 0.3s;
+        }
+
+        .combat-area {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            min-height: 200px;
+        }
+
+        .monster-display {
+            text-align: center;
+        }
+
+        .monster-name {
+            color: #ff4757;
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+
+        .monster-stats {
+            color: #c0c0e0;
+        }
+
+        .battle-log {
+            height: 250px;
+            overflow-y: auto;
+            background: rgba(20, 20, 40, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95em;
+            line-height: 1.6;
+        }
+
+        .log-damage { color: #ff6b81; }
+        .log-heal { color: #7bed9f; }
+        .log-exp { color: #70a1ff; }
+        .log-special { color: #ffa502; }
+        .log-system { color: #ffd700; }
+
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+        }
+
+        .inventory-slot {
+            aspect-ratio: 1;
+            background: rgba(50, 50, 70, 0.6);
+            border: 2px solid #5a5a7a;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            padding: 5px;
+        }
+
+        .inventory-slot:hover:not(.empty) {
+            border-color: #ffd700;
+            transform: scale(1.05);
+        }
+
+        .inventory-slot.empty {
+            cursor: default;
+            opacity: 0.5;
+        }
+
+        .item-icon {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+
+        .item-name {
+            font-size: 0.8em;
+            text-align: center;
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #2a2a4a, #1a1a2e);
+            border: 3px solid #ffd700;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        .modal-content h2 {
+            color: #ffd700;
+            margin-bottom: 20px;
+        }
+
+        .level-up-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .level-up-option {
+            background: rgba(60, 60, 90, 0.8);
+            border: 2px solid #6a6a9a;
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .level-up-option:hover {
+            border-color: #ffd700;
+            transform: scale(1.02);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .victory { color: #ffd700; }
+        .defeat { color: #ff4757; }
+
+        .final-stats {
+            text-align: left;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+
+        .final-stats p {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="game-title">⚔️ 地牢探险RPG ⚔️</h1>
+
+        <div id="characterCreation" class="panel character-creation">
+            <h2>创建你的冒险者</h2>
+            <div class="input-group">
+                <label>角色名称（2-12个字符）：</label>
+                <input type="text" id="playerName" maxlength="12" placeholder="输入你的名字">
+            </div>
+            <h3>选择职业</h3>
+            <div class="class-selection">
+                <div class="class-card" data-class="warrior" onclick="selectClass('warrior')">
+                    <h3 class="warrior">🛡️ 战士</h3>
+                    <p>生命值: 120</p>
+                    <p>攻击力: 12</p>
+                    <p>防御力: 8</p>
+                    <p style="font-size: 0.8em; color: #9090b0;">高生存，近战专家</p>
+                </div>
+                <div class="class-card" data-class="mage" onclick="selectClass('mage')">
+                    <h3 class="mage">🔮 法师</h3>
+                    <p>生命值: 80</p>
+                    <p>攻击力: 18</p>
+                    <p>防御力: 4</p>
+                    <p style="font-size: 0.8em; color: #9090b0;">高输出，魔法大师</p>
+                </div>
+                <div class="class-card" data-class="ranger" onclick="selectClass('ranger')">
+                    <h3 class="ranger">🏹 游侠</h3>
+                    <p>生命值: 100</p>
+                    <p>攻击力: 15</p>
+                    <p>防御力: 6</p>
+                    <p style="font-size: 0.8em; color: #9090b0;">平衡型，灵活多变</p>
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="startGame()" id="startBtn" disabled>开始冒险</button>
+        </div>
+
+        <div id="gameScreen" class="hidden">
+            <div class="panel">
+                <div class="panel-title">📊 冒险者状态</div>
+                <div class="status-bar">
+                    <div class="status-item">
+                        <div class="status-label">名称</div>
+                        <div class="status-value" id="displayName">-</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">职业</div>
+                        <div class="status-value" id="displayClass">-</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">等级</div>
+                        <div class="status-value" id="displayLevel">1</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">生命值</div>
+                        <div class="status-value" id="displayHP">100/100</div>
+                        <div class="hp-bar"><div class="hp-fill" id="hpFill" style="width: 100%"></div></div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">攻击力</div>
+                        <div class="status-value" id="displayAtk">10</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">防御力</div>
+                        <div class="status-value" id="displayDef">5</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">经验值</div>
+                        <div class="status-value" id="displayExp">0/100</div>
+                        <div class="exp-bar"><div class="exp-fill" id="expFill" style="width: 0%"></div></div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">战斗次数</div>
+                        <div class="status-value" id="displayBattles">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">🎒 背包 <span id="inventoryCount">(0/5)</span></div>
+                <div class="inventory-grid" id="inventoryGrid"></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">⚔️ 战斗区域</div>
+                <div class="combat-area" id="combatArea">
+                    <div style="text-align: center; color: #9090b0;">
+                        <p>准备好探索地牢了吗？</p>
+                        <p style="margin-top: 10px; font-size: 0.9em;">点击下方按钮开始探索</p>
+                    </div>
+                </div>
+                <div class="action-buttons" id="actionButtons">
+                    <button class="btn btn-primary" onclick="explore()" id="exploreBtn">🔍 探索地牢</button>
+                    <button class="btn btn-attack hidden" onclick="playerAttack()" id="attackBtn">⚔️ 攻击</button>
+                    <button class="btn btn-escape hidden" onclick="tryEscape()" id="escapeBtn">🏃 逃跑</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">📜 战斗日志</div>
+                <div class="battle-log" id="battleLog"></div>
+            </div>
+        </div>
+
+        <div id="levelUpModal" class="modal hidden">
+            <div class="modal-content">
+                <h2>🎉 等级提升！</h2>
+                <p style="color: #7bed9f; font-size: 1.2em;">恭喜你升到了 <span id="newLevel">2</span> 级！</p>
+                <p style="color: #70a1ff; margin: 10px 0;">生命值已完全恢复！</p>
+                <p>请选择一项属性增益：</p>
+                <div class="level-up-options" id="levelUpOptions"></div>
+            </div>
+        </div>
+
+        <div id="gameOverModal" class="modal hidden">
+            <div class="modal-content">
+                <h2 id="gameOverTitle">游戏结束</h2>
+                <div id="gameOverMessage"></div>
+                <div id="finalStats" class="final-stats hidden"></div>
+                <button class="btn btn-primary" onclick="restartGame()">🔄 重新开始</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let gameState = {
+            player: null,
+            selectedClass: null,
+            currentMonster: null,
+            inCombat: false,
+            battleCount: 0,
+            bossDefeated: false,
+            bossEncountered: false
+        };
+
+        const classStats = {
+            warrior: { name: '战士', maxHP: 120, atk: 12, def: 8, icon: '🛡️' },
+            mage: { name: '法师', maxHP: 80, atk: 18, def: 4, icon: '🔮' },
+            ranger: { name: '游侠', maxHP: 100, atk: 15, def: 6, icon: '🏹' }
+        };
+
+        const monsters = [
+            {
+                name: '哥布林',
+                icon: '👺',
+                maxHP: 40,
+                atk: 8,
+                def: 2,
+                exp: 30,
+                skills: [
+                    { name: '普通攻击', chance: 0.7, multiplier: 1, effect: null },
+                    { name: '重击', chance: 0.3, multiplier: 1.5, effect: 'damage' }
+                ]
+            },
+            {
+                name: '骷髅兵',
+                icon: '💀',
+                maxHP: 55,
+                atk: 10,
+                def: 4,
+                exp: 45,
+                skills: [
+                    { name: '普通攻击', chance: 0.6, multiplier: 1, effect: null },
+                    { name: '骨刃斩', chance: 0.25, multiplier: 1.4, effect: 'damage' },
+                    { name: '骨盾防御', chance: 0.15, multiplier: 0, effect: 'defense' }
+                ]
+            },
+            {
+                name: '暗影狼',
+                icon: '🐺',
+                maxHP: 70,
+                atk: 14,
+                def: 5,
+                exp: 60,
+                skills: [
+                    { name: '撕咬', chance: 0.5, multiplier: 1, effect: null },
+                    { name: '狂暴撕咬', chance: 0.35, multiplier: 1.6, effect: 'damage' },
+                    { name: '暗影潜行', chance: 0.15, multiplier: 0, effect: 'evade' }
+                ]
+            }
+        ];
+
+        const boss = {
+            name: '地牢守护者',
+            icon: '👹',
+            maxHP: 250,
+            atk: 25,
+            def: 12,
+            exp: 500,
+            isBoss: true,
+            skills: [
+                { name: '普通攻击', chance: 0.4, multiplier: 1, effect: null },
+                { name: '毁灭重击', chance: 0.3, multiplier: 2, effect: 'damage' },
+                { name: '岩石护甲', chance: 0.15, multiplier: 0, effect: 'defense' },
+                { name: '震荡波', chance: 0.15, multiplier: 1.8, effect: 'damage' }
+            ]
+        };
+
+        const items = [
+            { name: '生命药水', icon: '🧪', effect: 'heal', value: 40, description: '恢复40点生命值' },
+            { name: '大生命药水', icon: '🍷', effect: 'heal', value: 80, description: '恢复80点生命值' },
+            { name: '力量卷轴', icon: '📜', effect: 'atk', value: 3, description: '永久增加3点攻击力' },
+            { name: '护盾卷轴', icon: '📋', effect: 'def', value: 2, description: '永久增加2点防御力' },
+            { name: '生命结晶', icon: '💎', effect: 'maxHP', value: 20, description: '永久增加20点最大生命值' }
+        ];
+
+        const levelUpBonuses = [
+            { name: '强壮体魄', stat: 'maxHP', value: 15, text: '+15 最大生命值' },
+            { name: '力量提升', stat: 'atk', value: 3, text: '+3 攻击力' },
+            { name: '坚固护甲', stat: 'def', value: 2, text: '+2 防御力' },
+            { name: '生命涌泉', stat: 'maxHP', value: 25, text: '+25 最大生命值' },
+            { name: '战斗本能', stat: 'atk', value: 4, text: '+4 攻击力' },
+            { name: '钢铁之躯', stat: 'def', value: 3, text: '+3 防御力' }
+        ];
+
+        function selectClass(classType) {
+            gameState.selectedClass = classType;
+            document.querySelectorAll('.class-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            document.querySelector(`[data-class="${classType}"]`).classList.add('selected');
+            validateStartButton();
+        }
+
+        function validateStartButton() {
+            const name = document.getElementById('playerName').value.trim();
+            const startBtn = document.getElementById('startBtn');
+            startBtn.disabled = !(name.length >= 2 && name.length <= 12 && gameState.selectedClass);
+        }
+
+        document.getElementById('playerName').addEventListener('input', validateStartButton);
+
+        function startGame() {
+            const name = document.getElementById('playerName').value.trim();
+            const classData = classStats[gameState.selectedClass];
+
+            gameState.player = {
+                name: name,
+                class: gameState.selectedClass,
+                className: classData.name,
+                classIcon: classData.icon,
+                level: 1,
+                maxHP: classData.maxHP,
+                currentHP: classData.maxHP,
+                atk: classData.atk,
+                def: classData.def,
+                exp: 0,
+                inventory: []
+            };
+
+            gameState.battleCount = 0;
+            gameState.bossDefeated = false;
+            gameState.bossEncountered = false;
+
+            document.getElementById('characterCreation').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+
+            updateUI();
+            addLog('system', `${name}（${classData.name}）踏入了黑暗的地牢...`);
+            addLog('system', '准备好开始你的冒险了吗？点击"探索地牢"开始战斗！');
+        }
+
+        function updateUI() {
+            const p = gameState.player;
+
+            document.getElementById('displayName').textContent = p.name;
+            document.getElementById('displayClass').textContent = p.classIcon + ' ' + p.className;
+            document.getElementById('displayLevel').textContent = p.level;
+            document.getElementById('displayHP').textContent = `${p.currentHP}/${p.maxHP}`;
+            document.getElementById('displayAtk').textContent = p.atk;
+            document.getElementById('displayDef').textContent = p.def;
+            document.getElementById('displayExp').textContent = `${p.exp}/${p.level * 100}`;
+            document.getElementById('displayBattles').textContent = gameState.battleCount;
+
+            document.getElementById('hpFill').style.width = `${(p.currentHP / p.maxHP) * 100}%`;
+            document.getElementById('expFill').style.width = `${(p.exp / (p.level * 100)) * 100}%`;
+
+            updateInventory();
+        }
+
+        function updateInventory() {
+            const grid = document.getElementById('inventoryGrid');
+            grid.innerHTML = '';
+
+            for (let i = 0; i < 5; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'inventory-slot';
+
+                if (gameState.player.inventory[i]) {
+                    const item = gameState.player.inventory[i];
+                    slot.innerHTML = `
+                        <div class="item-icon">${item.icon}</div>
+                        <div class="item-name">${item.name}</div>
+                    `;
+                    slot.title = item.description;
+                    slot.onclick = () => useItem(i);
+                } else {
+                    slot.classList.add('empty');
+                    slot.innerHTML = `<div style="color: #555;">空</div>`;
+                }
+
+                grid.appendChild(slot);
+            }
+
+            document.getElementById('inventoryCount').textContent = 
+                `(${gameState.player.inventory.length}/5)`;
+        }
+
+        function addLog(type, message) {
+            const log = document.getElementById('battleLog');
+            const entry = document.createElement('div');
+            entry.className = `log-${type}`;
+            entry.textContent = `> ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function explore() {
+            if (gameState.inCombat) return;
+
+            gameState.battleCount++;
+            
+            let monster;
+            if (gameState.battleCount >= 10 && !gameState.bossDefeated) {
+                monster = { ...boss };
+                monster.currentHP = monster.maxHP;
+                monster.tempDef = 0;
+                monster.evading = false;
+                gameState.bossEncountered = true;
+                
+                gameState.player.currentHP = gameState.player.maxHP;
+                addLog('system', '🌟 你感到一股强大的气息逼近...');
+                addLog('system', '💫 神秘力量完全恢复了你的生命值！');
+                addLog('special', '⚠️ 最终BOSS出现：地牢守护者！');
+            } else {
+                const randomMonster = monsters[Math.floor(Math.random() * monsters.length)];
+                monster = { ...randomMonster };
+                monster.currentHP = monster.maxHP;
+                monster.tempDef = 0;
+                monster.evading = false;
+                addLog('system', `遭遇了 ${monster.icon} ${monster.name}！`);
+            }
+
+            gameState.currentMonster = monster;
+            gameState.inCombat = true;
+            showMonster();
+            toggleCombatButtons(true);
+            updateUI();
+        }
+
+        function showMonster() {
+            const m = gameState.currentMonster;
+            const area = document.getElementById('combatArea');
+            
+            area.innerHTML = `
+                <div class="monster-display">
+                    <div class="monster-name">${m.icon} ${m.name}</div>
+                    <div class="monster-stats">
+                        <p>生命值: <span id="monsterHP">${m.currentHP}/${m.maxHP}</span></p>
+                        <p>攻击力: ${m.atk} | 防御力: ${m.def}</p>
+                        ${m.isBoss ? '<p style="color: #ffd700;">👑 最终BOSS</p>' : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleCombatButtons(inCombat) {
+            document.getElementById('exploreBtn').classList.toggle('hidden', inCombat);
+            document.getElementById('attackBtn').classList.toggle('hidden', !inCombat);
+            document.getElementById('escapeBtn').classList.toggle('hidden', !inCombat);
+        }
+
+        function playerAttack() {
+            if (!gameState.inCombat) return;
+
+            const p = gameState.player;
+            const m = gameState.currentMonster;
+
+            let damage = Math.max(1, p.atk - (m.def + m.tempDef));
+            
+            if (m.evading) {
+                addLog('special', `${m.name} 躲避了你的攻击！`);
+                m.evading = false;
+            } else {
+                m.currentHP -= damage;
+                addLog('damage', `你对 ${m.name} 造成了 ${damage} 点伤害！`);
+            }
+
+            m.tempDef = 0;
+            updateMonsterHP();
+
+            if (m.currentHP <= 0) {
+                handleMonsterDefeat();
+                return;
+            }
+
+            setTimeout(monsterTurn, 500);
+        }
+
+        function monsterTurn() {
+            const p = gameState.player;
+            const m = gameState.currentMonster;
+
+            const rand = Math.random();
+            let cumulative = 0;
+            let selectedSkill = m.skills[0];
+
+            for (const skill of m.skills) {
+                cumulative += skill.chance;
+                if (rand <= cumulative) {
+                    selectedSkill = skill;
+                    break;
+                }
+            }
+
+            if (selectedSkill.effect === 'defense') {
+                m.tempDef = Math.floor(m.def * 0.5);
+                addLog('special', `${m.name} 使用了 ${selectedSkill.name}，防御力暂时提升！`);
+            } else if (selectedSkill.effect === 'evade') {
+                m.evading = true;
+                addLog('special', `${m.name} 使用了 ${selectedSkill.name}，准备躲避下一次攻击！`);
+            } else {
+                const damage = Math.max(1, Math.floor(m.atk * selectedSkill.multiplier) - p.def);
+                p.currentHP -= damage;
+                
+                if (selectedSkill.multiplier > 1) {
+                    addLog('special', `${m.name} 使用了 ${selectedSkill.name}！`);
+                }
+                addLog('damage', `${m.name} 对你造成了 ${damage} 点伤害！`);
+            }
+
+            updateUI();
+
+            if (p.currentHP <= 0) {
+                p.currentHP = 0;
+                updateUI();
+                handleGameOver(false);
+            }
+        }
+
+        function updateMonsterHP() {
+            const m = gameState.currentMonster;
+            const hpElement = document.getElementById('monsterHP');
+            if (hpElement) {
+                hpElement.textContent = `${Math.max(0, m.currentHP)}/${m.maxHP}`;
+            }
+        }
+
+        function handleMonsterDefeat() {
+            const p = gameState.player;
+            const m = gameState.currentMonster;
+
+            addLog('heal', `🎉 ${m.name} 被击败了！`);
+            addLog('exp', `获得 ${m.exp} 点经验值！`);
+
+            p.exp += m.exp;
+
+            if (m.isBoss) {
+                gameState.bossDefeated = true;
+            }
+
+            const dropChance = m.isBoss ? 1 : 0.4;
+            if (Math.random() < dropChance && p.inventory.length < 5) {
+                const item = items[Math.floor(Math.random() * items.length)];
+                p.inventory.push({ ...item });
+                addLog('special', `💎 获得了 ${item.icon} ${item.name}！`);
+            }
+
+            gameState.inCombat = false;
+            gameState.currentMonster = null;
+            toggleCombatButtons(false);
+            
+            document.getElementById('combatArea').innerHTML = `
+                <div style="text-align: center; color: #7bed9f;">
+                    <p>🎉 战斗胜利！</p>
+                    <p style="margin-top: 10px; font-size: 0.9em;">继续探索或使用物品恢复</p>
+                </div>
+            `;
+
+            updateUI();
+            checkLevelUp();
+
+            if (gameState.bossDefeated) {
+                setTimeout(() => handleGameOver(true), 1000);
+            }
+        }
+
+        function tryEscape() {
+            if (!gameState.inCombat) return;
+
+            const p = gameState.player;
+            const m = gameState.currentMonster;
+
+            const baseEscapeChance = m.isBoss ? 0.1 : 0.4;
+            const levelBonus = (p.level - 1) * 0.05;
+            const escapeChance = Math.min(0.9, baseEscapeChance + levelBonus);
+
+            if (Math.random() < escapeChance) {
+                addLog('system', `成功逃离了 ${m.name}！`);
+                gameState.inCombat = false;
+                gameState.currentMonster = null;
+                toggleCombatButtons(false);
+                
+                document.getElementById('combatArea').innerHTML = `
+                    <div style="text-align: center; color: #70a1ff;">
+                        <p>🏃 成功逃脱！</p>
+                        <p style="margin-top: 10px; font-size: 0.9em;">休息一下，继续冒险</p>
+                    </div>
+                `;
+            } else {
+                addLog('damage', `逃跑失败！${m.name} 趁机攻击！`);
+                const damage = Math.max(1, m.atk - p.def);
+                p.currentHP -= damage;
+                addLog('damage', `${m.name} 对你造成了 ${damage} 点伤害！`);
+                
+                updateUI();
+                
+                if (p.currentHP <= 0) {
+                    p.currentHP = 0;
+                    updateUI();
+                    handleGameOver(false);
+                }
+            }
+        }
+
+        function useItem(index) {
+            if (gameState.inCombat) {
+                addLog('system', '战斗中无法使用物品！');
+                return;
+            }
+
+            const item = gameState.player.inventory[index];
+            if (!item) return;
+
+            switch (item.effect) {
+                case 'heal':
+                    const healAmount = Math.min(item.value, gameState.player.maxHP - gameState.player.currentHP);
+                    gameState.player.currentHP += healAmount;
+                    addLog('heal', `使用了 ${item.icon} ${item.name}，恢复了 ${healAmount} 点生命值！`);
+                    break;
+                case 'atk':
+                    gameState.player.atk += item.value;
+                    addLog('special', `使用了 ${item.icon} ${item.name}，攻击力永久增加 ${item.value}！`);
+                    break;
+                case 'def':
+                    gameState.player.def += item.value;
+                    addLog('special', `使用了 ${item.icon} ${item.name}，防御力永久增加 ${item.value}！`);
+                    break;
+                case 'maxHP':
+                    gameState.player.maxHP += item.value;
+                    gameState.player.currentHP += item.value;
+                    addLog('special', `使用了 ${item.icon} ${item.name}，最大生命值永久增加 ${item.value}！`);
+                    break;
+            }
+
+            gameState.player.inventory.splice(index, 1);
+            updateUI();
+        }
+
+        function checkLevelUp() {
+            const p = gameState.player;
+            const expNeeded = p.level * 100;
+
+            if (p.exp >= expNeeded && p.level < 10) {
+                p.exp -= expNeeded;
+                p.level++;
+                p.currentHP = p.maxHP;
+
+                document.getElementById('newLevel').textContent = p.level;
+                generateLevelUpOptions();
+                document.getElementById('levelUpModal').classList.remove('hidden');
+            } else if (p.level >= 10) {
+                p.exp = 1000;
+            }
+
+            updateUI();
+        }
+
+        function generateLevelUpOptions() {
+            const container = document.getElementById('levelUpOptions');
+            container.innerHTML = '';
+
+            const shuffled = [...levelUpBonuses].sort(() => Math.random() - 0.5);
+            const options = shuffled.slice(0, 3);
+
+            options.forEach((option, index) => {
+                const div = document.createElement('div');
+                div.className = 'level-up-option';
+                div.innerHTML = `<strong>${option.name}</strong>: ${option.text}`;
+                div.onclick = () => selectLevelUpBonus(option);
+                container.appendChild(div);
+            });
+        }
+
+        function selectLevelUpBonus(option) {
+            const p = gameState.player;
+
+            switch (option.stat) {
+                case 'maxHP':
+                    p.maxHP += option.value;
+                    p.currentHP = p.maxHP;
+                    addLog('heal', `选择了 ${option.name}，最大生命值 +${option.value}！`);
+                    break;
+                case 'atk':
+                    p.atk += option.value;
+                    addLog('special', `选择了 ${option.name}，攻击力 +${option.value}！`);
+                    break;
+                case 'def':
+                    p.def += option.value;
+                    addLog('special', `选择了 ${option.name}，防御力 +${option.value}！`);
+                    break;
+            }
+
+            document.getElementById('levelUpModal').classList.add('hidden');
+            updateUI();
+
+            if (p.level < 10) {
+                checkLevelUp();
+            }
+        }
+
+        function handleGameOver(victory) {
+            const modal = document.getElementById('gameOverModal');
+            const title = document.getElementById('gameOverTitle');
+            const message = document.getElementById('gameOverMessage');
+            const finalStats = document.getElementById('finalStats');
+
+            if (victory) {
+                title.className = 'victory';
+                title.textContent = '🏆 胜利！';
+                message.innerHTML = `
+                    <p style="font-size: 1.2em; color: #ffd700; margin-bottom: 15px;">
+                        恭喜你击败了地牢守护者！
+                    </p>
+                    <p style="color: #7bed9f;">
+                        你成功征服了这座黑暗的地牢！
+                    </p>
+                `;
+            } else {
+                title.className = 'defeat';
+                title.textContent = '💀 失败';
+                message.innerHTML = `
+                    <p style="font-size: 1.2em; color: #ff4757; margin-bottom: 15px;">
+                        你倒在了地牢深处...
+                    </p>
+                    <p style="color: #9090b0;">
+                        不要放弃，重新挑战吧！
+                    </p>
+                `;
+            }
+
+            const p = gameState.player;
+            finalStats.classList.remove('hidden');
+            finalStats.innerHTML = `
+                <h3 style="color: #ffd700; margin-bottom: 10px;">📊 最终属性</h3>
+                <p><strong>角色名：</strong>${p.name}</p>
+                <p><strong>职业：</strong>${p.classIcon} ${p.className}</p>
+                <p><strong>等级：</strong>${p.level}</p>
+                <p><strong>生命值：</strong>${p.maxHP}</p>
+                <p><strong>攻击力：</strong>${p.atk}</p>
+                <p><strong>防御力：</strong>${p.def}</p>
+                <p><strong>战斗次数：</strong>${gameState.battleCount}</p>
+            `;
+
+            modal.classList.remove('hidden');
+        }
+
+        function restartGame() {
+            document.getElementById('gameOverModal').classList.add('hidden');
+            document.getElementById('gameScreen').classList.add('hidden');
+            document.getElementById('characterCreation').classList.remove('hidden');
+            
+            document.getElementById('playerName').value = '';
+            document.querySelectorAll('.class-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('battleLog').innerHTML = '';
+            
+            gameState = {
+                player: null,
+                selectedClass: null,
+                currentMonster: null,
+                inCombat: false,
+                battleCount: 0,
+                bossDefeated: false,
+                bossEncountered: false
+            };
+        }
+    </script>
+</body>
+</html>

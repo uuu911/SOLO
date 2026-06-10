@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>光之谜题 - 光线折射解谜游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 10px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            text-align: center;
+            padding: 10px 0;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 5px;
+        }
+
+        .level-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 15px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 12px;
+            margin-bottom: 10px;
+        }
+
+        .level-nav {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+        }
+
+        .btn:hover {
+            background: rgba(255,255,255,0.25);
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+        }
+
+        .game-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #gameCanvas {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 0 60px rgba(255,255,255,0.03);
+            max-width: 100%;
+        }
+
+        .element-bar {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 12px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .element-item {
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .element-item:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.05);
+        }
+
+        .element-item.selected {
+            border-color: #4ecdc4;
+            box-shadow: 0 0 15px rgba(78, 205, 196, 0.5);
+        }
+
+        .element-item svg {
+            width: 35px;
+            height: 35px;
+        }
+
+        .element-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            margin-bottom: 5px;
+        }
+
+        .element-item:hover .element-tooltip {
+            opacity: 1;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 12px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+
+        .steps {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .targets {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .target-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .target-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.5);
+        }
+
+        .target-color.matched {
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 5px currentColor; }
+            50% { box-shadow: 0 0 15px currentColor; }
+        }
+
+        .victory-modal {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            padding: 20px 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.4);
+            transform: translateX(150%);
+            transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 1000;
+        }
+
+        .victory-modal.show {
+            transform: translateX(0);
+        }
+
+        .victory-modal h3 {
+            font-size: 1.3rem;
+            margin-bottom: 8px;
+        }
+
+        .victory-modal p {
+            font-size: 0.95rem;
+            opacity: 0.9;
+        }
+
+        .warning-toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 107, 107, 0.95);
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-weight: bold;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 1001;
+        }
+
+        .warning-toast.show {
+            opacity: 1;
+        }
+
+        .level-select-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .level-select-modal.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .level-select-content {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .level-select-content h3 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .level-btn {
+            aspect-ratio: 1;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .level-btn:hover {
+            background: rgba(255,255,255,0.25);
+            transform: scale(1.05);
+        }
+
+        .level-btn.completed {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .level-btn.current {
+            border: 2px solid #4ecdc4;
+        }
+
+        .close-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255,255,255,0.25);
+        }
+
+        .instructions {
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.6);
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 1.4rem;
+            }
+
+            .element-item {
+                width: 44px;
+                height: 44px;
+            }
+
+            .element-item svg {
+                width: 30px;
+                height: 30px;
+            }
+
+            .btn {
+                padding: 6px 12px;
+                font-size: 0.8rem;
+            }
+
+            .level-info {
+                padding: 6px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✨ 光之谜题 ✨</h1>
+        </div>
+
+        <div class="level-info">
+            <div class="level-nav">
+                <button class="btn" id="prevLevel">◀ 上一关</button>
+                <button class="btn btn-primary" id="levelSelect">关卡 <span id="currentLevel">1</span></button>
+                <button class="btn" id="nextLevel">下一关 ▶</button>
+            </div>
+            <button class="btn btn-danger" id="resetLevel">🔄 重置</button>
+        </div>
+
+        <div class="game-area">
+            <canvas id="gameCanvas" width="480" height="480"></canvas>
+        </div>
+
+        <div class="element-bar" id="elementBar">
+            <div class="element-item" data-element="mirror" title="反射镜">
+                <svg viewBox="0 0 40 40">
+                    <line x1="5" y1="35" x2="35" y2="5" stroke="#4ecdc4" stroke-width="3" stroke-linecap="round"/>
+                    <circle cx="20" cy="20" r="3" fill="#4ecdc4"/>
+                </svg>
+                <span class="element-tooltip">反射镜</span>
+            </div>
+            <div class="element-item" data-element="splitter" title="分束器">
+                <svg viewBox="0 0 40 40">
+                    <line x1="10" y1="30" x2="30" y2="10" stroke="#ff6b6b" stroke-width="2" stroke-dasharray="4,2"/>
+                    <line x1="5" y1="20" x2="35" y2="20" stroke="#ff6b6b" stroke-width="2"/>
+                    <circle cx="20" cy="20" r="4" fill="#ff6b6b"/>
+                </svg>
+                <span class="element-tooltip">分束器</span>
+            </div>
+            <div class="element-item" data-element="filterR" title="红色滤色片">
+                <svg viewBox="0 0 40 40">
+                    <rect x="8" y="8" width="24" height="24" fill="rgba(255,0,0,0.5)" stroke="#ff4444" stroke-width="2" rx="3"/>
+                    <text x="20" y="25" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">R</text>
+                </svg>
+                <span class="element-tooltip">红色滤色片</span>
+            </div>
+            <div class="element-item" data-element="filterG" title="绿色滤色片">
+                <svg viewBox="0 0 40 40">
+                    <rect x="8" y="8" width="24" height="24" fill="rgba(0,255,0,0.5)" stroke="#44ff44" stroke-width="2" rx="3"/>
+                    <text x="20" y="25" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">G</text>
+                </svg>
+                <span class="element-tooltip">绿色滤色片</span>
+            </div>
+            <div class="element-item" data-element="filterB" title="蓝色滤色片">
+                <svg viewBox="0 0 40 40">
+                    <rect x="8" y="8" width="24" height="24" fill="rgba(0,0,255,0.5)" stroke="#4444ff" stroke-width="2" rx="3"/>
+                    <text x="20" y="25" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">B</text>
+                </svg>
+                <span class="element-tooltip">蓝色滤色片</span>
+            </div>
+            <div class="element-item" data-element="prism" title="合色棱镜">
+                <svg viewBox="0 0 40 40">
+                    <polygon points="20,5 35,35 5,35" fill="rgba(147,112,219,0.5)" stroke="#9370db" stroke-width="2"/>
+                    <circle cx="20" cy="25" r="3" fill="#9370db"/>
+                </svg>
+                <span class="element-tooltip">合色棱镜</span>
+            </div>
+            <div class="element-item" data-element="blocker" title="挡板">
+                <svg viewBox="0 0 40 40">
+                    <rect x="8" y="15" width="24" height="10" fill="#666" stroke="#888" stroke-width="2" rx="2"/>
+                    <line x1="12" y1="12" x2="12" y2="28" stroke="#888" stroke-width="2"/>
+                    <line x1="28" y1="12" x2="28" y2="28" stroke="#888" stroke-width="2"/>
+                </svg>
+                <span class="element-tooltip">挡板</span>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div class="steps">
+                <span>步数:</span>
+                <strong id="stepCount">0</strong>
+            </div>
+            <div class="targets" id="targetsDisplay"></div>
+        </div>
+
+        <div class="instructions">
+            单击放置元件 | 双击/右键旋转 | 拖拽移动 | Ctrl+Z 撤销
+        </div>
+    </div>
+
+    <div class="victory-modal" id="victoryModal">
+        <h3>🎉 恭喜过关！</h3>
+        <p>用时 <span id="victorySteps">0</span> 步完成</p>
+    </div>
+
+    <div class="warning-toast" id="warningToast">⚠️ 光路进入死循环！</div>
+
+    <div class="level-select-modal" id="levelSelectModal">
+        <div class="level-select-content">
+            <h3>选择关卡</h3>
+            <div class="level-grid" id="levelGrid"></div>
+            <button class="close-btn" id="closeLevelSelect">关闭</button>
+        </div>
+    </div>
+
+    <script>
+        const LEVELS = [
+            {
+                id: 1,
+                name: "初识光线",
+                gridSize: 8,
+                sources: [{ x: 0, y: 3, direction: 'right', color: { r: 255, g: 0, b: 0 } }],
+                sensors: [{ x: 7, y: 3, target: { r: 255, g: 0, b: 0 } }],
+                hint: "直接让红光到达感应器"
+            },
+            {
+                id: 2,
+                name: "反射入门",
+                gridSize: 8,
+                sources: [{ x: 0, y: 1, direction: 'right', color: { r: 0, g: 255, b: 0 } }],
+                sensors: [{ x: 7, y: 6, target: { r: 0, g: 255, b: 0 } }],
+                hint: "使用反射镜改变光路方向"
+            },
+            {
+                id: 3,
+                name: "色彩过滤",
+                gridSize: 8,
+                sources: [{ x: 0, y: 3, direction: 'right', color: { r: 255, g: 255, b: 255 } }],
+                sensors: [{ x: 7, y: 3, target: { r: 0, g: 0, b: 255 } }],
+                hint: "使用蓝色滤色片提取蓝光"
+            },
+            {
+                id: 4,
+                name: "分束挑战",
+                gridSize: 8,
+                sources: [{ x: 0, y: 3, direction: 'right', color: { r: 255, g: 0, b: 0 } }],
+                sensors: [
+                    { x: 7, y: 3, target: { r: 255, g: 0, b: 0 } },
+                    { x: 4, y: 7, target: { r: 255, g: 0, b: 0 } }
+                ],
+                hint: "使用分束器将光束分成两路"
+            },
+            {
+                id: 5,
+                name: "色彩合成",
+                gridSize: 8,
+                sources: [
+                    { x: 0, y: 2, direction: 'right', color: { r: 255, g: 0, b: 0 } },
+                    { x: 0, y: 5, direction: 'right', color: { r: 0, g: 0, b: 255 } }
+                ],
+                sensors: [{ x: 7, y: 3, target: { r: 255, g: 0, b: 255 } }],
+                hint: "使用合色棱镜混合两种颜色"
+            }
+        ];
+
+        const DIRECTIONS = {
+            up: { dx: 0, dy: -1 },
+            down: { dx: 0, dy: 1 },
+            left: { dx: -1, dy: 0 },
+            right: { dx: 1, dy: 0 }
+        };
+
+        const REFLECT_ANGLES = {
+            0: { up: 'right', down: 'left', left: 'down', right: 'up' },
+            90: { up: 'left', down: 'right', left: 'up', right: 'down' }
+        };
+
+        class LightPuzzleGame {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.currentLevel = 0;
+                this.grid = [];
+                this.elements = [];
+                this.selectedElement = null;
+                this.selectedPlaced = null;
+                this.steps = 0;
+                this.history = [];
+                this.lightPaths = [];
+                this.completedLevels = new Set();
+                this.isVictory = false;
+                this.loopWarning = false;
+                
+                this.cellSize = 60;
+                this.lastTouchTime = 0;
+                this.touchStartPos = null;
+                this.isDragging = false;
+                this.dragElement = null;
+                
+                this.init();
+            }
+
+            init() {
+                this.setupCanvas();
+                this.setupEventListeners();
+                this.loadLevel(0);
+                this.renderLevelGrid();
+                this.gameLoop();
+            }
+
+            setupCanvas() {
+                const resize = () => {
+                    const container = this.canvas.parentElement;
+                    const maxWidth = Math.min(container.clientWidth - 20, 480);
+                    const scale = maxWidth / 480;
+                    this.canvas.style.width = `${maxWidth}px`;
+                    this.canvas.style.height = `${maxWidth}px`;
+                    this.cellSize = Math.floor(maxWidth / 8);
+                };
+                resize();
+                window.addEventListener('resize', resize);
+            }
+
+            setupEventListeners() {
+                this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+                this.canvas.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
+                this.canvas.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    this.handleRightClick(e);
+                });
+
+                this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+                this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
+                this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: false });
+
+                document.querySelectorAll('.element-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        document.querySelectorAll('.element-item').forEach(i => i.classList.remove('selected'));
+                        item.classList.add('selected');
+                        this.selectedElement = item.dataset.element;
+                        this.selectedPlaced = null;
+                    });
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.ctrlKey && e.key === 'z') {
+                        e.preventDefault();
+                        this.undo();
+                    }
+                });
+
+                document.getElementById('prevLevel').addEventListener('click', () => this.prevLevel());
+                document.getElementById('nextLevel').addEventListener('click', () => this.nextLevel());
+                document.getElementById('resetLevel').addEventListener('click', () => this.resetLevel());
+                document.getElementById('levelSelect').addEventListener('click', () => this.showLevelSelect());
+                document.getElementById('closeLevelSelect').addEventListener('click', () => this.hideLevelSelect());
+            }
+
+            getGridPos(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const scale = this.canvas.width / rect.width;
+                const x = Math.floor((e.clientX - rect.left) * scale / this.cellSize);
+                const y = Math.floor((e.clientY - rect.top) * scale / this.cellSize);
+                return { x, y };
+            }
+
+            getGridPosTouch(touch) {
+                const rect = this.canvas.getBoundingClientRect();
+                const scale = this.canvas.width / rect.width;
+                const x = Math.floor((touch.clientX - rect.left) * scale / this.cellSize);
+                const y = Math.floor((touch.clientY - rect.top) * scale / this.cellSize);
+                return { x, y };
+            }
+
+            handleMouseDown(e) {
+                const pos = this.getGridPos(e);
+                const element = this.getElementAt(pos.x, pos.y);
+                
+                if (element && !element.fixed) {
+                    this.isDragging = true;
+                    this.dragElement = element;
+                    this.selectedPlaced = element;
+                    this.selectedElement = null;
+                    document.querySelectorAll('.element-item').forEach(i => i.classList.remove('selected'));
+                } else if (this.selectedElement && this.isValidPosition(pos.x, pos.y)) {
+                    this.placeElement(pos.x, pos.y, this.selectedElement);
+                }
+            }
+
+            handleMouseMove(e) {
+                if (this.isDragging && this.dragElement) {
+                    const pos = this.getGridPos(e);
+                    this.dragElement.dragX = pos.x;
+                    this.dragElement.dragY = pos.y;
+                }
+            }
+
+            handleMouseUp(e) {
+                if (this.isDragging && this.dragElement) {
+                    const pos = this.getGridPos(e);
+                    if (this.isValidPosition(pos.x, pos.y) && 
+                        (pos.x !== this.dragElement.x || pos.y !== this.dragElement.y)) {
+                        this.moveElement(this.dragElement, pos.x, pos.y);
+                    }
+                    this.dragElement.dragX = null;
+                    this.dragElement.dragY = null;
+                    this.isDragging = false;
+                    this.dragElement = null;
+                }
+            }
+
+            handleDoubleClick(e) {
+                const pos = this.getGridPos(e);
+                const element = this.getElementAt(pos.x, pos.y);
+                if (element && !element.fixed) {
+                    this.rotateElement(element);
+                }
+            }
+
+            handleRightClick(e) {
+                const pos = this.getGridPos(e);
+                const element = this.getElementAt(pos.x, pos.y);
+                if (element && !element.fixed) {
+                    this.rotateElement(element, true);
+                }
+            }
+
+            handleTouchStart(e) {
+                e.preventDefault();
+                
+                if (e.touches.length === 2) {
+                    const pos = this.getGridPosTouch(e.touches[0]);
+                    const element = this.getElementAt(pos.x, pos.y);
+                    if (element && !element.fixed) {
+                        this.rotateElement(element);
+                    }
+                    return;
+                }
+
+                const touch = e.touches[0];
+                const pos = this.getGridPosTouch(touch);
+                const now = Date.now();
+                
+                if (now - this.lastTouchTime < 300) {
+                    const element = this.getElementAt(pos.x, pos.y);
+                    if (element && !element.fixed) {
+                        this.rotateElement(element);
+                    }
+                    this.lastTouchTime = 0;
+                    return;
+                }
+                this.lastTouchTime = now;
+
+                const element = this.getElementAt(pos.x, pos.y);
+                if (element && !element.fixed) {
+                    this.isDragging = true;
+                    this.dragElement = element;
+                    this.selectedPlaced = element;
+                    this.touchStartPos = { x: touch.clientX, y: touch.clientY };
+                } else if (this.selectedElement && this.isValidPosition(pos.x, pos.y)) {
+                    this.placeElement(pos.x, pos.y, this.selectedElement);
+                }
+            }
+
+            handleTouchMove(e) {
+                e.preventDefault();
+                if (this.isDragging && this.dragElement && e.touches.length === 1) {
+                    const pos = this.getGridPosTouch(e.touches[0]);
+                    this.dragElement.dragX = pos.x;
+                    this.dragElement.dragY = pos.y;
+                }
+            }
+
+            handleTouchEnd(e) {
+                e.preventDefault();
+                if (this.isDragging && this.dragElement) {
+                    const pos = { x: this.dragElement.dragX, y: this.dragElement.dragY };
+                    if (pos.x !== null && this.isValidPosition(pos.x, pos.y) &&
+                        (pos.x !== this.dragElement.x || pos.y !== this.dragElement.y)) {
+                        this.moveElement(this.dragElement, pos.x, pos.y);
+                    }
+                    this.dragElement.dragX = null;
+                    this.dragElement.dragY = null;
+                    this.isDragging = false;
+                    this.dragElement = null;
+                }
+                this.touchStartPos = null;
+            }
+
+            isValidPosition(x, y) {
+                if (x < 0 || x >= 8 || y < 0 || y >= 8) return false;
+                const level = LEVELS[this.currentLevel];
+                
+                for (const source of level.sources) {
+                    if (source.x === x && source.y === y) return false;
+                }
+                for (const sensor of level.sensors) {
+                    if (sensor.x === x && sensor.y === y) return false;
+                }
+                
+                return !this.getElementAt(x, y);
+            }
+
+            getElementAt(x, y) {
+                return this.elements.find(e => e.x === x && e.y === y);
+            }
+
+            placeElement(x, y, type) {
+                this.saveHistory();
+                
+                const element = {
+                    x, y,
+                    type,
+                    rotation: 0,
+                    fixed: false,
+                    dragX: null,
+                    dragY: null
+                };
+                
+                this.elements.push(element);
+                this.steps++;
+                this.updateUI();
+                this.checkVictory();
+            }
+
+            moveElement(element, newX, newY) {
+                this.saveHistory();
+                element.x = newX;
+                element.y = newY;
+                this.steps++;
+                this.updateUI();
+                this.checkVictory();
+            }
+
+            rotateElement(element, counterClockwise = false) {
+                this.saveHistory();
+                if (counterClockwise) {
+                    element.rotation = (element.rotation - 90 + 360) % 360;
+                } else {
+                    element.rotation = (element.rotation + 90) % 360;
+                }
+                this.steps++;
+                this.updateUI();
+                this.checkVictory();
+            }
+
+            removeElement(element) {
+                this.saveHistory();
+                const index = this.elements.indexOf(element);
+                if (index > -1) {
+                    this.elements.splice(index, 1);
+                    this.steps++;
+                    this.updateUI();
+                    this.checkVictory();
+                }
+            }
+
+            saveHistory() {
+                this.history.push({
+                    elements: JSON.parse(JSON.stringify(this.elements)),
+                    steps: this.steps
+                });
+                if (this.history.length > 50) {
+                    this.history.shift();
+                }
+            }
+
+            undo() {
+                if (this.history.length > 0) {
+                    const state = this.history.pop();
+                    this.elements = state.elements;
+                    this.steps = state.steps;
+                    this.isVictory = false;
+                    this.updateUI();
+                }
+            }
+
+            loadLevel(index) {
+                this.currentLevel = index;
+                this.elements = [];
+                this.steps = 0;
+                this.history = [];
+                this.isVictory = false;
+                this.selectedElement = null;
+                this.selectedPlaced = null;
+                document.querySelectorAll('.element-item').forEach(i => i.classList.remove('selected'));
+                document.getElementById('currentLevel').textContent = index + 1;
+                this.updateUI();
+                this.hideVictory();
+            }
+
+            prevLevel() {
+                if (this.currentLevel > 0) {
+                    this.loadLevel(this.currentLevel - 1);
+                }
+            }
+
+            nextLevel() {
+                if (this.currentLevel < LEVELS.length - 1) {
+                    this.loadLevel(this.currentLevel + 1);
+                }
+            }
+
+            resetLevel() {
+                this.loadLevel(this.currentLevel);
+            }
+
+            showLevelSelect() {
+                document.getElementById('levelSelectModal').classList.add('show');
+            }
+
+            hideLevelSelect() {
+                document.getElementById('levelSelectModal').classList.remove('show');
+            }
+
+            renderLevelGrid() {
+                const grid = document.getElementById('levelGrid');
+                grid.innerHTML = '';
+                
+                LEVELS.forEach((level, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'level-btn';
+                    if (this.completedLevels.has(index)) btn.classList.add('completed');
+                    if (index === this.currentLevel) btn.classList.add('current');
+                    btn.textContent = index + 1;
+                    btn.addEventListener('click', () => {
+                        this.loadLevel(index);
+                        this.hideLevelSelect();
+                    });
+                    grid.appendChild(btn);
+                });
+            }
+
+            calculateLightPaths() {
+                const level = LEVELS[this.currentLevel];
+                this.lightPaths = [];
+                this.loopWarning = false;
+
+                for (const source of level.sensors) {
+                    source.receivedColor = { r: 0, g: 0, b: 0 };
+                }
+
+                for (const source of level.sources) {
+                    this.traceLightBeam(source.x, source.y, source.direction, { ...source.color }, 0, []);
+                }
+            }
+
+            traceLightBeam(startX, startY, direction, color, depth, visited) {
+                if (depth > 30) {
+                    this.loopWarning = true;
+                    return [];
+                }
+
+                const dir = DIRECTIONS[direction];
+                let x = startX;
+                let y = startY;
+                const path = [{ x, y, color: { ...color } }];
+
+                while (true) {
+                    x += dir.dx;
+                    y += dir.dy;
+
+                    if (x < 0 || x >= 8 || y < 0 || y >= 8) {
+                        break;
+                    }
+
+                    const level = LEVELS[this.currentLevel];
+                    
+                    for (const sensor of level.sensors) {
+                        if (sensor.x === x && sensor.y === y) {
+                            sensor.receivedColor.r = Math.min(255, sensor.receivedColor.r + color.r);
+                            sensor.receivedColor.g = Math.min(255, sensor.receivedColor.g + color.g);
+                            sensor.receivedColor.b = Math.min(255, sensor.receivedColor.b + color.b);
+                            path.push({ x, y, color: { ...color }, isSensor: true });
+                            this.lightPaths.push(path);
+                            return path;
+                        }
+                    }
+
+                    const element = this.getElementAt(x, y);
+                    
+                    if (element) {
+                        const visitKey = `${x},${y},${direction}`;
+                        if (visited.includes(visitKey)) {
+                            this.loopWarning = true;
+                            break;
+                        }
+                        visited.push(visitKey);
+
+                        path.push({ x, y, color: { ...color } });
+
+                        const result = this.interactWithElement(element, direction, color, depth, visited);
+                        
+                        for (const beam of result) {
+                            const subPath = this.traceLightBeam(x, y, beam.direction, beam.color, depth + 1, [...visited]);
+                            if (subPath.length > 0) {
+                                this.lightPaths.push([...path, ...subPath.slice(1)]);
+                            }
+                        }
+                        return path;
+                    }
+
+                    path.push({ x, y, color: { ...color } });
+                }
+
+                this.lightPaths.push(path);
+                return path;
+            }
+
+            interactWithElement(element, direction, color, depth, visited) {
+                const beams = [];
+
+                switch (element.type) {
+                    case 'mirror':
+                        const mirrorAngle = element.rotation % 180;
+                        const reflectMap = mirrorAngle === 0 ? REFLECT_ANGLES[0] : REFLECT_ANGLES[90];
+                        const newDir = reflectMap[direction];
+                        if (newDir) {
+                            beams.push({ direction: newDir, color: { ...color } });
+                        }
+                        break;
+
+                    case 'splitter':
+                        beams.push({ direction, color: { r: color.r * 0.5, g: color.g * 0.5, b: color.b * 0.5 } });
+                        const splitAngle = element.rotation % 180;
+                        const splitMap = splitAngle === 0 ? REFLECT_ANGLES[0] : REFLECT_ANGLES[90];
+                        const splitDir = splitMap[direction];
+                        if (splitDir) {
+                            beams.push({ direction: splitDir, color: { r: color.r * 0.5, g: color.g * 0.5, b: color.b * 0.5 } });
+                        }
+                        break;
+
+                    case 'filterR':
+                        if (color.r > 0) {
+                            beams.push({ direction, color: { r: color.r, g: 0, b: 0 } });
+                        }
+                        break;
+
+                    case 'filterG':
+                        if (color.g > 0) {
+                            beams.push({ direction, color: { r: 0, g: color.g, b: 0 } });
+                        }
+                        break;
+
+                    case 'filterB':
+                        if (color.b > 0) {
+                            beams.push({ direction, color: { r: 0, g: 0, b: color.b } });
+                        }
+                        break;
+
+                    case 'prism':
+                        beams.push({ direction, color: { ...color } });
+                        break;
+
+                    case 'blocker':
+                        break;
+                }
+
+                return beams;
+            }
+
+            checkVictory() {
+                this.calculateLightPaths();
+                
+                const level = LEVELS[this.currentLevel];
+                let allMatched = true;
+
+                for (const sensor of level.sensors) {
+                    if (!sensor.receivedColor) {
+                        allMatched = false;
+                        break;
+                    }
+                    
+                    const dr = sensor.target.r - sensor.receivedColor.r;
+                    const dg = sensor.target.g - sensor.receivedColor.g;
+                    const db = sensor.target.b - sensor.receivedColor.b;
+                    const distance = Math.sqrt(dr * dr + dg * dg + db * db);
+                    
+                    if (distance >= 15) {
+                        allMatched = false;
+                        break;
+                    }
+                }
+
+                if (allMatched && !this.isVictory) {
+                    this.isVictory = true;
+                    this.completedLevels.add(this.currentLevel);
+                    this.showVictory();
+                    this.renderLevelGrid();
+                }
+
+                this.updateTargetsDisplay();
+            }
+
+            updateTargetsDisplay() {
+                const container = document.getElementById('targetsDisplay');
+                container.innerHTML = '';
+                
+                const level = LEVELS[this.currentLevel];
+                for (const sensor of level.sensors) {
+                    const div = document.createElement('div');
+                    div.className = 'target-indicator';
+                    
+                    const colorDiv = document.createElement('div');
+                    colorDiv.className = 'target-color';
+                    colorDiv.style.backgroundColor = `rgb(${sensor.target.r},${sensor.target.g},${sensor.target.b})`;
+                    
+                    if (sensor.receivedColor) {
+                        const dr = sensor.target.r - sensor.receivedColor.r;
+                        const dg = sensor.target.g - sensor.receivedColor.g;
+                        const db = sensor.target.b - sensor.receivedColor.b;
+                        const distance = Math.sqrt(dr * dr + dg * dg + db * db);
+                        
+                        if (distance < 15) {
+                            colorDiv.classList.add('matched');
+                        }
+                    }
+                    
+                    div.appendChild(colorDiv);
+                    container.appendChild(div);
+                }
+            }
+
+            showVictory() {
+                document.getElementById('victorySteps').textContent = this.steps;
+                const modal = document.getElementById('victoryModal');
+                modal.classList.add('show');
+                
+                setTimeout(() => {
+                    modal.classList.remove('show');
+                }, 4000);
+            }
+
+            hideVictory() {
+                document.getElementById('victoryModal').classList.remove('show');
+            }
+
+            showWarning() {
+                const toast = document.getElementById('warningToast');
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 2000);
+            }
+
+            updateUI() {
+                document.getElementById('stepCount').textContent = this.steps;
+            }
+
+            gameLoop() {
+                this.render();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+
+            render() {
+                const ctx = this.ctx;
+                const cs = this.cellSize;
+
+                ctx.fillStyle = 'rgba(26, 26, 46, 0.95)';
+                ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 8; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(i * cs, 0);
+                    ctx.lineTo(i * cs, 8 * cs);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(0, i * cs);
+                    ctx.lineTo(8 * cs, i * cs);
+                    ctx.stroke();
+                }
+
+                this.renderLightPaths();
+                this.renderSources();
+                this.renderSensors();
+                this.renderElements();
+
+                if (this.loopWarning) {
+                    ctx.fillStyle = 'rgba(255, 107, 107, 0.3)';
+                    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                }
+            }
+
+            renderLightPaths() {
+                const ctx = this.ctx;
+                const cs = this.cellSize;
+
+                for (const path of this.lightPaths) {
+                    if (path.length < 2) continue;
+
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        path[0].x * cs + cs / 2,
+                        path[0].y * cs + cs / 2
+                    );
+
+                    for (let i = 1; i < path.length; i++) {
+                        ctx.lineTo(
+                            path[i].x * cs + cs / 2,
+                            path[i].y * cs + cs / 2
+                        );
+                    }
+
+                    const lastPoint = path[path.length - 1];
+                    ctx.strokeStyle = `rgba(${lastPoint.color.r}, ${lastPoint.color.g}, ${lastPoint.color.b}, 0.8)`;
+                    ctx.lineWidth = 4;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.stroke();
+
+                    ctx.strokeStyle = `rgba(${lastPoint.color.r}, ${lastPoint.color.g}, ${lastPoint.color.b}, 0.3)`;
+                    ctx.lineWidth = 10;
+                    ctx.stroke();
+                }
+            }
+
+            renderSources() {
+                const ctx = this.ctx;
+                const cs = this.cellSize;
+                const level = LEVELS[this.currentLevel];
+
+                for (const source of level.sources) {
+                    const cx = source.x * cs + cs / 2;
+                    const cy = source.y * cs + cs / 2;
+
+                    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, cs * 0.6);
+                    gradient.addColorStop(0, `rgba(${source.color.r}, ${source.color.g}, ${source.color.b}, 0.8)`);
+                    gradient.addColorStop(1, `rgba(${source.color.r}, ${source.color.g}, ${source.color.b}, 0)`);
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, cs * 0.6, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = `rgb(${source.color.r}, ${source.color.g}, ${source.color.b})`;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, cs * 0.25, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#fff';
+                    ctx.font = `bold ${cs * 0.25}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('☀', cx, cy);
+                }
+            }
+
+            renderSensors() {
+                const ctx = this.ctx;
+                const cs = this.cellSize;
+                const level = LEVELS[this.currentLevel];
+
+                for (const sensor of level.sensors) {
+                    const cx = sensor.x * cs + cs / 2;
+                    const cy = sensor.y * cs + cs / 2;
+
+                    ctx.strokeStyle = `rgb(${sensor.target.r}, ${sensor.target.g}, ${sensor.target.b})`;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, cs * 0.35, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    if (sensor.receivedColor) {
+                        ctx.fillStyle = `rgba(${sensor.receivedColor.r}, ${sensor.receivedColor.g}, ${sensor.receivedColor.b}, 0.6)`;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, cs * 0.3, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    ctx.fillStyle = '#fff';
+                    ctx.font = `${cs * 0.25}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('◉', cx, cy);
+                }
+            }
+
+            renderElements() {
+                const ctx = this.ctx;
+                const cs = this.cellSize;
+
+                for (const element of this.elements) {
+                    let x = element.x;
+                    let y = element.y;
+                    
+                    if (element.dragX !== null) {
+                        x = element.dragX;
+                        y = element.dragY;
+                    }
+
+                    const cx = x * cs + cs / 2;
+                    const cy = y * cs + cs / 2;
+
+                    ctx.save();
+                    ctx.translate(cx, cy);
+                    ctx.rotate(element.rotation * Math.PI / 180);
+
+                    if (element === this.selectedPlaced) {
+                        ctx.strokeStyle = '#4ecdc4';
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(-cs * 0.4, -cs * 0.4, cs * 0.8, cs * 0.8);
+                    }
+
+                    this.drawElementIcon(ctx, element.type, cs);
+
+                    ctx.restore();
+                }
+            }
+
+            drawElementIcon(ctx, type, cs) {
+                const size = cs * 0.35;
+
+                switch (type) {
+                    case 'mirror':
+                        ctx.strokeStyle = '#4ecdc4';
+                        ctx.lineWidth = 3;
+                        ctx.lineCap = 'round';
+                        ctx.beginPath();
+                        ctx.moveTo(-size, size);
+                        ctx.lineTo(size, -size);
+                        ctx.stroke();
+                        ctx.fillStyle = '#4ecdc4';
+                        ctx.beginPath();
+                        ctx.arc(0, 0, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                        break;
+
+                    case 'splitter':
+                        ctx.strokeStyle = '#ff6b6b';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([4, 2]);
+                        ctx.beginPath();
+                        ctx.moveTo(-size, size);
+                        ctx.lineTo(size, -size);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        ctx.beginPath();
+                        ctx.moveTo(-size, 0);
+                        ctx.lineTo(size, 0);
+                        ctx.stroke();
+                        ctx.fillStyle = '#ff6b6b';
+                        ctx.beginPath();
+                        ctx.arc(0, 0, 5, 0, Math.PI * 2);
+                        ctx.fill();
+                        break;
+
+                    case 'filterR':
+                        ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                        ctx.strokeStyle = '#ff4444';
+                        ctx.lineWidth = 2;
+                        ctx.fillRect(-size, -size, size * 2, size * 2);
+                        ctx.strokeRect(-size, -size, size * 2, size * 2);
+                        ctx.fillStyle = '#fff';
+                        ctx.font = `bold ${size}px sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('R', 0, 0);
+                        break;
+
+                    case 'filterG':
+                        ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
+                        ctx.strokeStyle = '#44ff44';
+                        ctx.lineWidth = 2;
+                        ctx.fillRect(-size, -size, size * 2, size * 2);
+                        ctx.strokeRect(-size, -size, size * 2, size * 2);
+                        ctx.fillStyle = '#fff';
+                        ctx.font = `bold ${size}px sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('G', 0, 0);
+                        break;
+
+                    case 'filterB':
+                        ctx.fillStyle = 'rgba(0, 0, 255, 0.5)';
+                        ctx.strokeStyle = '#4444ff';
+                        ctx.lineWidth = 2;
+                        ctx.fillRect(-size, -size, size * 2, size * 2);
+                        ctx.strokeRect(-size, -size, size * 2, size * 2);
+                        ctx.fillStyle = '#fff';
+                        ctx.font = `bold ${size}px sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('B', 0, 0);
+                        break;
+
+                    case 'prism':
+                        ctx.fillStyle = 'rgba(147, 112, 219, 0.5)';
+                        ctx.strokeStyle = '#9370db';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(0, -size);
+                        ctx.lineTo(size, size);
+                        ctx.lineTo(-size, size);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.stroke();
+                        break;
+
+                    case 'blocker':
+                        ctx.fillStyle = '#666';
+                        ctx.strokeStyle = '#888';
+                        ctx.lineWidth = 2;
+                        ctx.fillRect(-size, -size / 2, size * 2, size);
+                        ctx.strokeRect(-size, -size / 2, size * 2, size);
+                        ctx.beginPath();
+                        ctx.moveTo(-size * 0.7, -size * 0.7);
+                        ctx.lineTo(-size * 0.7, size * 0.7);
+                        ctx.moveTo(size * 0.7, -size * 0.7);
+                        ctx.lineTo(size * 0.7, size * 0.7);
+                        ctx.stroke();
+                        break;
+                }
+            }
+
+            loadExternalLevel(levelData) {
+                LEVELS.push(levelData);
+                this.renderLevelGrid();
+            }
+        }
+
+        const game = new LightPuzzleGame();
+    </script>
+</body>
+</html>

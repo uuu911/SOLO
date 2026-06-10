@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>街头篮球1v1</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #1a1a2e; 
+            display: flex; 
+            flex-direction: column;
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh;
+            font-family: 'Arial', sans-serif;
+            color: white;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #gameCanvas {
+            border: 4px solid #e94560;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(233, 69, 96, 0.5);
+            background: #2d3436;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 40px;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+        .score-box {
+            background: rgba(0,0,0,0.6);
+            padding: 8px 20px;
+            border-radius: 8px;
+            border: 2px solid #e94560;
+        }
+        #controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        #btnRookie {
+            background: #00b894;
+            color: white;
+        }
+        #btnVeteran {
+            background: #e94560;
+            color: white;
+        }
+        #btnRookie:hover, #btnVeteran:hover {
+            transform: scale(1.1);
+        }
+        #info {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #b2bec3;
+            text-align: center;
+        }
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            padding: 30px 50px;
+            border-radius: 15px;
+            text-align: center;
+            display: none;
+            z-index: 100;
+            border: 3px solid #e94560;
+        }
+        #gameOver h2 {
+            color: #e94560;
+            margin-bottom: 20px;
+            font-size: 32px;
+        }
+        #gameOver button {
+            background: #e94560;
+            color: white;
+            padding: 15px 30px;
+            font-size: 18px;
+        }
+        .active-difficulty {
+            box-shadow: 0 0 15px currentColor;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">
+            <div class="score-box">玩家: <span id="playerScore">0</span></div>
+            <div class="score-box">AI: <span id="aiScore">0</span></div>
+        </div>
+        <div id="gameOver">
+            <h2 id="winnerText"></h2>
+            <button onclick="Game.restart()">再来一局</button>
+        </div>
+    </div>
+    <div id="controls">
+        <button id="btnRookie" onclick="Game.setDifficulty('rookie')">菜鸟模式</button>
+        <button id="btnVeteran" onclick="Game.setDifficulty('veteran')">街头老手</button>
+    </div>
+    <div id="info">
+        方向键移动 | 空格键按住蓄力投篮/抢断/盖帽 | 先得11分且领先2分获胜
+    </div>
+
+    <script>
+        const CONFIG = {
+            CANVAS_WIDTH: 400,
+            CANVAS_HEIGHT: 700,
+            SCALE: 1,
+            PLAYER_SIZE: 30,
+            BALL_SIZE: 12,
+            PLAYER_SPEED: 5,
+            FRICTION: 0.85,
+            GRAVITY: 0.5,
+            THREE_POINT_Y: 450,
+            HOOP_X: 200,
+            HOOP_Y: 80,
+            HOOP_RADIUS: 25,
+            BACKBOARD_X: 200,
+            BACKBOARD_Y: 50,
+            BACKBOARD_WIDTH: 100,
+            BACKBOARD_HEIGHT: 10,
+            FREEZE_TIME: 1000,
+            MAX_CHARGE: 100,
+            CHARGE_SPEED: 2,
+            PERFECT_CHARGE_MIN: 60,
+            PERFECT_CHARGE_MAX: 85,
+        };
+    </script>
+
+    <script>
+        const AudioSystem = (function() {
+            let audioCtx = null;
+
+            function init() {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            function playTone(frequency, duration, type = 'sine', volume = 0.3) {
+                if (!audioCtx) init();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.frequency.value = frequency;
+                oscillator.type = type;
+                gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + duration);
+            }
+
+            function dribble() {
+                playTone(150 + Math.random() * 50, 0.1, 'square', 0.2);
+            }
+
+            function score() {
+                playTone(523, 0.1, 'sine', 0.4);
+                setTimeout(() => playTone(659, 0.1, 'sine', 0.4), 100);
+                setTimeout(() => playTone(784, 0.15, 'sine', 0.4), 200);
+            }
+
+            function miss() {
+                playTone(200, 0.15, 'sawtooth', 0.3);
+                setTimeout(() => playTone(150, 0.2, 'sawtooth', 0.2), 100);
+            }
+
+            function foul() {
+                playTone(800, 0.1, 'square', 0.5);
+                setTimeout(() => playTone(600, 0.1, 'square', 0.5), 150);
+                setTimeout(() => playTone(800, 0.1, 'square', 0.5), 300);
+                setTimeout(() => playTone(600, 0.2, 'square', 0.5), 450);
+            }
+
+            return {
+                init,
+                dribble,
+                score,
+                miss,
+                foul
+            };
+        })();
+    </script>
+
+    <script>
+        const Court = (function() {
+            function draw(ctx) {
+                ctx.fillStyle = '#2d3436';
+                ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+
+                ctx.fillStyle = '#636e72';
+                ctx.fillRect(50, 20, CONFIG.CANVAS_WIDTH - 100, CONFIG.CANVAS_HEIGHT - 40);
+
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+
+                ctx.beginPath();
+                ctx.moveTo(100, CONFIG.CANVAS_HEIGHT - 20);
+                ctx.lineTo(100, CONFIG.THREE_POINT_Y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(300, CONFIG.CANVAS_HEIGHT - 20);
+                ctx.lineTo(300, CONFIG.THREE_POINT_Y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(200, CONFIG.THREE_POINT_Y, 100, Math.PI, 0);
+                ctx.stroke();
+
+                ctx.strokeStyle = '#ff7675';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([10, 5]);
+                ctx.beginPath();
+                ctx.moveTo(150, 200);
+                ctx.lineTo(150, 150);
+                ctx.arc(200, 150, 50, Math.PI, 0);
+                ctx.lineTo(250, 200);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(150, 200);
+                ctx.lineTo(150, 180);
+                ctx.lineTo(250, 180);
+                ctx.lineTo(250, 200);
+                ctx.stroke();
+
+                ctx.fillStyle = '#dfe6e9';
+                ctx.fillRect(
+                    CONFIG.BACKBOARD_X - CONFIG.BACKBOARD_WIDTH / 2,
+                    CONFIG.BACKBOARD_Y,
+                    CONFIG.BACKBOARD_WIDTH,
+                    CONFIG.BACKBOARD_HEIGHT
+                );
+
+                ctx.strokeStyle = '#ff7675';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(CONFIG.HOOP_X, CONFIG.HOOP_Y, CONFIG.HOOP_RADIUS, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(CONFIG.HOOP_X - CONFIG.HOOP_RADIUS, CONFIG.HOOP_Y);
+                ctx.lineTo(CONFIG.HOOP_X - CONFIG.HOOP_RADIUS, CONFIG.BACKBOARD_Y + CONFIG.BACKBOARD_HEIGHT);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(CONFIG.HOOP_X + CONFIG.HOOP_RADIUS, CONFIG.HOOP_Y);
+                ctx.lineTo(CONFIG.HOOP_X + CONFIG.HOOP_RADIUS, CONFIG.BACKBOARD_Y + CONFIG.BACKBOARD_HEIGHT);
+                ctx.stroke();
+            }
+
+            function isOutOfBounds(x, y) {
+                return x < 50 + CONFIG.BALL_SIZE || 
+                       x > CONFIG.CANVAS_WIDTH - 50 - CONFIG.BALL_SIZE ||
+                       y < 20 || 
+                       y > CONFIG.CANVAS_HEIGHT - 20;
+            }
+
+            function isThreePoint(y) {
+                return y > CONFIG.THREE_POINT_Y;
+            }
+
+            function isBeyondThreePoint(y) {
+                return y > CONFIG.THREE_POINT_Y + 30;
+            }
+
+            return {
+                draw,
+                isOutOfBounds,
+                isThreePoint,
+                isBeyondThreePoint
+            };
+        })();
+    </script>
+
+    <script>
+        const Ball = (function() {
+            let x = CONFIG.HOOP_X;
+            let y = CONFIG.THREE_POINT_Y + 50;
+            let vx = 0;
+            let vy = 0;
+            let isHeld = true;
+            let holder = null;
+            let lastDribbleTime = 0;
+
+            function reset(newX, newY) {
+                x = newX || CONFIG.HOOP_X + (Math.random() - 0.5) * 40;
+                y = newY || CONFIG.THREE_POINT_Y + 50;
+                vx = 0;
+                vy = 0;
+                isHeld = true;
+                holder = null;
+            }
+
+            function setHolder(player) {
+                holder = player;
+                isHeld = true;
+                vx = 0;
+                vy = 0;
+            }
+
+            function release(forceX, forceY) {
+                if (holder) {
+                    x = holder.x;
+                    y = holder.y - 20;
+                }
+                holder = null;
+                isHeld = false;
+                vx = forceX;
+                vy = forceY;
+            }
+
+            function shoot(charge, direction) {
+                const power = charge * 0.15;
+                release(direction * power * 0.5, -power);
+            }
+
+            function update(players) {
+                if (isHeld && holder) {
+                    x = holder.x;
+                    y = holder.y - 25;
+                    if (Date.now() - lastDribbleTime > 300 && holder.isMoving) {
+                        AudioSystem.dribble();
+                        lastDribbleTime = Date.now();
+                    }
+                    return;
+                }
+
+                vy += CONFIG.GRAVITY;
+                x += vx;
+                y += vy;
+                vx *= 0.995;
+
+                if (x < 50 + CONFIG.BALL_SIZE) {
+                    x = 50 + CONFIG.BALL_SIZE;
+                    vx = -vx * 0.7;
+                }
+                if (x > CONFIG.CANVAS_WIDTH - 50 - CONFIG.BALL_SIZE) {
+                    x = CONFIG.CANVAS_WIDTH - 50 - CONFIG.BALL_SIZE;
+                    vx = -vx * 0.7;
+                }
+                if (y > CONFIG.CANVAS_HEIGHT - 20 - CONFIG.BALL_SIZE) {
+                    y = CONFIG.CANVAS_HEIGHT - 20 - CONFIG.BALL_SIZE;
+                    vy = -vy * 0.5;
+                    vx *= 0.8;
+                    if (Math.abs(vy) > 1) {
+                        AudioSystem.dribble();
+                        lastDribbleTime = Date.now();
+                    }
+                }
+
+                const backboardLeft = CONFIG.BACKBOARD_X - CONFIG.BACKBOARD_WIDTH / 2;
+                const backboardRight = CONFIG.BACKBOARD_X + CONFIG.BACKBOARD_WIDTH / 2;
+                const backboardTop = CONFIG.BACKBOARD_Y;
+                const backboardBottom = CONFIG.BACKBOARD_Y + CONFIG.BACKBOARD_HEIGHT;
+
+                if (y < backboardBottom && y > backboardTop - 10 && 
+                    x > backboardLeft - CONFIG.BALL_SIZE && x < backboardRight + CONFIG.BALL_SIZE) {
+                    if (vy < 0) {
+                        vy = -vy * 0.5 + (Math.random() - 0.5) * 2;
+                        vx += (Math.random() - 0.5) * 3;
+                        y = backboardBottom;
+                        AudioSystem.miss();
+                    }
+                }
+
+                const hoopDist = Math.sqrt(
+                    Math.pow(x - CONFIG.HOOP_X, 2) + 
+                    Math.pow(y - CONFIG.HOOP_Y, 2)
+                );
+                
+                if (hoopDist < CONFIG.HOOP_RADIUS + CONFIG.BALL_SIZE && vy > 0) {
+                    if (Math.abs(x - CONFIG.HOOP_X) < 8 && y > CONFIG.HOOP_Y - 5) {
+                        return { type: 'score' };
+                    } else {
+                        const angle = Math.atan2(y - CONFIG.HOOP_Y, x - CONFIG.HOOP_X);
+                        const speed = Math.sqrt(vx * vx + vy * vy) * 0.6;
+                        vx = Math.cos(angle) * speed + (Math.random() - 0.5) * 2;
+                        vy = Math.sin(angle) * speed + (Math.random() - 0.5) * 2;
+                        AudioSystem.miss();
+                    }
+                }
+
+                for (let player of players) {
+                    const dist = Math.sqrt(Math.pow(x - player.x, 2) + Math.pow(y - player.y, 2));
+                    if (dist < CONFIG.PLAYER_SIZE && y > player.y - 40) {
+                        if (player.canGrab && !isHeld && Math.abs(vy) < 8) {
+                            setHolder(player);
+                            return { type: 'rebound', player };
+                        }
+                    }
+                }
+
+                return null;
+            }
+
+            function draw(ctx) {
+                ctx.fillStyle = '#e17055';
+                ctx.beginPath();
+                ctx.arc(x, y, CONFIG.BALL_SIZE, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = '#2d3436';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(x, y, CONFIG.BALL_SIZE, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(x - CONFIG.BALL_SIZE, y);
+                ctx.lineTo(x + CONFIG.BALL_SIZE, y);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(x, y - CONFIG.BALL_SIZE);
+                ctx.lineTo(x, y + CONFIG.BALL_SIZE);
+                ctx.stroke();
+            }
+
+            return {
+                reset,
+                setHolder,
+                release,
+                shoot,
+                update,
+                draw,
+                get x() { return x; },
+                get y() { return y; },
+                get vx() { return vx; },
+                get vy() { return vy; },
+                get isHeld() { return isHeld; },
+                get holder() { return holder; }
+            };
+        })();
+    </script>
+
+    <script>
+        const Player = (function() {
+            function Player(isPlayer) {
+                this.x = isPlayer ? CONFIG.HOOP_X : CONFIG.HOOP_X;
+                this.y = isPlayer ? CONFIG.CANVAS_HEIGHT - 100 : 150;
+                this.vx = 0;
+                this.vy = 0;
+                this.isPlayer = isPlayer;
+                this.charge = 0;
+                this.isCharging = false;
+                this.color = isPlayer ? '#00b894' : '#e94560';
+                this.name = isPlayer ? '玩家' : 'AI';
+                this.isJumping = false;
+                this.jumpTime = 0;
+                this.canGrab = true;
+                this.isMoving = false;
+                this.foulCount = 0;
+            }
+
+            Player.prototype.move = function(dx, dy) {
+                this.vx += dx * 0.8;
+                this.vy += dy * 0.8;
+                this.isMoving = dx !== 0 || dy !== 0;
+            };
+
+            Player.prototype.jump = function() {
+                if (!this.isJumping) {
+                    this.vy -= 12;
+                    this.isJumping = true;
+                    this.jumpTime = Date.now();
+                }
+            };
+
+            Player.prototype.update = function() {
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                this.vx *= CONFIG.FRICTION;
+                this.vy *= CONFIG.FRICTION;
+
+                this.x = Math.max(50 + CONFIG.PLAYER_SIZE / 2, 
+                    Math.min(CONFIG.CANVAS_WIDTH - 50 - CONFIG.PLAYER_SIZE / 2, this.x));
+                this.y = Math.max(100, 
+                    Math.min(CONFIG.CANVAS_HEIGHT - 50 - CONFIG.PLAYER_SIZE / 2, this.y));
+
+                if (this.isJumping && Date.now() - this.jumpTime > 500) {
+                    this.isJumping = false;
+                }
+
+                if (this.isCharging) {
+                    this.charge = Math.min(CONFIG.MAX_CHARGE, this.charge + CONFIG.CHARGE_SPEED);
+                }
+            };
+
+            Player.prototype.startCharge = function() {
+                if (Ball.holder === this && !this.isCharging) {
+                    this.isCharging = true;
+                    this.charge = 0;
+                }
+            };
+
+            Player.prototype.releaseShot = function(defender) {
+                if (!this.isCharging) {
+                    if (Ball.holder !== this && Ball.holder) {
+                        this.attemptStealOrBlock(defender);
+                    }
+                    return null;
+                }
+
+                this.isCharging = false;
+                const currentCharge = this.charge;
+                this.charge = 0;
+
+                const hoopDir = CONFIG.HOOP_Y < this.y ? -1 : 1;
+                const distToHoop = Math.sqrt(
+                    Math.pow(CONFIG.HOOP_X - this.x, 2) + 
+                    Math.pow(CONFIG.HOOP_Y - this.y, 2)
+                );
+                
+                let hitProbability = 0.5;
+                
+                if (currentCharge >= CONFIG.PERFECT_CHARGE_MIN && currentCharge <= CONFIG.PERFECT_CHARGE_MAX) {
+                    hitProbability += 0.3;
+                } else {
+                    hitProbability -= 0.2;
+                }
+
+                hitProbability -= distToHoop * 0.001;
+
+                if (Court.isThreePoint(this.y)) {
+                    hitProbability -= 0.3;
+                }
+
+                if (defender) {
+                    const distToDefender = Math.sqrt(
+                        Math.pow(defender.x - this.x, 2) + 
+                        Math.pow(defender.y - this.y, 2)
+                    );
+                    if (distToDefender < 60) {
+                        hitProbability -= 0.2;
+                    }
+                    if (defender.isJumping && distToDefender < 80) {
+                        hitProbability -= 0.15;
+                    }
+                }
+
+                hitProbability = Math.max(0.1, Math.min(0.95, hitProbability));
+                const willHit = Math.random() < hitProbability;
+
+                let aimX = CONFIG.HOOP_X - this.x;
+                let aimY = CONFIG.HOOP_Y - this.y - 30;
+                
+                if (!willHit) {
+                    aimX += (Math.random() - 0.5) * 60;
+                    aimY += (Math.random() - 0.5) * 40;
+                }
+
+                const power = currentCharge * 0.12;
+                const dirX = aimX / distToHoop;
+                const dirY = aimY / distToHoop;
+
+                Ball.shoot(currentCharge, 0);
+                Ball.vx = dirX * power * 0.8;
+                Ball.vy = dirY * power - 2;
+
+                return { charge: currentCharge, hitProbability };
+            };
+
+            Player.prototype.attemptStealOrBlock = function(ballHandler) {
+                const dist = Math.sqrt(
+                    Math.pow(ballHandler.x - this.x, 2) + 
+                    Math.pow(ballHandler.y - this.y, 2)
+                );
+
+                if (dist < 50) {
+                    if (ballHandler.isCharging) {
+                        if (Math.random() < 0.4) {
+                            ballHandler.isCharging = false;
+                            ballHandler.charge = 0;
+                            Ball.release((Math.random() - 0.5) * 5, -3);
+                            AudioSystem.foul();
+                            return { type: 'foul', fouler: this };
+                        }
+                    } else {
+                        if (Math.random() < 0.3) {
+                            Ball.setHolder(this);
+                            return { type: 'steal' };
+                        } else if (Math.random() < 0.15) {
+                            AudioSystem.foul();
+                            return { type: 'foul', fouler: this };
+                        }
+                    }
+                }
+                return null;
+            };
+
+            Player.prototype.draw = function(ctx) {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y - (this.isJumping ? 15 : 0), CONFIG.PLAYER_SIZE / 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y - (this.isJumping ? 15 : 0), CONFIG.PLAYER_SIZE / 2, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(this.x - 5, this.y - 5 - (this.isJumping ? 15 : 0), 4, 0, Math.PI * 2);
+                ctx.arc(this.x + 5, this.y - 5 - (this.isJumping ? 15 : 0), 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (this.isCharging) {
+                    const barWidth = 40;
+                    const barHeight = 6;
+                    const barX = this.x - barWidth / 2;
+                    const barY = this.y - 55 - (this.isJumping ? 15 : 0);
+                    
+                    ctx.fillStyle = '#2d3436';
+                    ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+                    
+                    const chargeRatio = this.charge / CONFIG.MAX_CHARGE;
+                    let barColor = '#00b894';
+                    if (chargeRatio > CONFIG.PERFECT_CHARGE_MIN / CONFIG.MAX_CHARGE && 
+                        chargeRatio < CONFIG.PERFECT_CHARGE_MAX / CONFIG.MAX_CHARGE) {
+                        barColor = '#fdcb6e';
+                    }
+                    if (chargeRatio >= CONFIG.PERFECT_CHARGE_MAX / CONFIG.MAX_CHARGE) {
+                        barColor = '#e17055';
+                    }
+                    
+                    ctx.fillStyle = barColor;
+                    ctx.fillRect(barX, barY, barWidth * chargeRatio, barHeight);
+                }
+
+                if (Ball.holder === this) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('持球', this.x, this.y + 25);
+                }
+            };
+
+            return Player;
+        })();
+    </script>
+
+    <script>
+        const AI = (function() {
+            let difficulty = 'rookie';
+            let state = 'defending';
+            let targetX = CONFIG.HOOP_X;
+            let targetY = 150;
+            let decisionTimer = 0;
+            let shotTimer = 0;
+
+            function setDifficulty(level) {
+                difficulty = level;
+            }
+
+            function update(aiPlayer, player, ball) {
+                const reactionSpeed = difficulty === 'rookie' ? 0.3 : 0.6;
+                const aggressiveness = difficulty === 'rookie' ? 0.3 : 0.7;
+
+                decisionTimer++;
+                if (decisionTimer > (difficulty === 'rookie' ? 60 : 30)) {
+                    decisionTimer = 0;
+                    makeDecision(aiPlayer, player, ball);
+                }
+
+                if (ball.holder === aiPlayer) {
+                    state = 'attacking';
+                    handleAttack(aiPlayer, player, aggressiveness);
+                } else if (ball.holder === player) {
+                    state = 'defending';
+                    handleDefense(aiPlayer, player, aggressiveness);
+                } else {
+                    state = 'chasing';
+                    handleChase(aiPlayer, ball);
+                }
+
+                aiPlayer.vx += (targetX - aiPlayer.x) * 0.05 * reactionSpeed;
+                aiPlayer.vy += (targetY - aiPlayer.y) * 0.05 * reactionSpeed;
+            }
+
+            function makeDecision(aiPlayer, player, ball) {
+                if (ball.holder === aiPlayer) {
+                    const distToHoop = Math.sqrt(
+                        Math.pow(CONFIG.HOOP_X - aiPlayer.x, 2) + 
+                        Math.pow(CONFIG.HOOP_Y - aiPlayer.y, 2)
+                    );
+                    const distToPlayer = Math.sqrt(
+                        Math.pow(player.x - aiPlayer.x, 2) + 
+                        Math.pow(player.y - aiPlayer.y, 2)
+                    );
+
+                    if (distToPlayer > 80 || Court.isThreePoint(aiPlayer.y)) {
+                        if (Math.random() < (difficulty === 'rookie' ? 0.3 : 0.6)) {
+                            shotTimer = 30;
+                        }
+                    }
+                }
+            }
+
+            function handleAttack(aiPlayer, player, aggressiveness) {
+                const distToHoop = CONFIG.HOOP_Y - aiPlayer.y;
+                const distToPlayer = Math.sqrt(
+                    Math.pow(player.x - aiPlayer.x, 2) + 
+                    Math.pow(player.y - aiPlayer.y, 2)
+                );
+
+                if (Court.isBeyondThreePoint(aiPlayer.y)) {
+                    targetY = CONFIG.THREE_POINT_Y - 50;
+                    targetX = CONFIG.HOOP_X + (Math.random() - 0.5) * 100;
+                } else if (distToPlayer < 60) {
+                    targetX = aiPlayer.x + (player.x > aiPlayer.x ? -1 : 1) * 50;
+                    targetY = aiPlayer.y + (player.y > aiPlayer.y ? -1 : 1) * 30;
+                } else {
+                    targetY = Math.max(120, aiPlayer.y - 30);
+                    targetX = CONFIG.HOOP_X + (Math.random() - 0.5) * 80;
+                }
+
+                if (shotTimer > 0) {
+                    shotTimer--;
+                    if (shotTimer === 0) {
+                        aiPlayer.startCharge();
+                        setTimeout(() => {
+                            aiPlayer.releaseShot(player);
+                        }, difficulty === 'rookie' ? 500 : 350);
+                    }
+                }
+
+                if (distToHoop < 100 && distToPlayer > 70) {
+                    aiPlayer.startCharge();
+                    setTimeout(() => {
+                        aiPlayer.releaseShot(player);
+                    }, difficulty === 'rookie' ? 600 : 400);
+                }
+            }
+
+            function handleDefense(aiPlayer, player, aggressiveness) {
+                const hoopDirY = Math.sign(CONFIG.HOOP_Y - player.y);
+                const idealX = player.x;
+                const idealY = player.y + hoopDirY * 40;
+
+                const distToPlayer = Math.sqrt(
+                    Math.pow(player.x - aiPlayer.x, 2) + 
+                    Math.pow(player.y - aiPlayer.y, 2)
+                );
+
+                targetX = idealX + (Math.random() - 0.5) * 20;
+                targetY = idealY + (Math.random() - 0.5) * 10;
+
+                if (player.isCharging && Math.random() < aggressiveness * 0.8) {
+                    aiPlayer.jump();
+                }
+
+                if (distToPlayer < 50 && !player.isCharging && Math.random() < aggressiveness * 0.3) {
+                    aiPlayer.releaseShot(player);
+                }
+            }
+
+            function handleChase(aiPlayer, ball) {
+                targetX = ball.x;
+                targetY = ball.y;
+            }
+
+            return {
+                setDifficulty,
+                update,
+                get difficulty() { return difficulty; }
+            };
+        })();
+    </script>
+
+    <script>
+        const Input = (function() {
+            const keys = {};
+
+            function init() {
+                document.addEventListener('keydown', (e) => {
+                    keys[e.code] = true;
+                    if (e.code === 'Space') {
+                        e.preventDefault();
+                        if (GameGlobals.player) {
+                            GameGlobals.player.startCharge();
+                        }
+                    }
+                });
+
+                document.addEventListener('keyup', (e) => {
+                    keys[e.code] = false;
+                    if (e.code === 'Space') {
+                        e.preventDefault();
+                        if (GameGlobals.player) {
+                            GameGlobals.player.releaseShot(GameGlobals.aiPlayer);
+                        }
+                    }
+                });
+            }
+
+            function update(player) {
+                let dx = 0, dy = 0;
+                if (keys['ArrowLeft'] || keys['KeyA']) dx -= 1;
+                if (keys['ArrowRight'] || keys['KeyD']) dx += 1;
+                if (keys['ArrowUp'] || keys['KeyW']) dy -= 1;
+                if (keys['ArrowDown'] || keys['KeyS']) dy += 1;
+                player.move(dx, dy);
+            }
+
+            return {
+                init,
+                update
+            };
+        })();
+    </script>
+
+    <script>
+        const GameGlobals = {
+            ctx: null,
+            canvas: null,
+            player: null,
+            aiPlayer: null,
+            playerScore: 0,
+            aiScore: 0,
+            isFrozen: false,
+            possession: 'player',
+            mustClearThreePoint: false,
+            hasClearedThreePoint: true
+        };
+    </script>
+
+    <script>
+        const Game = (function() {
+            let animationId;
+            let backboardHitTime = 0;
+            let backboardHitOffset = 0;
+
+            function init() {
+                GameGlobals.canvas = document.getElementById('gameCanvas');
+                GameGlobals.ctx = GameGlobals.canvas.getContext('2d');
+                
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+
+                GameGlobals.player = new Player(true);
+                GameGlobals.aiPlayer = new Player(false);
+                Ball.setHolder(GameGlobals.player);
+
+                Input.init();
+                AudioSystem.init();
+
+                updateScoreUI();
+                updateDifficultyButtons();
+
+                gameLoop();
+            }
+
+            function resizeCanvas() {
+                const maxWidth = Math.min(window.innerWidth - 40, 400);
+                const maxHeight = Math.min(window.innerHeight - 200, 700);
+                
+                const scaleX = maxWidth / CONFIG.CANVAS_WIDTH;
+                const scaleY = maxHeight / CONFIG.CANVAS_HEIGHT;
+                CONFIG.SCALE = Math.min(scaleX, scaleY);
+
+                GameGlobals.canvas.width = CONFIG.CANVAS_WIDTH;
+                GameGlobals.canvas.height = CONFIG.CANVAS_HEIGHT;
+                GameGlobals.canvas.style.width = (CONFIG.CANVAS_WIDTH * CONFIG.SCALE) + 'px';
+                GameGlobals.canvas.style.height = (CONFIG.CANVAS_HEIGHT * CONFIG.SCALE) + 'px';
+            }
+
+            function setDifficulty(level) {
+                AI.setDifficulty(level);
+                updateDifficultyButtons();
+            }
+
+            function updateDifficultyButtons() {
+                document.getElementById('btnRookie').classList.toggle('active-difficulty', 
+                    AI.difficulty === 'rookie');
+                document.getElementById('btnVeteran').classList.toggle('active-difficulty', 
+                    AI.difficulty === 'veteran');
+            }
+
+            function updateScoreUI() {
+                document.getElementById('playerScore').textContent = GameGlobals.playerScore;
+                document.getElementById('aiScore').textContent = GameGlobals.aiScore;
+            }
+
+            function checkWinCondition() {
+                const p = GameGlobals.playerScore;
+                const a = GameGlobals.aiScore;
+                
+                if ((p >= 11 || a >= 11) && Math.abs(p - a) >= 2) {
+                    const winner = p > a ? '玩家' : 'AI';
+                    document.getElementById('winnerText').textContent = `${winner}获胜！`;
+                    document.getElementById('gameOver').style.display = 'block';
+                    return true;
+                }
+                return false;
+            }
+
+            function freezeAndServe(scorer) {
+                GameGlobals.isFrozen = true;
+                
+                setTimeout(() => {
+                    GameGlobals.isFrozen = false;
+                    GameGlobals.possession = scorer === 'player' ? 'aiPlayer' : 'player';
+                    GameGlobals.mustClearThreePoint = true;
+                    GameGlobals.hasClearedThreePoint = false;
+
+                    const serveX = CONFIG.HOOP_X + (Math.random() - 0.5) * 80;
+                    const serveY = CONFIG.THREE_POINT_Y + 50;
+
+                    if (GameGlobals.possession === 'player') {
+                        GameGlobals.player.x = serveX;
+                        GameGlobals.player.y = serveY + 30;
+                        GameGlobals.aiPlayer.x = CONFIG.HOOP_X;
+                        GameGlobals.aiPlayer.y = 200;
+                        Ball.setHolder(GameGlobals.player);
+                    } else {
+                        GameGlobals.aiPlayer.x = serveX;
+                        GameGlobals.aiPlayer.y = serveY + 30;
+                        GameGlobals.player.x = CONFIG.HOOP_X;
+                        GameGlobals.player.y = CONFIG.CANVAS_HEIGHT - 150;
+                        Ball.setHolder(GameGlobals.aiPlayer);
+                    }
+                }, CONFIG.FREEZE_TIME);
+            }
+
+            function handleRebound(rebounder) {
+                if (rebounder === GameGlobals.player) {
+                    if (GameGlobals.possession === 'aiPlayer') {
+                        GameGlobals.possession = 'player';
+                        GameGlobals.mustClearThreePoint = true;
+                        GameGlobals.hasClearedThreePoint = false;
+                    }
+                } else {
+                    if (GameGlobals.possession === 'player') {
+                        GameGlobals.possession = 'aiPlayer';
+                        GameGlobals.mustClearThreePoint = true;
+                        GameGlobals.hasClearedThreePoint = false;
+                    }
+                }
+            }
+
+            function handleFoul(fouler) {
+                fouler.foulCount++;
+                
+                if (fouler === GameGlobals.player) {
+                    if (Math.random() < 0.7) {
+                        GameGlobals.aiScore += 1;
+                    }
+                    if (Math.random() < 0.7) {
+                        GameGlobals.aiScore += 1;
+                    }
+                    freezeAndServe('aiPlayer');
+                } else {
+                    if (Math.random() < 0.7) {
+                        GameGlobals.playerScore += 1;
+                    }
+                    if (Math.random() < 0.7) {
+                        GameGlobals.playerScore += 1;
+                    }
+                    freezeAndServe('player');
+                }
+                updateScoreUI();
+            }
+
+            function gameLoop() {
+                if (!GameGlobals.isFrozen) {
+                    update();
+                }
+                render();
+                animationId = requestAnimationFrame(gameLoop);
+            }
+
+            function update() {
+                Input.update(GameGlobals.player);
+                GameGlobals.player.update();
+                GameGlobals.aiPlayer.update();
+                AI.update(GameGlobals.aiPlayer, GameGlobals.player, Ball);
+
+                if (GameGlobals.mustClearThreePoint && GameGlobals.possession === 'player') {
+                    if (Court.isBeyondThreePoint(GameGlobals.player.y)) {
+                        GameGlobals.hasClearedThreePoint = true;
+                    }
+                } else if (GameGlobals.mustClearThreePoint && GameGlobals.possession === 'aiPlayer') {
+                    if (Court.isBeyondThreePoint(GameGlobals.aiPlayer.y)) {
+                        GameGlobals.hasClearedThreePoint = true;
+                    }
+                }
+
+                const ballResult = Ball.update([GameGlobals.player, GameGlobals.aiPlayer]);
+                
+                if (ballResult) {
+                    if (ballResult.type === 'score') {
+                        const scorer = Ball.holder === GameGlobals.player ? 'player' : 'aiPlayer';
+                        const isThree = Court.isThreePoint(
+                            Ball.holder === GameGlobals.player ? GameGlobals.player.y : GameGlobals.aiPlayer.y
+                        );
+                        const points = isThree ? 3 : 2;
+
+                        if (scorer === 'player') {
+                            GameGlobals.playerScore += points;
+                        } else {
+                            GameGlobals.aiScore += points;
+                        }
+
+                        AudioSystem.score();
+                        backboardHitTime = Date.now();
+                        backboardHitOffset = 5;
+                        updateScoreUI();
+                        
+                        if (!checkWinCondition()) {
+                            freezeAndServe(scorer);
+                        }
+                    } else if (ballResult.type === 'rebound') {
+                        handleRebound(ballResult.player);
+                    } else if (ballResult.type === 'foul') {
+                        handleFoul(ballResult.fouler);
+                    }
+                }
+
+                if (backboardHitOffset > 0) {
+                    backboardHitOffset *= 0.9;
+                    if (backboardHitOffset < 0.1) backboardHitOffset = 0;
+                }
+            }
+
+            function render() {
+                const ctx = GameGlobals.ctx;
+                ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+
+                Court.draw(ctx);
+
+                if (backboardHitOffset > 0) {
+                    ctx.fillStyle = '#fdcb6e';
+                    ctx.fillRect(
+                        CONFIG.BACKBOARD_X - CONFIG.BACKBOARD_WIDTH / 2 - backboardHitOffset,
+                        CONFIG.BACKBOARD_Y - backboardHitOffset,
+                        CONFIG.BACKBOARD_WIDTH + backboardHitOffset * 2,
+                        CONFIG.BACKBOARD_HEIGHT + backboardHitOffset * 2
+                    );
+                }
+
+                if (GameGlobals.mustClearThreePoint && !GameGlobals.hasClearedThreePoint) {
+                    ctx.fillStyle = 'rgba(255, 118, 117, 0.3)';
+                    ctx.fillRect(50, CONFIG.THREE_POINT_Y, CONFIG.CANVAS_WIDTH - 100, 50);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '14px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('需带出三分线！', CONFIG.HOOP_X, CONFIG.THREE_POINT_Y + 30);
+                }
+
+                GameGlobals.player.draw(ctx);
+                GameGlobals.aiPlayer.draw(ctx);
+                Ball.draw(ctx);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(`球权: ${GameGlobals.possession === 'player' ? '玩家' : 'AI'}`, 55, CONFIG.CANVAS_HEIGHT - 35);
+            }
+
+            function restart() {
+                GameGlobals.playerScore = 0;
+                GameGlobals.aiScore = 0;
+                GameGlobals.isFrozen = false;
+                GameGlobals.possession = 'player';
+                GameGlobals.mustClearThreePoint = false;
+                GameGlobals.hasClearedThreePoint = true;
+
+                GameGlobals.player.x = CONFIG.HOOP_X;
+                GameGlobals.player.y = CONFIG.CANVAS_HEIGHT - 100;
+                GameGlobals.aiPlayer.x = CONFIG.HOOP_X;
+                GameGlobals.aiPlayer.y = 150;
+                Ball.setHolder(GameGlobals.player);
+
+                document.getElementById('gameOver').style.display = 'none';
+                updateScoreUI();
+            }
+
+            return {
+                init,
+                setDifficulty,
+                restart
+            };
+        })();
+
+        window.onload = Game.init;
+    </script>
+</body>
+</html>

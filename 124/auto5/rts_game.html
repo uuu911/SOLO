@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTS Game Prototype</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #1a1a2e; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+            display: flex;
+        }
+        #gameCanvas {
+            background: #2d3436;
+            border: 2px solid #4a69bd;
+        }
+        #uiPanel {
+            width: 180px;
+            background: #1e272e;
+            border: 2px solid #4a69bd;
+            border-left: none;
+            padding: 10px;
+            color: #dfe6e9;
+            font-size: 12px;
+        }
+        .uiSection {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            background: #2d3436;
+            border-radius: 4px;
+        }
+        .uiTitle {
+            font-weight: bold;
+            color: #00cec9;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        #deselectBtn {
+            width: 100%;
+            padding: 8px;
+            background: #e17055;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-top: 5px 0;
+        }
+        #deselectBtn:hover {
+            background: #d63031;
+        }
+        #modeIndicator {
+            padding: 5px;
+            text-align: center;
+            border-radius: 4px;
+            margin-top: 10px;
+            display: none;
+        }
+        .amode-active {
+            background: #fdcb6e;
+            color: #2d3436;
+            display: block !important;
+        }
+        #minimapContainer {
+            position: absolute;
+            bottom: 10px;
+            right: 200px;
+            border: 2px solid #4a69bd;
+            background: #1e272e;
+        }
+        #minimap {
+            display: block;
+        }
+        .tooltip {
+            position: absolute;
+            background: rgba(214, 48, 49, 0.9);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="608"></canvas>
+        <div id="uiPanel">
+            <div class="uiSection">
+                <div class="uiTitle">单位信息</div>
+                <div id="selectedCount">选中单位数量: 0</div>
+            </div>
+            <div class="uiSection">
+                <div class="uiTitle">控制</div>
+                <button id="deselectBtn">解散选择</button>
+                <div id="modeIndicator">A-move模式</div>
+            </div>
+            <div class="uiSection">
+                <div class="uiTitle">操作说明</div>
+                <div>左键拖动: 框选单位</div>
+                <div>Shift+框选: 追加选择</div>
+                <div>Ctrl+框选: 取消选择</div>
+                <div>右键: 移动命令</div>
+                <div>A键: 攻击移动</div>
+                <div>S键: 停止</div>
+                <div>Delete: 取消选择</div>
+            </div>
+        </div>
+        <div id="minimapContainer">
+            <canvas id="minimap" width="120" height="90"></canvas>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        'use strict';
+
+        const CONFIG = {
+            GRID_SIZE: 32,
+            MAP_WIDTH: 25,
+            MAP_HEIGHT: 19,
+            OBSTACLE_COUNT: 20,
+            PLAYER_UNIT_COUNT: 12,
+            ENEMY_UNIT_COUNT: 8,
+            UNIT_RADIUS: 12,
+            MAX_SELECTED: 24,
+            ATTACK_COOLDOWN: 1000,
+            DAMAGE: 10,
+            PLAYER_HP: 100,
+            ENEMY_HP: 50,
+            MELEE_RANGE: 1,
+            RANGED_RANGE: 3,
+            MAX_PATH_NODES: 500,
+            MINIMAP_WIDTH: 120,
+            MINIMAP_HEIGHT: 90
+        };
+
+        const Game = {
+            canvas: null,
+            ctx: null,
+            minimapCanvas: null,
+            minimapCtx: null,
+            lastTime: 0,
+            deltaTime: 0,
+            running: true,
+
+            init: function() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.minimapCanvas = document.getElementById('minimap');
+                this.minimapCtx = this.minimapCanvas.getContext('2d');
+                
+                Map.init();
+                UnitManager.init();
+                InputHandler.init();
+                Renderer.init();
+                Pathfinder.init();
+                
+                this.gameLoop();
+            },
+
+            gameLoop: function(currentTime = 0) {
+                    this.deltaTime = currentTime - this.lastTime;
+                    this.lastTime = currentTime;
+
+                    this.update();
+                    this.render();
+
+                    requestAnimationFrame((time) => this.gameLoop(time));
+                },
+
+            update: function() {
+                    UnitManager.update(this.deltaTime);
+                    InputHandler.update();
+                },
+
+            render: function() {
+                    Renderer.render();
+                }
+            };
+
+        const Map = {
+            grid: [],
+            obstacles: [],
+
+            init: function() {
+                this.grid = [];
+                for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
+                    this.grid[y] = [];
+                    for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
+                        this.grid[y][x] = 0;
+                    }
+                }
+                this.generateObstacles();
+            },
+
+            generateObstacles: function() {
+                this.obstacles = [];
+                let count = 0;
+                while (count < CONFIG.OBSTACLE_COUNT) {
+                    const x = Math.floor(Math.random() * (CONFIG.MAP_WIDTH - 4)) + 2;
+                    const y = Math.floor(Math.random() * (CONFIG.MAP_HEIGHT - 4)) + 2;
+                    
+                    if (this.grid[y][x] === 0 && !this.isSpawnArea(x, y)) {
+                        this.grid[y][x] = 1;
+                        this.obstacles.push({ x, y });
+                        count++;
+                    }
+                }
+            },
+
+            isSpawnArea: function(x, y) {
+                if (x < 6 && y > CONFIG.MAP_HEIGHT - 6) return true;
+                if (x > CONFIG.MAP_WIDTH - 6 && y < 6) return true;
+                return false;
+            },
+
+            isWalkable: function(x, y) {
+                if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) return false;
+                return this.grid[y][x] === 0;
+            },
+
+            isOccupied: function(x, y, excludeUnit = null) {
+                return UnitManager.units.some(u => 
+                    u !== excludeUnit && u.alive && 
+                    Math.floor(u.x / CONFIG.GRID_SIZE) === x && 
+                    Math.floor(u.y / CONFIG.GRID_SIZE) === y
+                );
+            }
+        };
+
+        const UnitManager = {
+            units: [],
+            selectedUnits: [],
+
+            init: function() {
+                this.units = [];
+                this.selectedUnits = [];
+                this.spawnPlayerUnits();
+                this.spawnEnemyUnits();
+            },
+
+            spawnPlayerUnits: function() {
+                for (let i = 0; i < CONFIG.PLAYER_UNIT_COUNT; i++) {
+                    let placed = false;
+                    while (!placed) {
+                        const gridX = Math.floor(Math.random() * 5) + 1;
+                        const gridY = Math.floor(Math.random() * 5) + (CONFIG.MAP_HEIGHT - 6);
+                        if (!Map.isOccupied(gridX, gridY)) {
+                            this.units.push(this.createUnit(
+                                gridX * CONFIG.GRID_SIZE + CONFIG.GRID_SIZE / 2,
+                                gridY * CONFIG.GRID_SIZE + CONFIG.GRID_SIZE / 2,
+                                'player',
+                                i < 6 ? 'melee' : 'ranged'
+                            ));
+                            placed = true;
+                        }
+                    }
+                }
+            },
+
+            spawnEnemyUnits: function() {
+                for (let i = 0; i < CONFIG.ENEMY_UNIT_COUNT; i++) {
+                    let placed = false;
+                    while (!placed) {
+                        const gridX = Math.floor(Math.random() * 5) + (CONFIG.MAP_WIDTH - 6);
+                        const gridY = Math.floor(Math.random() * 5) + 1;
+                        if (!Map.isOccupied(gridX, gridY)) {
+                            this.units.push(this.createUnit(
+                                gridX * CONFIG.GRID_SIZE + CONFIG.GRID_SIZE / 2,
+                                gridY * CONFIG.GRID_SIZE + CONFIG.GRID_SIZE / 2,
+                                'enemy',
+                                i < 4 ? 'melee' : 'ranged'
+                            ));
+                            placed = true;
+                        }
+                    }
+                }
+            },
+
+            createUnit: function(x, y, team, type) {
+                return {
+                    x: x,
+                    y: y,
+                    team: team,
+                    type: type,
+                    hp: team === 'player' ? CONFIG.PLAYER_HP : CONFIG.ENEMY_HP,
+                    maxHp: team === 'player' ? CONFIG.PLAYER_HP : CONFIG.PLAYER_HP,
+                    alive: true,
+                    speed: 80,
+                    targetX: null,
+                    targetY: null,
+                    path: [],
+                    pathIndex: 0,
+                    attackCooldown: 0,
+                    attackTarget: null,
+                    isAMove: false,
+                    aMoveTargetX: null,
+                    aMoveTargetY: null
+                };
+            },
+
+            update: function(deltaTime) {
+                for (let i = this.units.length - 1; i >= 0; i--) {
+                    const unit = this.units[i];
+                    if (!unit.alive) {
+                        this.units.splice(i, 1);
+                        const selIndex = this.selectedUnits.indexOf(unit);
+                        if (selIndex !== -1) {
+                            this.selectedUnits.splice(selIndex, 1);
+                            this.updateSelectedCount();
+                        }
+                        continue;
+                    }
+
+                    if (unit.attackCooldown > 0) {
+                        unit.attackCooldown -= deltaTime;
+                    }
+
+                    if (unit.team === 'enemy') {
+                        this.updateEnemyUnit(unit, deltaTime);
+                    } else {
+                        this.updatePlayerUnit(unit, deltaTime);
+                    }
+                }
+            },
+
+            updateEnemyUnit: function(unit, deltaTime) {
+                const target = this.findNearestEnemy(unit, 'player');
+                if (target && this.isInRange(unit, target)) {
+                    this.attack(unit, target);
+                }
+            },
+
+            updatePlayerUnit: function(unit, deltaTime) {
+                if (unit.isAMove) {
+                    const target = this.findNearestEnemy(unit, 'enemy');
+                    if (target && this.isInRange(unit, target)) {
+                        unit.path = [];
+                        unit.targetX = null;
+                        unit.targetY = null;
+                        this.attack(unit, target);
+                        return;
+                    } else if (target && this.getDistance(unit, target) <= (unit.type === 'melee' ? CONFIG.MELEE_RANGE : CONFIG.RANGED_RANGE) * CONFIG.GRID_SIZE * 2) {
+                        unit.path = Pathfinder.findPath(
+                            Math.floor(unit.x / CONFIG.GRID_SIZE),
+                            Math.floor(unit.y / CONFIG.GRID_SIZE),
+                            Math.floor(target.x / CONFIG.GRID_SIZE),
+                            Math.floor(target.y / CONFIG.GRID_SIZE),
+                            unit
+                        );
+                        unit.pathIndex = 0;
+                    }
+                }
+
+                if (unit.attackTarget && unit.attackTarget.alive) {
+                    if (this.isInRange(unit, unit.attackTarget)) {
+                        this.attack(unit, unit.attackTarget);
+                        return;
+                    } else {
+                        unit.attackTarget = null;
+                    }
+                }
+
+                if (unit.path.length > 0) {
+                    this.moveAlongPath(unit, deltaTime);
+                } else if (unit.targetX !== null && unit.targetY !== null) {
+                    this.moveStraight(unit, deltaTime);
+                } else if (unit.isAMove && unit.aMoveTargetX !== null) {
+                    const dist = Math.hypot(unit.x - unit.aMoveTargetX, unit.y - unit.aMoveTargetY);
+                    if (dist < 5) {
+                        unit.isAMove = false;
+                        unit.aMoveTargetX = null;
+                        unit.aMoveTargetY = null;
+                    }
+                }
+            },
+
+            moveAlongPath: function(unit, deltaTime) {
+                if (unit.pathIndex >= unit.path.length) {
+                    unit.path = [];
+                    unit.pathIndex = 0;
+                    return;
+                }
+
+                const target = unit.path[unit.pathIndex];
+                const targetX = target.x * CONFIG.GRID_SIZE + CONFIG.GRID_SIZE / 2;
+                const targetY = target.y * CONFIG.GRID_SIZE + CONFIG.GRID_SIZE / 2;
+
+                const dx = targetX - unit.x;
+                const dy = targetY - unit.y;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist < 2) {
+                    unit.pathIndex++;
+                    return;
+                }
+
+                const moveSpeed = unit.speed * (deltaTime / 1000);
+                let moveX = (dx / dist) * moveSpeed;
+                let moveY = (dy / dist) * moveSpeed;
+
+                const avoid = this.getSeparationVector(unit, moveSpeed);
+                moveX += avoid.x * 0.5;
+                moveY += avoid.y * 0.5;
+
+                const finalDist = Math.hypot(moveX, moveY);
+                if (finalDist > 0) {
+                    moveX = (moveX / finalDist) * Math.min(moveSpeed, dist);
+                    moveY = (moveY / finalDist) * Math.min(moveSpeed, dist);
+                }
+
+                const nextGridX = Math.floor((unit.x + moveX) / CONFIG.GRID_SIZE);
+                const nextGridY = Math.floor((unit.y + moveY) / CONFIG.GRID_SIZE);
+                if (Map.isWalkable(nextGridX, nextGridY)) {
+                    unit.x += moveX;
+                    unit.y += moveY;
+                } else {
+                    unit.pathIndex++;
+                }
+            },
+
+            moveStraight: function(unit, deltaTime) {
+                const dx = unit.targetX - unit.x;
+                const dy = unit.targetY - unit.y;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist < 3) {
+                    unit.targetX = null;
+                    unit.targetY = null;
+                    return;
+                }
+
+                const moveSpeed = unit.speed * (deltaTime / 1000);
+                let moveX = (dx / dist) * moveSpeed;
+                let moveY = (dy / dist) * moveSpeed;
+
+                const avoid = this.getSeparationVector(unit, moveSpeed);
+                moveX += avoid.x * 0.5;
+                moveY += avoid.y * 0.5;
+
+                const finalDist = Math.hypot(moveX, moveY);
+                if (finalDist > 0) {
+                    const scale = Math.min(moveSpeed, dist) / finalDist;
+                    moveX *= scale;
+                    moveY *= scale;
+                }
+
+                const nextX = unit.x + moveX;
+                const nextY = unit.y + moveY;
+                const nextGridX = Math.floor(nextX / CONFIG.GRID_SIZE);
+                const nextGridY = Math.floor(nextY / CONFIG.GRID_SIZE);
+                if (Map.isWalkable(nextGridX, nextGridY)) {
+                    unit.x = nextX;
+                    unit.y = nextY;
+                }
+            },
+
+            getSeparationVector: function(unit, moveSpeed) {
+                let sepX = 0;
+                let sepY = 0;
+                const minDist = CONFIG.UNIT_RADIUS * 2.2;
+
+                for (const other of this.units) {
+                    if (other === unit || !other.alive) continue;
+                    const ddx = unit.x - other.x;
+                    const ddy = unit.y - other.y;
+                    const d = Math.hypot(ddx, ddy);
+                    if (d < minDist && d > 0) {
+                        const force = (minDist - d) / minDist;
+                        sepX += (ddx / d) * force * moveSpeed;
+                        sepY += (ddy / d) * force * moveSpeed;
+                    }
+                }
+                return { x: sepX, y: sepY };
+            },
+
+            findNearestEnemy: function(unit, targetTeam) {
+                let nearest = null;
+                let nearestDist = Infinity;
+
+                for (const other of this.units) {
+                    if (other.team === targetTeam && other.alive) {
+                        const dist = this.getDistance(unit, other);
+                        if (dist < nearestDist) {
+                            nearestDist = dist;
+                            nearest = other;
+                        }
+                    }
+                }
+                return nearest;
+            },
+
+            getDistance: function(a, b) {
+                return Math.hypot(a.x - b.x, a.y - b.y);
+            },
+
+            isInRange: function(attacker, target) {
+                const range = (attacker.type === 'melee' ? CONFIG.MELEE_RANGE : CONFIG.RANGED_RANGE) * CONFIG.GRID_SIZE;
+                return this.getDistance(attacker, target) <= range;
+            },
+
+            attack: function(attacker, target) {
+                if (attacker.attackCooldown <= 0) {
+                    target.hp -= CONFIG.DAMAGE;
+                    attacker.attackCooldown = CONFIG.ATTACK_COOLDOWN;
+                    
+                    if (target.hp <= 0) {
+                        target.alive = false;
+                    }
+                }
+            },
+
+            selectUnitsInRect: function(x1, y1, x2, y2, mode = 'set') {
+                const minX = Math.min(x1, x2);
+                const maxX = Math.max(x1, x2);
+                const minY = Math.min(y1, y2);
+                const maxY = Math.max(y1, y2);
+
+                const unitsInRect = this.units.filter(u => 
+                    u.team === 'player' && u.alive &&
+                    u.x >= minX && u.x <= maxX &&
+                    u.y >= minY && u.y <= maxY
+                );
+
+                if (mode === 'add' && unitsInRect.length === 0) {
+                    return;
+                }
+
+                if (mode === 'set') {
+                    this.selectedUnits = unitsInRect.slice(0, CONFIG.MAX_SELECTED);
+                    if (unitsInRect.length > CONFIG.MAX_SELECTED) {
+                        Renderer.showTooltip('最多选择24个单位', maxX, minY - 30);
+                    }
+                } else if (mode === 'add') {
+                    for (const unit of unitsInRect) {
+                        if (!this.selectedUnits.includes(unit) && this.selectedUnits.length < CONFIG.MAX_SELECTED) {
+                            this.selectedUnits.push(unit);
+                        }
+                    }
+                } else if (mode === 'remove') {
+                    this.selectedUnits = this.selectedUnits.filter(u => !unitsInRect.includes(u));
+                }
+
+                this.updateSelectedCount();
+            },
+
+            clearSelection: function() {
+                this.selectedUnits = [];
+                this.updateSelectedCount();
+            },
+
+            updateSelectedCount: function() {
+                document.getElementById('selectedCount').textContent = 
+                    `选中单位数量: ${this.selectedUnits.length}`;
+            },
+
+            moveSelectedUnits: function(targetX, targetY, isAMove = false) {
+                if (this.selectedUnits.length === 0) return;
+
+                const gridX = Math.floor(targetX / CONFIG.GRID_SIZE);
+                const gridY = Math.floor(targetY / CONFIG.GRID_SIZE);
+
+                if (!Map.isWalkable(gridX, gridY)) return;
+
+                const reservedTargets = new Set();
+
+                for (let i = 0; i < this.selectedUnits.length; i++) {
+                    const unit = this.selectedUnits[i];
+                    if (!unit.alive) continue;
+
+                    let targetGridX = gridX;
+                    let targetGridY = gridY;
+                    let foundTarget = false;
+
+                    const offset = this.getFormationOffset(i, this.selectedUnits.length);
+                    const candidates = [
+                        { x: gridX + offset.x, y: gridY + offset.y },
+                        { x: gridX, y: gridY },
+                        { x: gridX + offset.x, y: gridY },
+                        { x: gridX, y: gridY + offset.y }
+                    ];
+
+                    for (let ring = 0; ring < 5 && !foundTarget; ring++) {
+                        for (const cand of candidates) {
+                            for (let dy = -ring; dy <= ring && !foundTarget; dy++) {
+                                for (let dx = -ring; dx <= ring && !foundTarget; dx++) {
+                                    const tx = cand.x + dx;
+                                    const ty = cand.y + dy;
+                                    const key = `${tx},${ty}`;
+                                    if (Map.isWalkable(tx, ty) && !reservedTargets.has(key)) {
+                                        targetGridX = tx;
+                                        targetGridY = ty;
+                                        reservedTargets.add(key);
+                                        foundTarget = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    const startX = Math.floor(unit.x / CONFIG.GRID_SIZE);
+                    const startY = Math.floor(unit.y / CONFIG.GRID_SIZE);
+                    
+                    unit.path = Pathfinder.findPath(startX, startY, targetGridX, targetGridY, unit);
+                    unit.pathIndex = 0;
+                    unit.isAMove = isAMove;
+                    unit.aMoveTargetX = targetGridX * CONFIG.GRID_SIZE + CONFIG.GRID_SIZE / 2;
+                    unit.aMoveTargetY = targetGridY * CONFIG.GRID_SIZE + CONFIG.GRID_SIZE / 2;
+                    unit.attackTarget = null;
+
+                    if (unit.path.length === 0 && (startX !== targetGridX || startY !== targetGridY)) {
+                        unit.targetX = targetGridX * CONFIG.GRID_SIZE + CONFIG.GRID_SIZE / 2;
+                        unit.targetY = targetGridY * CONFIG.GRID_SIZE + CONFIG.GRID_SIZE / 2;
+                    } else {
+                        unit.targetX = null;
+                        unit.targetY = null;
+                    }
+                }
+            },
+
+            getFormationOffset: function(index, total) {
+                const cols = Math.ceil(Math.sqrt(total));
+                const row = Math.floor(index / cols);
+                const col = index % cols;
+                return { x: col - Math.floor(cols / 2), y: row - Math.floor(Math.ceil(total / cols) / 2) };
+            },
+
+            stopSelectedUnits: function() {
+                for (const unit of this.selectedUnits) {
+                    unit.path = [];
+                    unit.pathIndex = 0;
+                    unit.isAMove = false;
+                    unit.aMoveTargetX = null;
+                    unit.aMoveTargetY = null;
+                    unit.attackTarget = null;
+                    unit.targetX = null;
+                    unit.targetY = null;
+                }
+            }
+        };
+
+        const Pathfinder = {
+            init: function() {},
+
+            findPath: function(startX, startY, endX, endY, unit) {
+                const openList = [];
+                const closedList = new Set();
+                const cameFrom = {};
+                const gScore = {};
+                const fScore = {};
+
+                const startKey = `${startX},${startY}`;
+                gScore[startKey] = 0;
+                fScore[startKey] = this.heuristic(startX, startY, endX, endY);
+                openList.push({ x: startX, y: startY, f: fScore[startKey] });
+
+                let nodesSearched = 0;
+
+                while (openList.length > 0 && nodesSearched < CONFIG.MAX_PATH_NODES) {
+                    nodesSearched++;
+                    
+                    openList.sort((a, b) => a.f - b.f);
+                    const current = openList.shift();
+                    const currentKey = `${current.x},${current.y}`;
+
+                    if (current.x === endX && current.y === endY) {
+                        return this.reconstructPath(cameFrom, current);
+                    }
+
+                    closedList.add(currentKey);
+
+                    const neighbors = this.getNeighbors(current.x, current.y, unit);
+                    for (const neighbor of neighbors) {
+                        const neighborKey = `${neighbor.x},${neighbor.y}`;
+                        if (closedList.has(neighborKey)) continue;
+
+                        const tentativeG = gScore[currentKey] + neighbor.cost;
+
+                        if (!openList.some(n => n.x === neighbor.x && n.y === neighbor.y)) {
+                            cameFrom[neighborKey] = current;
+                            gScore[neighborKey] = tentativeG;
+                            fScore[neighborKey] = tentativeG + this.heuristic(neighbor.x, neighbor.y, endX, endY);
+                            openList.push({ x: neighbor.x, y: neighbor.y, f: fScore[neighborKey] });
+                        } else if (tentativeG < gScore[neighborKey]) {
+                            cameFrom[neighborKey] = current;
+                            gScore[neighborKey] = tentativeG;
+                            fScore[neighborKey] = tentativeG + this.heuristic(neighbor.x, neighbor.y, endX, endY);
+                        }
+                    }
+                }
+
+                return [];
+            },
+
+            heuristic: function(x1, y1, x2, y2) {
+                return Math.hypot(x1 - x2, y1 - y2);
+            },
+
+            getNeighbors: function(x, y, unit) {
+                const neighbors = [];
+                const directions = [
+                    { dx: -1, dy: 0, cost: 1 },
+                    { dx: 1, dy: 0, cost: 1 },
+                    { dx: 0, dy: -1, cost: 1 },
+                    { dx: 0, dy: 1, cost: 1 },
+                    { dx: -1, dy: -1, cost: Math.SQRT2 },
+                    { dx: 1, dy: -1, cost: Math.SQRT2 },
+                    { dx: -1, dy: 1, cost: Math.SQRT2 },
+                    { dx: 1, dy: 1, cost: Math.SQRT2 }
+                ];
+
+                for (const dir of directions) {
+                    const nx = x + dir.dx;
+                    const ny = y + dir.dy;
+                    
+                    if (Map.isWalkable(nx, ny)) {
+                        const occupied = Map.isOccupied(nx, ny, unit);
+                        const cost = dir.cost * (occupied ? 3 : 1);
+                        neighbors.push({ x: nx, y: ny, cost: cost });
+                    }
+                }
+
+                return neighbors;
+            },
+
+            reconstructPath: function(cameFrom, current) {
+                const path = [];
+                let key = `${current.x},${current.y}`;
+                while (cameFrom[key]) {
+                    path.unshift({ x: current.x, y: current.y });
+                    current = cameFrom[key];
+                    key = `${current.x},${current.y}`;
+                }
+                return path;
+            }
+        };
+
+        const InputHandler = {
+            mouseX: 0,
+            mouseY: 0,
+            isDragging: false,
+            dragStartX: 0,
+            dragStartY: 0,
+            isAMoveMode: false,
+            keys: {},
+
+            init: function() {
+                Game.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
+                Game.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+                Game.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
+                Game.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+                document.addEventListener('keydown', (e) => this.onKeyDown(e));
+                document.addEventListener('keyup', (e) => this.onKeyUp(e));
+                document.getElementById('deselectBtn').addEventListener('click', () => {
+                    UnitManager.clearSelection();
+                });
+            },
+
+            update: function() {},
+
+            onMouseDown: function(e) {
+                const rect = Game.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                if (e.button === 0) {
+                    if (this.isAMoveMode) {
+                        UnitManager.moveSelectedUnits(x, y, true);
+                        this.setAMoveMode(false);
+                    } else {
+                        this.isDragging = true;
+                        this.dragStartX = x;
+                        this.dragStartY = y;
+                    }
+                } else if (e.button === 2) {
+                    UnitManager.moveSelectedUnits(x, y, false);
+                }
+            },
+
+            onMouseMove: function(e) {
+                const rect = Game.canvas.getBoundingClientRect();
+                this.mouseX = e.clientX - rect.left;
+                this.mouseY = e.clientY - rect.top;
+            },
+
+            onMouseUp: function(e) {
+                if (e.button === 0 && this.isDragging) {
+                    this.isDragging = false;
+                    
+                    let mode = 'set';
+                    if (this.keys['ShiftLeft'] || this.keys['ShiftRight']) {
+                        mode = 'add';
+                    } else if (this.keys['ControlLeft'] || this.keys['ControlRight']) {
+                        mode = 'remove';
+                    }
+
+                    UnitManager.selectUnitsInRect(
+                        this.dragStartX, this.dragStartY,
+                        this.mouseX, this.mouseY,
+                        mode
+                    );
+                }
+            },
+
+            onKeyDown: function(e) {
+                this.keys[e.code] = true;
+
+                if (e.code === 'KeyA') {
+                    this.setAMoveMode(true);
+                }
+
+                if (e.code === 'KeyS') {
+                    UnitManager.stopSelectedUnits();
+                }
+
+                if (e.code === 'Delete') {
+                    UnitManager.clearSelection();
+                }
+            },
+
+            onKeyUp: function(e) {
+                this.keys[e.code] = false;
+            },
+
+            setAMoveMode: function(active) {
+                this.isAMoveMode = active;
+                const indicator = document.getElementById('modeIndicator');
+                if (active) {
+                    indicator.classList.add('amode-active');
+                } else {
+                    indicator.classList.remove('amode-active');
+                }
+            }
+        };
+
+        const Renderer = {
+            tooltipTimer: null,
+
+            init: function() {},
+
+            render: function() {
+                this.clear();
+                this.renderGrid();
+                this.renderObstacles();
+                this.renderPaths();
+                this.renderUnits();
+                this.renderSelectionBox();
+                this.renderMinimap();
+            },
+
+            clear: function() {
+                Game.ctx.fillStyle = '#2d3436';
+                Game.ctx.fillRect(0, 0, Game.canvas.width, Game.canvas.height);
+            },
+
+            renderGrid: function() {
+                Game.ctx.strokeStyle = '#636e72';
+                Game.ctx.lineWidth = 0.5;
+
+                for (let x = 0; x <= CONFIG.MAP_WIDTH; x++) {
+                    Game.ctx.beginPath();
+                    Game.ctx.moveTo(x * CONFIG.GRID_SIZE, 0);
+                    Game.ctx.lineTo(x * CONFIG.GRID_SIZE, Game.canvas.height);
+                    Game.ctx.stroke();
+                }
+
+                for (let y = 0; y <= CONFIG.MAP_HEIGHT; y++) {
+                    Game.ctx.beginPath();
+                    Game.ctx.moveTo(0, y * CONFIG.GRID_SIZE);
+                    Game.ctx.lineTo(Game.canvas.width, y * CONFIG.GRID_SIZE);
+                    Game.ctx.stroke();
+                }
+            },
+
+            renderObstacles: function() {
+                Game.ctx.fillStyle = '#6c5ce7';
+                for (const obs of Map.obstacles) {
+                    Game.ctx.fillRect(
+                        obs.x * CONFIG.GRID_SIZE + 2,
+                        obs.y * CONFIG.GRID_SIZE + 2,
+                        CONFIG.GRID_SIZE - 4,
+                        CONFIG.GRID_SIZE - 4
+                    );
+                }
+            },
+
+            renderPaths: function() {
+                for (const unit of UnitManager.selectedUnits) {
+                    if (unit.path && unit.path.length > 0) {
+                        Game.ctx.strokeStyle = unit.team === 'player' ? 'rgba(116, 185, 255, 0.5)' : 'rgba(255, 118, 117, 0.5)';
+                        Game.ctx.lineWidth = 2;
+                        Game.ctx.beginPath();
+                        Game.ctx.moveTo(unit.x, unit.y);
+                        for (let i = unit.pathIndex; i < unit.path.length; i++) {
+                            const point = unit.path[i];
+                            Game.ctx.lineTo(
+                                point.x * CONFIG.GRID_SIZE + CONFIG.GRID_SIZE / 2,
+                                point.y * CONFIG.GRID_SIZE + CONFIG.GRID_SIZE / 2
+                            );
+                        }
+                        Game.ctx.stroke();
+                    }
+                }
+            },
+
+            renderUnits: function() {
+                for (const unit of UnitManager.units) {
+                    if (!unit.alive) continue;
+
+                    const isSelected = UnitManager.selectedUnits.includes(unit);
+                    
+                    Game.ctx.beginPath();
+                    Game.ctx.arc(unit.x, unit.y, CONFIG.UNIT_RADIUS, 0, Math.PI * 2);
+                    
+                    if (unit.team === 'player') {
+                        Game.ctx.fillStyle = '#0984e3';
+                    } else {
+                        Game.ctx.fillStyle = '#d63031';
+                    }
+                    Game.ctx.fill();
+
+                    if (isSelected) {
+                        Game.ctx.strokeStyle = '#00b894';
+                        Game.ctx.lineWidth = 3;
+                        Game.ctx.stroke();
+                    }
+
+                    if (unit.type === 'ranged') {
+                        Game.ctx.fillStyle = '#fdcb6e';
+                        Game.ctx.beginPath();
+                        Game.ctx.arc(unit.x, unit.y, 4, 0, Math.PI * 2);
+                        Game.ctx.fill();
+                    }
+
+                    const hpPercent = unit.hp / unit.maxHp;
+                    const hpBarWidth = CONFIG.UNIT_RADIUS * 2;
+                    const hpBarHeight = 4;
+                    
+                    Game.ctx.fillStyle = '#2d3436';
+                    Game.ctx.fillRect(
+                        unit.x - hpBarWidth / 2,
+                        unit.y - CONFIG.UNIT_RADIUS - 8,
+                        hpBarWidth,
+                        hpBarHeight
+                    );
+                    
+                    Game.ctx.fillStyle = hpPercent > 0.5 ? '#00b894' : hpPercent > 0.25 ? '#fdcb6e' : '#d63031';
+                    Game.ctx.fillRect(
+                        unit.x - hpBarWidth / 2,
+                        unit.y - CONFIG.UNIT_RADIUS - 8,
+                        hpBarWidth * hpPercent,
+                        hpBarHeight
+                    );
+                }
+            },
+
+            renderSelectionBox: function() {
+                if (InputHandler.isDragging) {
+                    const x = Math.min(InputHandler.dragStartX, InputHandler.mouseX);
+                    const y = Math.min(InputHandler.dragStartY, InputHandler.mouseY);
+                    const width = Math.abs(InputHandler.mouseX - InputHandler.dragStartX);
+                    const height = Math.abs(InputHandler.mouseY - InputHandler.dragStartY);
+
+                    Game.ctx.strokeStyle = '#00cec9';
+                    Game.ctx.lineWidth = 2;
+                    Game.ctx.setLineDash([5, 5]);
+                    Game.ctx.strokeRect(x, y, width, height);
+                    Game.ctx.setLineDash([]);
+                    Game.ctx.fillStyle = 'rgba(0, 206, 201, 0.1)';
+                    Game.ctx.fillRect(x, y, width, height);
+                }
+            },
+
+            renderMinimap: function() {
+                const scaleX = CONFIG.MINIMAP_WIDTH / (CONFIG.MAP_WIDTH * CONFIG.GRID_SIZE);
+                const scaleY = CONFIG.MINIMAP_HEIGHT / (CONFIG.MAP_HEIGHT * CONFIG.GRID_SIZE);
+
+                Game.minimapCtx.fillStyle = '#1e272e';
+                Game.minimapCtx.fillRect(0, 0, CONFIG.MINIMAP_WIDTH, CONFIG.MINIMAP_HEIGHT);
+
+                Game.minimapCtx.fillStyle = '#6c5ce7';
+                for (const obs of Map.obstacles) {
+                    Game.minimapCtx.fillRect(
+                        obs.x * CONFIG.GRID_SIZE * scaleX,
+                        obs.y * CONFIG.GRID_SIZE * scaleY,
+                        CONFIG.GRID_SIZE * scaleX,
+                        CONFIG.GRID_SIZE * scaleY
+                    );
+                }
+
+                for (const unit of UnitManager.units) {
+                    if (!unit.alive) continue;
+                    Game.minimapCtx.fillStyle = unit.team === 'player' ? '#0984e3' : '#d63031';
+                    Game.minimapCtx.beginPath();
+                    Game.minimapCtx.arc(
+                        unit.x * scaleX,
+                        unit.y * scaleY,
+                        2,
+                        0,
+                        Math.PI * 2
+                    );
+                    Game.minimapCtx.fill();
+                }
+
+                Game.minimapCtx.strokeStyle = '#00cec9';
+                Game.minimapCtx.lineWidth = 1;
+                Game.minimapCtx.strokeRect(0, 0, CONFIG.MINIMAP_WIDTH, CONFIG.MINIMAP_HEIGHT);
+            },
+
+            showTooltip: function(text, x, y) {
+                const existing = document.querySelector('.tooltip');
+                if (existing) existing.remove();
+
+                const tooltip = document.createElement('div');
+                tooltip.className = 'tooltip';
+                tooltip.textContent = text;
+                tooltip.style.left = x + 'px';
+                tooltip.style.top = y + 'px';
+                document.getElementById('gameContainer').appendChild(tooltip);
+
+                setTimeout(() => tooltip.remove(), 2000);
+            }
+        };
+
+        window.addEventListener('load', () => {
+            Game.init();
+        });
+
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>情绪蜡烛手作店</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .game-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .panel {
+            background: linear-gradient(145deg, #ffffff 0%, #f0f0f0 100%);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .resource-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .resource-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .customer-queue {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .customer {
+            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+            padding: 15px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .customer:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .customer-emoji {
+            font-size: 40px;
+        }
+
+        .customer-info {
+            flex: 1;
+        }
+
+        .customer-mood {
+            font-weight: bold;
+            color: #4338ca;
+            margin-bottom: 5px;
+        }
+
+        .patience-bar {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .patience-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+
+        .patience-fill.warning {
+            background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+        }
+
+        .patience-fill.danger {
+            background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
+        }
+
+        .shelf {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .shelf-slot {
+            aspect-ratio: 1;
+            background: linear-gradient(145deg, #f3f4f6 0%, #e5e7eb 100%);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 3px dashed #d1d5db;
+        }
+
+        .shelf-slot:hover {
+            transform: scale(1.05);
+            border-color: #667eea;
+        }
+
+        .shelf-slot.filled {
+            border-style: solid;
+            border-color: #667eea;
+            background: linear-gradient(145deg, #e0e7ff 0%, #c7d2fe 100%);
+        }
+
+        .shelf-slot.selected {
+            border-color: #f59e0b;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
+        }
+
+        .candle-emoji {
+            font-size: 36px;
+            margin-bottom: 5px;
+        }
+
+        .candle-name {
+            font-size: 12px;
+            font-weight: bold;
+            color: #4338ca;
+            text-align: center;
+        }
+
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #9ca3af;
+        }
+
+        .recipe-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .recipe-card {
+            background: linear-gradient(145deg, #f8f9fa 0%, #f0f0f0 100%);
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .recipe-card:hover {
+            border-color: #667eea;
+        }
+
+        .recipe-card.crafting {
+            border-color: #f59e0b;
+            background: linear-gradient(145deg, #fef3c7 0%, #fde68a 100%);
+        }
+
+        .recipe-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .recipe-emoji {
+            font-size: 32px;
+        }
+
+        .recipe-name {
+            font-weight: bold;
+            font-size: 16px;
+            color: #4338ca;
+        }
+
+        .recipe-mood {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .recipe-ingredients {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .ingredient {
+            background: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .craft-progress {
+            width: 100%;
+            height: 10px;
+            background: #e5e7eb;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .craft-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+            transition: width 0.1s linear;
+        }
+
+        .shop-items {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .shop-item {
+            background: linear-gradient(145deg, #f8f9fa 0%, #f0f0f0 100%);
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .shop-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .shop-item-emoji {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .shop-item-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .shop-item-price {
+            color: #f59e0b;
+            font-weight: bold;
+        }
+
+        .upgrade-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .upgrade-card {
+            background: linear-gradient(145deg, #f8f9fa 0%, #f0f0f0 100%);
+            padding: 15px;
+            border-radius: 12px;
+        }
+
+        .upgrade-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .upgrade-name {
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .upgrade-level {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .upgrade-effect {
+            font-size: 13px;
+            color: #4b5563;
+            margin-bottom: 10px;
+        }
+
+        .upgrade-btn {
+            width: 100%;
+        }
+
+        .upgrade-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .event-banner {
+            background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            text-align: center;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .event-title {
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        .event-timer {
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 15px;
+            border-radius: 15px;
+            display: inline-block;
+        }
+
+        .game-over-modal {
+            text-align: center;
+        }
+
+        .game-over-title {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .game-over-title.win {
+            color: #10b981;
+        }
+
+        .game-over-title.lose {
+            color: #ef4444;
+        }
+
+        .game-over-stats {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .game-over-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .game-over-stat:last-child {
+            border-bottom: none;
+        }
+
+        .center-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .workstation {
+            background: linear-gradient(145deg, #fef3c7 0%, #fde68a 100%);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .workstation-title {
+            font-weight: bold;
+            color: #92400e;
+            margin-bottom: 10px;
+        }
+
+        .workstation-status {
+            font-size: 14px;
+            color: #78350f;
+        }
+
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <div class="title">🕯️ 情绪蜡烛手作店</div>
+            <div class="stats">
+                <div class="stat">💰 <span id="gold">100</span></div>
+                <div class="stat">⭐ <span id="reputation">20</span></div>
+                <div class="stat">📦 货架: <span id="shelf-count">0</span>/<span id="shelf-max">3</span></div>
+            </div>
+        </div>
+
+        <div id="event-banner" class="event-banner" style="display: none;">
+            <div class="event-title" id="event-title"></div>
+            <div class="event-timer" id="event-timer"></div>
+        </div>
+
+        <div class="main-content">
+            <div class="panel">
+                <div class="panel-title">📦 原材料</div>
+                <div class="resource-list" id="resources">
+                </div>
+                <div class="buttons">
+                    <button class="btn btn-success" onclick="openShop()">🛒 商店</button>
+                    <button class="btn btn-warning" onclick="openUpgrades()">⬆️ 升级</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">👥 顾客队列</div>
+                <div class="customer-queue" id="customer-queue">
+                </div>
+            </div>
+
+            <div class="center-area">
+                <div class="panel">
+                    <div class="panel-title">🏪 货架</div>
+                    <div class="shelf" id="shelf">
+                    </div>
+                </div>
+                <div class="workstation">
+                    <div class="workstation-title">🔨 工作台</div>
+                    <div class="workstation-status" id="workstation-status">空闲中</div>
+                    <div class="craft-progress" id="craft-progress" style="display: none;">
+                        <div class="craft-progress-fill" id="craft-progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="openCrafting()" style="width: 100%;">
+                    🔨 制作蜡烛
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="crafting-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">🔨 蜡烛制作台</div>
+                <button class="close-btn" onclick="closeModal('crafting-modal')">&times;</button>
+            </div>
+            <div class="recipe-list" id="recipe-list">
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="shop-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">🛒 原材料商店</div>
+                <button class="close-btn" onclick="closeModal('shop-modal')">&times;</button>
+            </div>
+            <div class="shop-items" id="shop-items">
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="upgrade-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">⬆️ 店铺升级</div>
+                <button class="close-btn" onclick="closeModal('upgrade-modal')">&times;</button>
+            </div>
+            <div class="upgrade-list" id="upgrade-list">
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="game-over-modal">
+        <div class="modal-content game-over-modal">
+            <div class="game-over-title" id="game-over-title"></div>
+            <div class="game-over-stats" id="game-over-stats"></div>
+            <button class="btn btn-primary" onclick="restartGame()">🔄 重新开始</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+    <script src="customer.js"></script>
+    <script src="crafting.js"></script>
+    <script src="shop.js"></script>
+    <script src="ui.js"></script>
+    <script>
+        window.onload = function() {
+            initGame();
+        };
+    </script>
+</body>
+</html>

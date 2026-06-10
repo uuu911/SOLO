@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>平台跳跃游戏</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #1a1a2e; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas { 
+            background: #16213e; 
+            display: block;
+            image-rendering: pixelated;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <script>
+    // ============================================
+    // 模块: 接口定义 (Interfaces)
+    // ============================================
+    
+    const IUpdatable = {
+        update: function(deltaTime) {}
+    };
+    
+    const ICollidable = {
+        onCollide: function(other) {},
+        getBounds: function() {}
+    };
+
+    // ============================================
+    // 模块: 工具函数 (Utils)
+    // ============================================
+    
+    const Utils = {
+        rectIntersect: function(r1, r2) {
+            return r1.x < r2.x + r2.width &&
+                   r1.x + r1.width > r2.x &&
+                   r1.y < r2.y + r2.height &&
+                   r1.y + r1.height > r2.y;
+        },
+        
+        clamp: function(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        },
+        
+        lerp: function(a, b, t) {
+            return a + (b - a) * t;
+        }
+    };
+
+    // ============================================
+    // 模块: 实体管理器 (EntityManager)
+    // ============================================
+    
+    class EntityManager {
+        constructor() {
+            this.entities = [];
+            this.toAdd = [];
+            this.toRemove = [];
+        }
+        
+        add(entity) {
+            this.toAdd.push(entity);
+        }
+        
+        remove(entity) {
+            this.toRemove.push(entity);
+        }
+        
+        update(deltaTime) {
+            for (const entity of this.entities) {
+                if (entity.update) {
+                    entity.update(deltaTime);
+                }
+            }
+            
+            this.processRemovals();
+            this.processAdditions();
+        }
+        
+        processAdditions() {
+            for (const entity of this.toAdd) {
+                this.entities.push(entity);
+            }
+            this.toAdd = [];
+        }
+        
+        processRemovals() {
+            for (const entity of this.toRemove) {
+                const index = this.entities.indexOf(entity);
+                if (index !== -1) {
+                    this.entities.splice(index, 1);
+                }
+            }
+            this.toRemove = [];
+        }
+        
+        getCollidables() {
+            return this.entities.filter(e => e.getBounds);
+        }
+        
+        getAll() {
+            return this.entities;
+        }
+        
+        clear() {
+            this.entities = [];
+            this.toAdd = [];
+            this.toRemove = [];
+        }
+    }
+
+    // ============================================
+    // 模块: 摄像机 (Camera)
+    // ============================================
+    
+    class Camera {
+        constructor(worldWidth, worldHeight, viewportWidth, viewportHeight) {
+            this.x = 0;
+            this.y = 0;
+            this.worldWidth = worldWidth;
+            this.worldHeight = worldHeight;
+            this.viewportWidth = viewportWidth;
+            this.viewportHeight = viewportHeight;
+            this.target = null;
+            this.smoothing = 0.08;
+            this.threshold = 100;
+        }
+        
+        follow(target) {
+            this.target = target;
+        }
+        
+        update(deltaTime) {
+            if (!this.target) return;
+            
+            const targetX = this.target.x - this.viewportWidth / 2;
+            const targetCenterX = this.target.x;
+            const currentCenterX = this.x + this.viewportWidth / 2;
+            
+            if (Math.abs(targetCenterX - currentCenterX) > this.threshold) {
+                this.x = Utils.lerp(this.x, targetX, this.smoothing);
+            }
+            
+            this.x = Utils.clamp(this.x, 0, this.worldWidth - this.viewportWidth);
+            this.y = Utils.clamp(this.y, 0, this.worldHeight - this.viewportHeight);
+        }
+        
+        apply(ctx) {
+            ctx.translate(-Math.floor(this.x), -Math.floor(this.y));
+        }
+    }
+
+    // ============================================
+    // 模块: 天气系统 (WeatherSystem)
+    // ============================================
+    
+    class WeatherSystem {
+        constructor() {
+            this.active = false;
+            this.duration = 0;
+            this.maxDuration = 10;
+            this.frictionModifier = 0.3;
+            this.originalFriction = {};
+        }
+        
+        activate() {
+            if (this.active) return;
+            this.active = true;
+            this.duration = this.maxDuration;
+        }
+        
+        update(deltaTime, platforms) {
+            if (!this.active) return;
+            
+            this.duration -= deltaTime;
+            if (this.duration <= 0) {
+                this.active = false;
+                this.restorePlatforms(platforms);
+                return;
+            }
+            
+            this.applyEffect(platforms);
+        }
+        
+        applyEffect(platforms) {
+            for (const platform of platforms) {
+                if (!this.originalFriction[platform.id]) {
+                    this.originalFriction[platform.id] = platform.friction || 1;
+                }
+                platform.friction = this.frictionModifier;
+                platform.isIcy = true;
+            }
+        }
+        
+        restorePlatforms(platforms) {
+            for (const platform of platforms) {
+                if (this.originalFriction[platform.id] !== undefined) {
+                    platform.friction = this.originalFriction[platform.id];
+                    platform.isIcy = false;
+                }
+            }
+            this.originalFriction = {};
+        }
+        
+        getColorTint() {
+            if (!this.active) return null;
+            const alpha = Math.min(1, this.duration / 2);
+            return `rgba(150, 200, 255, ${alpha * 0.15})`;
+        }
+    }
+
+    // ============================================
+    // 模块: 平台基类 (Platform)
+    // ============================================
+    
+    let platformIdCounter = 0;
+    
+    class Platform {
+        constructor(x, y, width, height, type = 'static') {
+            this.id = ++platformIdCounter;
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.type = type;
+            this.visible = true;
+            this.collidable = true;
+            this.friction = 1;
+            this.isIcy = false;
+        }
+        
+        getBounds() {
+            return {
+                x: this.x,
+                y: this.y,
+                width: this.width,
+                height: this.height
+            };
+        }
+        
+        draw(ctx) {
+            if (!this.visible) return;
+            
+            if (this.isIcy) {
+                ctx.fillStyle = '#a0d8ef';
+            } else {
+                this.applyPlatformColor(ctx);
+            }
+            
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.fillRect(this.x, this.y, this.width, 4);
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect(this.x, this.y + this.height - 4, this.width, 4);
+        }
+    }
+
+    // ============================================
+    // 模块: 静态平台 (StaticPlatform)
+    // ============================================
+    
+    class StaticPlatform extends Platform {
+        constructor(x, y, width, height) {
+            super(x, y, width, height, 'static');
+        }
+        
+        applyPlatformColor(ctx) {
+            ctx.fillStyle = '#4a5568';
+        }
+        
+        update(deltaTime) {}
+        
+        onCollide(other) {}
+    }
+
+    // ============================================
+    // 模块: 单向穿透平台 (OneWayPlatform)
+    // ============================================
+    
+    class OneWayPlatform extends Platform {
+        constructor(x, y, width, height) {
+            super(x, y, width, height, 'oneway');
+        }
+        
+        applyPlatformColor(ctx) {
+            ctx.fillStyle = '#68d391';
+        }
+        
+        update(deltaTime) {}
+        
+        onCollide(other) {}
+        
+        canCollideFromTop(player) {
+            return player.vy >= 0 && 
+                   player.y + player.height <= this.y + 10;
+        }
+    }
+
+    // ============================================
+    // 模块: 消失平台 (DisappearingPlatform)
+    // ============================================
+    
+    class DisappearingPlatform extends Platform {
+        constructor(x, y, width, height) {
+            super(x, y, width, height, 'disappearing');
+            this.standTimer = 0;
+            this.standThreshold = 1;
+            this.opacity = 1;
+            this.disappearing = false;
+            this.goneTimer = 0;
+            this.respawnTime = 2;
+            this.playerOnPlatform = false;
+        }
+        
+        applyPlatformColor(ctx) {
+            ctx.globalAlpha = this.opacity;
+            ctx.fillStyle = '#ed8936';
+        }
+        
+        draw(ctx) {
+            if (!this.visible && this.opacity <= 0) return;
+            
+            ctx.save();
+            super.draw(ctx);
+            ctx.restore();
+        }
+        
+        update(deltaTime) {
+            if (this.disappearing) {
+                this.opacity -= deltaTime * 2;
+                if (this.opacity <= 0) {
+                    this.opacity = 0;
+                    this.collidable = false;
+                    this.disappearing = false;
+                    this.goneTimer = this.respawnTime;
+                }
+            } else if (!this.collidable) {
+                this.goneTimer -= deltaTime;
+                if (this.goneTimer <= 0 && !this.playerOnPlatform) {
+                    this.opacity = 1;
+                    this.collidable = true;
+                    this.standTimer = 0;
+                }
+            }
+            
+            if (this.playerOnPlatform && this.collidable && !this.disappearing) {
+                this.standTimer += deltaTime;
+                if (this.standTimer >= this.standThreshold) {
+                    this.disappearing = true;
+                }
+            }
+            
+            this.playerOnPlatform = false;
+        }
+        
+        onPlayerStand() {
+            this.playerOnPlatform = true;
+        }
+        
+        onCollide(other) {}
+    }
+
+    // ============================================
+    // 模块: 玩家 (Player)
+    // ============================================
+    
+    class Player {
+        constructor(x, y) {
+            this.startX = x;
+            this.startY = y;
+            this.x = x;
+            this.y = y;
+            this.width = 32;
+            this.height = 48;
+            this.vx = 0;
+            this.vy = 0;
+            this.speed = 200;
+            this.gravity = 800;
+            this.jumpPower = -400;
+            this.doubleJumpPower = -350;
+            this.onGround = false;
+            this.canDoubleJump = true;
+            this.hasDoubleJumped = false;
+            this.facingRight = true;
+            this.coins = 0;
+            this.alive = true;
+        }
+        
+        update(deltaTime, keys, platforms, enemies) {
+            if (!this.alive) return;
+            
+            this.handleHorizontalMovement(deltaTime, keys, platforms);
+            this.handleVerticalMovement(deltaTime, platforms, enemies);
+            this.checkDeath();
+        }
+        
+        handleHorizontalMovement(deltaTime, keys, platforms) {
+            let targetVx = 0;
+            
+            if (keys.left) {
+                targetVx = -this.speed;
+                this.facingRight = false;
+            }
+            if (keys.right) {
+                targetVx = this.speed;
+                this.facingRight = true;
+            }
+            
+            let friction = 0.85;
+            for (const platform of platforms) {
+                if (platform.collidable && this.isOnPlatform(platform)) {
+                    friction = platform.friction || 0.85;
+                    break;
+                }
+            }
+            
+            this.vx = Utils.lerp(this.vx, targetVx, 1 - Math.pow(friction, deltaTime * 60));
+            this.x += this.vx * deltaTime;
+            
+            this.resolveHorizontalCollisions(platforms);
+        }
+        
+        handleVerticalMovement(deltaTime, platforms, enemies) {
+            this.vy += this.gravity * deltaTime;
+            this.y += this.vy * deltaTime;
+            
+            this.onGround = false;
+            this.resolveVerticalCollisions(platforms, enemies);
+            
+            if (this.onGround) {
+                this.canDoubleJump = true;
+                this.hasDoubleJumped = false;
+            }
+        }
+        
+        jump() {
+            if (this.onGround) {
+                this.vy = this.jumpPower;
+                this.onGround = false;
+            } else if (this.canDoubleJump && !this.hasDoubleJumped) {
+                this.vy = this.doubleJumpPower;
+                this.hasDoubleJumped = true;
+            }
+        }
+        
+        isOnPlatform(platform) {
+            const bounds = platform.getBounds();
+            return this.vy >= 0 &&
+                   this.y + this.height >= bounds.y - 5 &&
+                   this.y + this.height <= bounds.y + 10 &&
+                   this.x + this.width > bounds.x &&
+                   this.x < bounds.x + bounds.width;
+        }
+        
+        resolveHorizontalCollisions(platforms) {
+            for (const platform of platforms) {
+                if (!platform.collidable) continue;
+                if (platform.type === 'oneway') continue;
+                
+                const bounds = platform.getBounds();
+                const playerBounds = this.getBounds();
+                
+                if (Utils.rectIntersect(playerBounds, bounds)) {
+                    if (this.vx > 0) {
+                        this.x = bounds.x - this.width;
+                    } else if (this.vx < 0) {
+                        this.x = bounds.x + bounds.width;
+                    }
+                    this.vx = 0;
+                }
+            }
+        }
+        
+        resolveVerticalCollisions(platforms, enemies) {
+            for (const platform of platforms) {
+                if (!platform.collidable) continue;
+                
+                const bounds = platform.getBounds();
+                
+                if (platform.type === 'oneway') {
+                    if (platform.canCollideFromTop(this) && 
+                        this.y + this.height > bounds.y &&
+                        this.y + this.height < bounds.y + bounds.height / 2) {
+                        this.y = bounds.y - this.height;
+                        this.vy = 0;
+                        this.onGround = true;
+                    }
+                    continue;
+                }
+                
+                const playerBounds = this.getBounds();
+                if (Utils.rectIntersect(playerBounds, bounds)) {
+                    if (this.vy > 0) {
+                        this.y = bounds.y - this.height;
+                        this.vy = 0;
+                        this.onGround = true;
+                        
+                        if (platform.type === 'disappearing') {
+                            platform.onPlayerStand();
+                        }
+                    } else if (this.vy < 0) {
+                        this.y = bounds.y + bounds.height;
+                        this.vy = 0;
+                    }
+                }
+            }
+            
+            for (const enemy of enemies) {
+                if (!enemy.alive) continue;
+                
+                const enemyBounds = enemy.getBounds();
+                const playerBounds = this.getBounds();
+                
+                if (Utils.rectIntersect(playerBounds, enemyBounds)) {
+                    const footY = this.y + this.height;
+                    const enemyTop = enemyBounds.y;
+                    
+                    if (this.vy > 0 && footY - enemyTop <= 5) {
+                        enemy.onStomped();
+                        this.vy = -200;
+                        this.canDoubleJump = true;
+                        this.hasDoubleJumped = false;
+                    } else {
+                        this.die();
+                    }
+                }
+            }
+        }
+        
+        checkDeath() {
+            if (this.y > 700) {
+                this.die();
+            }
+        }
+        
+        die() {
+            this.alive = false;
+            setTimeout(() => this.respawn(), 1000);
+        }
+        
+        respawn() {
+            this.x = this.startX;
+            this.y = this.startY;
+            this.vx = 0;
+            this.vy = 0;
+            this.onGround = false;
+            this.canDoubleJump = true;
+            this.hasDoubleJumped = false;
+            this.alive = true;
+        }
+        
+        getBounds() {
+            return {
+                x: this.x,
+                y: this.y,
+                width: this.width,
+                height: this.height
+            };
+        }
+        
+        onCollide(other) {}
+        
+        draw(ctx) {
+            ctx.save();
+            
+            ctx.fillStyle = '#4299e1';
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            
+            ctx.fillStyle = '#fff';
+            const eyeX = this.facingRight ? this.x + 18 : this.x + 6;
+            ctx.fillRect(eyeX, this.y + 12, 8, 8);
+            
+            ctx.fillStyle = '#000';
+            ctx.fillRect(eyeX + 2, this.y + 14, 4, 4);
+            
+            if (!this.onGround && !this.hasDoubleJumped) {
+                ctx.fillStyle = 'rgba(66, 153, 225, 0.5)';
+                ctx.fillRect(this.x + 8, this.y + this.height + 5, 16, 4);
+            }
+            
+            ctx.restore();
+        }
+    }
+
+    // ============================================
+    // 模块: 巡逻敌人 (PatrolEnemy)
+    // ============================================
+    
+    class PatrolEnemy {
+        constructor(x, y, platform) {
+            this.x = x;
+            this.y = y;
+            this.width = 32;
+            this.height = 32;
+            this.platform = platform;
+            this.speed = 80;
+            this.direction = 1;
+            this.alive = true;
+        }
+        
+        update(deltaTime) {
+            if (!this.alive) return;
+            
+            this.x += this.speed * this.direction * deltaTime;
+            
+            const bounds = this.platform.getBounds();
+            if (this.x <= bounds.x) {
+                this.x = bounds.x;
+                this.direction = 1;
+            } else if (this.x + this.width >= bounds.x + bounds.width) {
+                this.x = bounds.x + bounds.width - this.width;
+                this.direction = -1;
+            }
+        }
+        
+        getBounds() {
+            return {
+                x: this.x,
+                y: this.y,
+                width: this.width,
+                height: this.height
+            };
+        }
+        
+        onCollide(other) {}
+        
+        onStomped() {
+            this.alive = false;
+        }
+        
+        draw(ctx) {
+            if (!this.alive) return;
+            
+            ctx.fillStyle = '#e53e3e';
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(this.x + 6, this.y + 8, 8, 8);
+            ctx.fillRect(this.x + 18, this.y + 8, 8, 8);
+            
+            ctx.fillStyle = '#000';
+            ctx.fillRect(this.x + 8, this.y + 10, 4, 4);
+            ctx.fillRect(this.x + 20, this.y + 10, 4, 4);
+        }
+    }
+
+    // ============================================
+    // 模块: 跳跃敌人 (JumpingEnemy)
+    // ============================================
+    
+    class JumpingEnemy {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.groundY = y;
+            this.width = 32;
+            this.height = 32;
+            this.vy = 0;
+            this.gravity = 600;
+            this.jumpInterval = 2;
+            this.jumpTimer = 0;
+            this.jumpPower = -350;
+            this.alive = true;
+        }
+        
+        update(deltaTime) {
+            if (!this.alive) return;
+            
+            this.jumpTimer += deltaTime;
+            
+            if (this.jumpTimer >= this.jumpInterval && this.y >= this.groundY - 5) {
+                this.vy = this.jumpPower;
+                this.jumpTimer = 0;
+            }
+            
+            this.vy += this.gravity * deltaTime;
+            this.y += this.vy * deltaTime;
+            
+            if (this.y > this.groundY) {
+                this.y = this.groundY;
+                this.vy = 0;
+            }
+        }
+        
+        getBounds() {
+            return {
+                x: this.x,
+                y: this.y,
+                width: this.width,
+                height: this.height
+            };
+        }
+        
+        onCollide(other) {}
+        
+        onStomped() {
+            this.alive = false;
+        }
+        
+        draw(ctx) {
+            if (!this.alive) return;
+            
+            ctx.fillStyle = '#9f7aea';
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(this.x + 6, this.y + 8, 8, 8);
+            ctx.fillRect(this.x + 18, this.y + 8, 8, 8);
+            
+            ctx.fillStyle = '#000';
+            ctx.fillRect(this.x + 8, this.y + 12, 4, 4);
+            ctx.fillRect(this.x + 20, this.y + 12, 4, 4);
+            
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(this.x + 12, this.y + 24);
+            ctx.lineTo(this.x + 16, this.y + 20);
+            ctx.lineTo(this.x + 20, this.y + 24);
+            ctx.fill();
+        }
+    }
+
+    // ============================================
+    // 模块: 金币 (Coin)
+    // ============================================
+    
+    class Coin {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.width = 20;
+            this.height = 20;
+            this.collected = false;
+            this.bobOffset = Math.random() * Math.PI * 2;
+            this.bobTimer = 0;
+        }
+        
+        update(deltaTime) {
+            this.bobTimer += deltaTime;
+        }
+        
+        getBounds() {
+            return {
+                x: this.x,
+                y: this.y,
+                width: this.width,
+                height: this.height
+            };
+        }
+        
+        onCollide(other) {
+            if (other instanceof Player && !this.collected) {
+                this.collected = true;
+                other.coins++;
+            }
+        }
+        
+        draw(ctx) {
+            if (this.collected) return;
+            
+            const bobY = Math.sin(this.bobTimer * 3 + this.bobOffset) * 4;
+            
+            ctx.save();
+            ctx.translate(this.x + this.width / 2, this.y + this.height / 2 + bobY);
+            
+            ctx.fillStyle = '#f6e05e';
+            ctx.beginPath();
+            ctx.arc(0, 0, 10, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#d69e2e';
+            ctx.beginPath();
+            ctx.arc(0, 0, 6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#f6e05e';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('$', 0, 0);
+            
+            ctx.restore();
+        }
+    }
+
+    // ============================================
+    // 模块: 天气石 (WeatherStone)
+    // ============================================
+    
+    class WeatherStone {
+        constructor(x, y, weatherSystem) {
+            this.x = x;
+            this.y = y;
+            this.width = 40;
+            this.height = 40;
+            this.weatherSystem = weatherSystem;
+            this.activated = false;
+            this.glowTimer = 0;
+        }
+        
+        update(deltaTime) {
+            this.glowTimer += deltaTime;
+        }
+        
+        getBounds() {
+            return {
+                x: this.x,
+                y: this.y,
+                width: this.width,
+                height: this.height
+            };
+        }
+        
+        onCollide(other) {
+            if (other instanceof Player && !this.activated) {
+                this.weatherSystem.activate();
+                this.activated = true;
+            }
+        }
+        
+        draw(ctx) {
+            ctx.save();
+            
+            const glowIntensity = 0.3 + Math.sin(this.glowTimer * 2) * 0.2;
+            const glowColor = this.activated ? 
+                `rgba(100, 200, 255, ${glowIntensity})` : 
+                `rgba(150, 100, 255, ${glowIntensity})`;
+            
+            ctx.shadowColor = glowColor;
+            ctx.shadowBlur = 20;
+            
+            ctx.fillStyle = this.activated ? '#63b3ed' : '#805ad5';
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.fillRect(this.x + 5, this.y + 5, 10, 10);
+            
+            ctx.restore();
+        }
+    }
+
+    // ============================================
+    // 模块: 游戏主类 (Game)
+    // ============================================
+    
+    class Game {
+        constructor() {
+            this.canvas = document.getElementById('gameCanvas');
+            this.ctx = this.canvas.getContext('2d');
+            
+            this.WORLD_WIDTH = 3200;
+            this.WORLD_HEIGHT = 600;
+            this.VIEWPORT_WIDTH = 800;
+            this.VIEWPORT_HEIGHT = 600;
+            
+            this.canvas.width = this.VIEWPORT_WIDTH;
+            this.canvas.height = this.VIEWPORT_HEIGHT;
+            
+            this.gameState = 'start';
+            this.totalCoins = 30;
+            
+            this.entityManager = new EntityManager();
+            this.camera = new Camera(this.WORLD_WIDTH, this.WORLD_HEIGHT, 
+                                    this.VIEWPORT_WIDTH, this.VIEWPORT_HEIGHT);
+            this.weatherSystem = new WeatherSystem();
+            
+            this.keys = { left: false, right: false, jump: false };
+            this.lastTime = 0;
+            
+            this.platforms = [];
+            this.enemies = [];
+            this.coins = [];
+            
+            this.setupInput();
+            this.setupResize();
+            this.initLevel();
+        }
+        
+        setupInput() {
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keys.left = true;
+                if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keys.right = true;
+                if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+                    if (!this.keys.jump && this.player && this.player.alive) {
+                        this.player.jump();
+                    }
+                    this.keys.jump = true;
+                }
+            });
+            
+            window.addEventListener('keyup', (e) => {
+                if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keys.left = false;
+                if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keys.right = false;
+                if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') this.keys.jump = false;
+            });
+            
+            this.canvas.addEventListener('click', () => {
+                if (this.gameState === 'start') {
+                    this.gameState = 'playing';
+                } else if (this.gameState === 'win') {
+                    this.restart();
+                }
+            });
+        }
+        
+        setupResize() {
+            const resize = () => {
+                const container = document.getElementById('gameContainer');
+                const maxWidth = window.innerWidth - 40;
+                const maxHeight = window.innerHeight - 40;
+                
+                const scaleX = maxWidth / this.VIEWPORT_WIDTH;
+                const scaleY = maxHeight / this.VIEWPORT_HEIGHT;
+                const scale = Math.min(scaleX, scaleY, 1);
+                
+                this.canvas.style.width = `${this.VIEWPORT_WIDTH * scale}px`;
+                this.canvas.style.height = `${this.VIEWPORT_HEIGHT * scale}px`;
+            };
+            
+            window.addEventListener('resize', resize);
+            resize();
+        }
+        
+        initLevel() {
+            this.platforms = [];
+            this.enemies = [];
+            this.coins = [];
+            
+            this.addPlatform(new StaticPlatform(0, 550, 400, 50));
+            this.addPlatform(new StaticPlatform(500, 550, 300, 50));
+            this.addPlatform(new StaticPlatform(900, 550, 400, 50));
+            this.addPlatform(new StaticPlatform(1400, 550, 300, 50));
+            this.addPlatform(new StaticPlatform(1800, 550, 400, 50));
+            this.addPlatform(new StaticPlatform(2300, 550, 400, 50));
+            this.addPlatform(new StaticPlatform(2800, 550, 400, 50));
+            
+            this.addPlatform(new StaticPlatform(200, 450, 150, 20));
+            this.addPlatform(new OneWayPlatform(400, 380, 120, 15));
+            this.addPlatform(new DisappearingPlatform(580, 320, 100, 15));
+            this.addPlatform(new StaticPlatform(750, 400, 150, 20));
+            
+            this.addPlatform(new OneWayPlatform(950, 450, 100, 15));
+            this.addPlatform(new DisappearingPlatform(1100, 380, 100, 15));
+            this.addPlatform(new StaticPlatform(1250, 320, 150, 20));
+            
+            this.addPlatform(new StaticPlatform(1500, 420, 120, 20));
+            this.addPlatform(new OneWayPlatform(1680, 350, 100, 15));
+            this.addPlatform(new DisappearingPlatform(1850, 420, 100, 15));
+            
+            this.addPlatform(new StaticPlatform(2000, 350, 150, 20));
+            this.addPlatform(new OneWayPlatform(2200, 280, 120, 15));
+            this.addPlatform(new DisappearingPlatform(2400, 350, 100, 15));
+            this.addPlatform(new StaticPlatform(2600, 420, 150, 20));
+            
+            this.addPlatform(new StaticPlatform(2850, 350, 200, 20));
+            this.addPlatform(new OneWayPlatform(3000, 280, 150, 15));
+            
+            this.addEnemy(new PatrolEnemy(520, 518, this.platforms[1]));
+            this.addEnemy(new PatrolEnemy(920, 518, this.platforms[2]));
+            this.addEnemy(new JumpingEnemy(1450, 518));
+            this.addEnemy(new PatrolEnemy(1850, 518, this.platforms[4]));
+            this.addEnemy(new JumpingEnemy(2350, 518));
+            
+            const coinPositions = [
+                { x: 100, y: 500 }, { x: 150, y: 500 }, { x: 200, y: 500 },
+                { x: 250, y: 400 }, { x: 450, y: 330 }, { x: 620, y: 270 },
+                { x: 550, y: 500 }, { x: 600, y: 500 }, { x: 650, y: 500 },
+                { x: 800, y: 350 }, { x: 1000, y: 400 }, { x: 1150, y: 330 },
+                { x: 950, y: 500 }, { x: 1000, y: 500 }, { x: 1050, y: 500 },
+                { x: 1300, y: 270 }, { x: 1550, y: 370 }, { x: 1720, y: 300 },
+                { x: 1450, y: 500 }, { x: 1500, y: 500 }, { x: 1550, y: 500 },
+                { x: 1900, y: 370 }, { x: 2050, y: 300 }, { x: 2250, y: 230 },
+                { x: 1850, y: 500 }, { x: 1900, y: 500 }, { x: 1950, y: 500 },
+                { x: 2450, y: 300 }, { x: 2900, y: 300 }, { x: 3050, y: 230 }
+            ];
+            
+            for (const pos of coinPositions) {
+                this.addCoin(new Coin(pos.x, pos.y));
+            }
+            
+            this.weatherStone = new WeatherStone(2100, 505, this.weatherSystem);
+            this.entityManager.add(this.weatherStone);
+            
+            this.player = new Player(100, 450);
+            this.camera.follow(this.player);
+        }
+        
+        addPlatform(platform) {
+            this.platforms.push(platform);
+            this.entityManager.add(platform);
+        }
+        
+        addEnemy(enemy) {
+            this.enemies.push(enemy);
+            this.entityManager.add(enemy);
+        }
+        
+        addCoin(coin) {
+            this.coins.push(coin);
+            this.entityManager.add(coin);
+        }
+        
+        restart() {
+            this.entityManager.clear();
+            this.weatherSystem = new WeatherSystem();
+            this.initLevel();
+            this.gameState = 'playing';
+        }
+        
+        update(deltaTime) {
+            if (this.gameState !== 'playing') return;
+            
+            this.entityManager.update(deltaTime);
+            
+            if (this.player && this.player.alive) {
+                this.player.update(deltaTime, this.keys, this.platforms, this.enemies);
+                this.camera.update(deltaTime);
+                this.weatherSystem.update(deltaTime, this.platforms);
+                
+                for (const coin of this.coins) {
+                    if (!coin.collected) {
+                        const playerBounds = this.player.getBounds();
+                        const coinBounds = coin.getBounds();
+                        if (Utils.rectIntersect(playerBounds, coinBounds)) {
+                            coin.onCollide(this.player);
+                        }
+                    }
+                }
+                
+                const playerBounds = this.player.getBounds();
+                const stoneBounds = this.weatherStone.getBounds();
+                if (Utils.rectIntersect(playerBounds, stoneBounds)) {
+                    this.weatherStone.onCollide(this.player);
+                }
+            }
+            
+            if (this.player.coins >= this.totalCoins) {
+                this.gameState = 'win';
+            }
+        }
+        
+        draw() {
+            const ctx = this.ctx;
+            
+            ctx.fillStyle = '#16213e';
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            ctx.save();
+            this.camera.apply(ctx);
+            
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < this.WORLD_WIDTH; x += 100) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, this.WORLD_HEIGHT);
+                ctx.stroke();
+            }
+            for (let y = 0; y < this.WORLD_HEIGHT; y += 100) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(this.WORLD_WIDTH, y);
+                ctx.stroke();
+            }
+            
+            for (const entity of this.entityManager.getAll()) {
+                if (entity.draw) entity.draw(ctx);
+            }
+            
+            if (this.player) {
+                this.player.draw(ctx);
+            }
+            
+            ctx.restore();
+            
+            const weatherTint = this.weatherSystem.getColorTint();
+            if (weatherTint) {
+                ctx.fillStyle = weatherTint;
+                ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+            
+            this.drawUI(ctx);
+            
+            if (this.gameState === 'start') {
+                this.drawStartScreen(ctx);
+            } else if (this.gameState === 'win') {
+                this.drawWinScreen(ctx);
+            }
+        }
+        
+        drawUI(ctx) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(this.canvas.width - 120, 10, 110, 40);
+            
+            ctx.fillStyle = '#f6e05e';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${this.player ? this.player.coins : 0}/${this.totalCoins}`, 
+                        this.canvas.width - 20, 38);
+            
+            ctx.fillStyle = '#f6e05e';
+            ctx.beginPath();
+            ctx.arc(this.canvas.width - 100, 28, 12, 0, Math.PI * 2);
+            ctx.fill();
+            
+            if (this.weatherSystem.active) {
+                ctx.fillStyle = 'rgba(100, 200, 255, 0.8)';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText('❄ 冰霜效果', 20, 30);
+            }
+        }
+        
+        drawStartScreen(ctx) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('平台跳跃游戏', this.canvas.width / 2, this.canvas.height / 2 - 50);
+            
+            ctx.font = '24px Arial';
+            ctx.fillStyle = '#a0aec0';
+            ctx.fillText('点击开始游戏', this.canvas.width / 2, this.canvas.height / 2 + 20);
+            
+            ctx.font = '16px Arial';
+            ctx.fillStyle = '#718096';
+            ctx.fillText('方向键/WASD 移动 | 空格 跳跃', this.canvas.width / 2, this.canvas.height / 2 + 70);
+            ctx.fillText('支持二段跳 | 踩踏敌人消灭它们', this.canvas.width / 2, this.canvas.height / 2 + 100);
+        }
+        
+        drawWinScreen(ctx) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            ctx.fillStyle = '#48bb78';
+            ctx.font = 'bold 64px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('胜利！', this.canvas.width / 2, this.canvas.height / 2 - 30);
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '24px Arial';
+            ctx.fillText('收集了所有金币！', this.canvas.width / 2, this.canvas.height / 2 + 30);
+            
+            ctx.fillStyle = '#4299e1';
+            ctx.font = '20px Arial';
+            ctx.fillText('点击重新开始', this.canvas.width / 2, this.canvas.height / 2 + 80);
+        }
+        
+        gameLoop(timestamp) {
+            const deltaTime = Math.min((timestamp - this.lastTime) / 1000, 0.05);
+            this.lastTime = timestamp;
+            
+            this.update(deltaTime);
+            this.draw();
+            
+            requestAnimationFrame((t) => this.gameLoop(t));
+        }
+        
+        start() {
+            this.lastTime = performance.now();
+            this.gameLoop(this.lastTime);
+        }
+    }
+
+    // ============================================
+    // 模块: 游戏启动 (Bootstrap)
+    // ============================================
+    
+    window.addEventListener('load', () => {
+        const game = new Game();
+        game.start();
+    });
+    </script>
+</body>
+</html>

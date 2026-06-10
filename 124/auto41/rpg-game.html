@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>角色扮演游戏 - 核心玩法原型</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .status-bar {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .status-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .player-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .player-level {
+            font-size: 18px;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+
+        .exp-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .exp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #a8e6cf, #88d8b0);
+            transition: width 0.3s ease;
+        }
+
+        .resource-bars {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .resource-bar {
+            height: 25px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .hp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #ee5a5a);
+            transition: width 0.3s ease;
+        }
+
+        .mp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ecdc4, #44a08d);
+            transition: width 0.3s ease;
+        }
+
+        .resource-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 12px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .attributes {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .attr-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .attr-name {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 5px;
+        }
+
+        .attr-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .str-color { color: #ff6b6b; }
+        .agi-color { color: #4ecdc4; }
+        .int-color { color: #a29bfe; }
+
+        .main-area {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #ffd700;
+            border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .attr-allocation {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .remaining-points {
+            font-size: 16px;
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(255, 215, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .remaining-points span {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .alloc-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+
+        .alloc-name {
+            width: 60px;
+            font-weight: bold;
+        }
+
+        .alloc-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alloc-btn {
+            width: 35px;
+            height: 35px;
+            border: none;
+            border-radius: 50%;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .alloc-btn:hover:not(:disabled) {
+            transform: scale(1.1);
+        }
+
+        .alloc-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .btn-minus {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-plus {
+            background: #4ecdc4;
+            color: white;
+        }
+
+        .alloc-value {
+            font-size: 20px;
+            font-weight: bold;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .derived-stats {
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        .derived-stats div {
+            margin-bottom: 5px;
+        }
+
+        .monster-info {
+            text-align: center;
+        }
+
+        .monster-name {
+            font-size: 22px;
+            font-weight: bold;
+            color: #ff6b6b;
+            margin-bottom: 10px;
+        }
+
+        .monster-level {
+            display: inline-block;
+            background: #ff6b6b;
+            padding: 3px 12px;
+            border-radius: 15px;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .monster-hp-bar {
+            height: 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .monster-hp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4757, #ff6b81);
+            transition: width 0.3s ease;
+        }
+
+        .monster-hp-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .monster-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .monster-stat {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px;
+            border-radius: 8px;
+        }
+
+        .battle-actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .action-btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .action-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-attack {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a5a);
+            color: white;
+        }
+
+        .btn-escape {
+            background: linear-gradient(45deg, #a29bfe, #6c5ce7);
+            color: white;
+        }
+
+        .btn-find {
+            background: linear-gradient(45deg, #00b894, #00cec9);
+            color: white;
+        }
+
+        .start-battle {
+            text-align: center;
+            padding: 30px;
+        }
+
+        .start-battle h3 {
+            margin-bottom: 20px;
+            color: #ffd700;
+        }
+
+        .log-panel {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .battle-log {
+            height: 200px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 8px;
+            border-radius: 6px;
+        }
+
+        .log-player {
+            background: rgba(78, 205, 196, 0.2);
+            border-left: 3px solid #4ecdc4;
+        }
+
+        .log-monster {
+            background: rgba(255, 107, 107, 0.2);
+            border-left: 3px solid #ff6b6b;
+        }
+
+        .log-system {
+            background: rgba(255, 215, 0, 0.2);
+            border-left: 3px solid #ffd700;
+        }
+
+        .log-damage {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        .log-heal {
+            color: #4ecdc4;
+            font-weight: bold;
+        }
+
+        .log-crit {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .log-miss {
+            color: #a29bfe;
+            font-weight: bold;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .battle-log::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .battle-log::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .battle-log::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="status-bar">
+            <div class="status-top">
+                <div class="player-name" id="playerName">勇者</div>
+                <div class="player-level">Lv.<span id="playerLevel">1</span></div>
+            </div>
+            <div class="exp-bar">
+                <div class="exp-fill" id="expFill" style="width: 0%"></div>
+            </div>
+            <div style="text-align: center; font-size: 12px; color: #aaa; margin-bottom: 10px;">
+                经验: <span id="currentExp">0</span> / <span id="expNeeded">100</span>
+            </div>
+            <div class="resource-bars">
+                <div>
+                    <div style="font-size: 12px; margin-bottom: 5px; color: #ff6b6b;">生命值</div>
+                    <div class="resource-bar">
+                        <div class="hp-fill" id="hpFill" style="width: 100%"></div>
+                        <span class="resource-text"><span id="currentHp">0</span> / <span id="maxHp">0</span></span>
+                    </div>
+                </div>
+                <div>
+                    <div style="font-size: 12px; margin-bottom: 5px; color: #4ecdc4;">法力值</div>
+                    <div class="resource-bar">
+                        <div class="mp-fill" id="mpFill" style="width: 100%"></div>
+                        <span class="resource-text"><span id="currentMp">0</span> / <span id="maxMp">0</span></span>
+                    </div>
+                </div>
+            </div>
+            <div class="attributes">
+                <div class="attr-item">
+                    <div class="attr-name">力量</div>
+                    <div class="attr-value str-color" id="strValue">0</div>
+                </div>
+                <div class="attr-item">
+                    <div class="attr-name">敏捷</div>
+                    <div class="attr-value agi-color" id="agiValue">0</div>
+                </div>
+                <div class="attr-item">
+                    <div class="attr-name">智力</div>
+                    <div class="attr-value int-color" id="intValue">0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-area">
+            <div class="panel">
+                <div class="panel-title">⚔️ 属性分配</div>
+                <div class="attr-allocation">
+                    <div class="remaining-points">
+                        剩余属性点: <span id="remainingPoints">10</span>
+                    </div>
+                    <div class="alloc-item">
+                        <span class="alloc-name str-color">力量</span>
+                        <div class="alloc-controls">
+                            <button class="alloc-btn btn-minus" id="strMinus" onclick="ui.allocAttr('str', -1)">-</button>
+                            <span class="alloc-value" id="allocStr">0</span>
+                            <button class="alloc-btn btn-plus" id="strPlus" onclick="ui.allocAttr('str', 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="alloc-item">
+                        <span class="alloc-name agi-color">敏捷</span>
+                        <div class="alloc-controls">
+                            <button class="alloc-btn btn-minus" id="agiMinus" onclick="ui.allocAttr('agi', -1)">-</button>
+                            <span class="alloc-value" id="allocAgi">0</span>
+                            <button class="alloc-btn btn-plus" id="agiPlus" onclick="ui.allocAttr('agi', 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="alloc-item">
+                        <span class="alloc-name int-color">智力</span>
+                        <div class="alloc-controls">
+                            <button class="alloc-btn btn-minus" id="intMinus" onclick="ui.allocAttr('int', -1)">-</button>
+                            <span class="alloc-value" id="allocInt">0</span>
+                            <button class="alloc-btn btn-plus" id="intPlus" onclick="ui.allocAttr('int', 1)">+</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="derived-stats">
+                    <div>📊 衍生战斗数值:</div>
+                    <div>最大生命 = 力量 × 10 = <span id="calcHp">0</span></div>
+                    <div>最大法力 = 智力 × 10 = <span id="calcMp">0</span></div>
+                    <div>攻击伤害 = 力量 × 2 = <span id="calcAtk">0</span></div>
+                    <div>暴击率 = 敏捷 × 0.5% = <span id="calcCrit">0%</span> (上限20%)</div>
+                    <div>闪避率 = 敏捷 × 1% = <span id="calcDodge">0%</span> (上限30%)</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">👹 战斗区域</div>
+                <div id="monsterArea" class="monster-info">
+                    <div id="noMonster" class="start-battle">
+                        <h3>准备好了吗？</h3>
+                        <button class="action-btn btn-find" onclick="battleManager.findEnemy()">寻找敌人</button>
+                    </div>
+                    <div id="hasMonster" class="hidden">
+                        <div class="monster-name" id="monsterName">史莱姆</div>
+                        <div class="monster-level">Lv.<span id="monsterLevel">1</span></div>
+                        <div class="monster-hp-bar">
+                            <div class="monster-hp-fill" id="monsterHpFill" style="width: 100%"></div>
+                            <span class="monster-hp-text"><span id="monsterCurrentHp">20</span> / <span id="monsterMaxHp">20</span></span>
+                        </div>
+                        <div class="monster-stats">
+                            <div class="monster-stat">攻击力: <span id="monsterAtk">3</span></div>
+                            <div class="monster-stat">经验值: <span id="monsterExp">20</span></div>
+                        </div>
+                        <div class="battle-actions">
+                            <button class="action-btn btn-attack" id="btnAttack" onclick="battleManager.playerAttack()">⚔️ 攻击</button>
+                            <button class="action-btn btn-escape" id="btnEscape" onclick="battleManager.tryEscape()">🏃 逃跑</button>
+                        </div>
+                    </div>
+                    <div id="monsterDead" class="hidden">
+                        <div style="font-size: 24px; color: #ffd700; margin-bottom: 20px;">🎉 胜利！</div>
+                        <div style="margin-bottom: 20px;">获得经验值: <span id="gainedExp" style="color: #ffd700; font-weight: bold;">0</span></div>
+                        <button class="action-btn btn-find" onclick="battleManager.findEnemy()">继续寻找敌人</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="log-panel">
+            <div class="panel-title">📜 战斗日志</div>
+            <div class="battle-log" id="battleLog">
+                <div class="log-entry log-system">欢迎来到RPG世界！请先分配你的初始属性点（共10点），然后点击"寻找敌人"开始战斗！</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class Player {
+            constructor() {
+                this.name = '勇者';
+                this.level = 1;
+                this.exp = 0;
+                
+                this.baseStr = 0;
+                this.baseAgi = 0;
+                this.baseInt = 0;
+                
+                this.allocatedStr = 0;
+                this.allocatedAgi = 0;
+                this.allocatedInt = 0;
+                
+                this.remainingPoints = 10;
+                this.freePoints = 0;
+                
+                this.currentHp = 0;
+                this.currentMp = 0;
+            }
+
+            get str() {
+                return this.baseStr + this.allocatedStr;
+            }
+
+            get agi() {
+                return this.baseAgi + this.allocatedAgi;
+            }
+
+            get int() {
+                return this.baseInt + this.allocatedInt;
+            }
+
+            get maxHp() {
+                return this.str * 10;
+            }
+
+            get maxMp() {
+                return this.int * 10;
+            }
+
+            get attackDamage() {
+                return this.str * 2;
+            }
+
+            get critRate() {
+                return Math.min(this.agi * 0.5, 20);
+            }
+
+            get dodgeRate() {
+                return Math.min(this.agi * 1, 30);
+            }
+
+            get expNeeded() {
+                return 100 * this.level * this.level;
+            }
+
+            allocatePoint(attr, delta) {
+                const allocatedKey = 'allocated' + attr.charAt(0).toUpperCase() + attr.slice(1);
+                
+                if (delta > 0) {
+                    if (this.remainingPoints <= 0) return false;
+                    this[allocatedKey] += delta;
+                    this.remainingPoints -= delta;
+                } else {
+                    if (this[allocatedKey] <= 0) return false;
+                    this[allocatedKey] += delta;
+                    this.remainingPoints -= delta;
+                }
+                
+                this.updateResources();
+                return true;
+            }
+
+            updateResources() {
+                const maxHp = this.maxHp;
+                const maxMp = this.maxMp;
+                
+                if (this.currentHp === 0 && maxHp > 0) {
+                    this.currentHp = maxHp;
+                } else {
+                    this.currentHp = Math.min(this.currentHp, maxHp);
+                }
+                
+                if (this.currentMp === 0 && maxMp > 0) {
+                    this.currentMp = maxMp;
+                } else {
+                    this.currentMp = Math.min(this.currentMp, maxMp);
+                }
+            }
+
+            takeDamage(damage) {
+                this.currentHp = Math.max(0, this.currentHp - damage);
+                return this.currentHp <= 0;
+            }
+
+            heal(amount) {
+                this.currentHp = Math.min(this.maxHp, this.currentHp + amount);
+            }
+
+            addExp(amount) {
+                this.exp += amount;
+                let leveledUp = false;
+                
+                while (this.exp >= this.expNeeded) {
+                    this.exp -= this.expNeeded;
+                    this.level++;
+                    this.remainingPoints += 3;
+                    this.freePoints += 3;
+                    leveledUp = true;
+                }
+                
+                return leveledUp;
+            }
+
+            isAlive() {
+                return this.currentHp > 0;
+            }
+        }
+
+        class Monster {
+            constructor(playerLevel) {
+                this.name = this.generateName();
+                this.level = this.generateLevel(playerLevel);
+                this.maxHp = this.level * 20;
+                this.currentHp = this.maxHp;
+                this.attack = this.level * 3;
+                this.expReward = this.level * 20;
+            }
+
+            generateLevel(playerLevel) {
+                return Math.floor(Math.random() * (playerLevel + 2)) + 1;
+            }
+
+            generateName() {
+                const names = ['史莱姆', '哥布林', '骷髅兵', '狼人', '石像鬼', '暗影', '毒蛇', '食人魔', '幽灵', '巨魔'];
+                return names[Math.floor(Math.random() * names.length)];
+            }
+
+            takeDamage(damage) {
+                this.currentHp = Math.max(0, this.currentHp - damage);
+                return this.currentHp <= 0;
+            }
+
+            isAlive() {
+                return this.currentHp > 0;
+            }
+        }
+
+        class BattleManager {
+            constructor() {
+                this.player = null;
+                this.monster = null;
+                this.inBattle = false;
+            }
+
+            init(player) {
+                this.player = player;
+            }
+
+            findEnemy() {
+                if (this.player.remainingPoints > 0 && this.player.freePoints === 0) {
+                    ui.addLog('请先分配完所有初始属性点！', 'system');
+                    return;
+                }
+
+                this.monster = new Monster(this.player.level);
+                this.inBattle = true;
+                
+                ui.showMonster();
+                ui.updateMonsterDisplay();
+                ui.addLog(`遭遇了 Lv.${this.monster.level} ${this.monster.name}！`, 'system');
+                ui.addLog(`怪物属性 - HP: ${this.monster.maxHp}, 攻击力: ${this.monster.attack}`, 'system');
+            }
+
+            playerAttack() {
+                if (!this.inBattle || !this.monster) return;
+
+                const baseDamage = this.player.attackDamage;
+                const critChance = this.player.critRate;
+                const baseHitRate = 90;
+                const monsterDodge = 0;
+                const finalHitRate = Math.max(10, baseHitRate - monsterDodge);
+
+                const hitRoll = Math.random() * 100;
+                const critRoll = Math.random() * 100;
+
+                if (hitRoll > finalHitRate) {
+                    ui.addLog(`你攻击 ${this.monster.name}，但<span class="log-miss">未命中</span>！`, 'player');
+                } else {
+                    const isCrit = critRoll < critChance;
+                    let finalDamage = baseDamage;
+                    
+                    if (isCrit) {
+                        finalDamage = Math.floor(baseDamage * 1.5);
+                        ui.addLog(`💥 <span class="log-crit">暴击！</span>你对 ${this.monster.name} 造成了 <span class="log-damage">${finalDamage}</span> 点伤害！`, 'player');
+                    } else {
+                        ui.addLog(`你对 ${this.monster.name} 造成了 <span class="log-damage">${finalDamage}</span> 点伤害！`, 'player');
+                    }
+
+                    const monsterDead = this.monster.takeDamage(finalDamage);
+                    ui.updateMonsterDisplay();
+
+                    if (monsterDead) {
+                        this.handleMonsterDefeat();
+                        return;
+                    }
+                }
+
+                setTimeout(() => this.monsterAttack(), 500);
+            }
+
+            monsterAttack() {
+                if (!this.inBattle || !this.monster || !this.monster.isAlive()) return;
+
+                const damage = this.monster.attack;
+                const playerDodge = this.player.dodgeRate;
+                const dodgeRoll = Math.random() * 100;
+
+                if (dodgeRoll < playerDodge) {
+                    ui.addLog(`${this.monster.name} 攻击你，但你<span class="log-miss">闪避</span>了！（闪避率: ${playerDodge}%）`, 'monster');
+                } else {
+                    const playerDead = this.player.takeDamage(damage);
+                    ui.addLog(`${this.monster.name} 对你造成了 <span class="log-damage">${damage}</span> 点伤害！`, 'monster');
+                    ui.updatePlayerDisplay();
+
+                    if (playerDead) {
+                        this.handlePlayerDefeat();
+                    }
+                }
+            }
+
+            tryEscape() {
+                if (!this.inBattle) return;
+
+                const escapeChance = 40 + this.player.agi * 2;
+                const roll = Math.random() * 100;
+
+                if (roll < escapeChance) {
+                    ui.addLog(`你成功逃跑了！`, 'system');
+                    this.endBattle(false);
+                    ui.hideMonster();
+                } else {
+                    ui.addLog(`逃跑失败！`, 'system');
+                    setTimeout(() => this.monsterAttack(), 300);
+                }
+            }
+
+            handleMonsterDefeat() {
+                const expGained = this.monster.expReward;
+                const leveledUp = this.player.addExp(expGained);
+
+                ui.addLog(`🎉 ${this.monster.name} 被击败了！获得 <span class="log-heal">${expGained}</span> 点经验！`, 'system');
+                
+                if (leveledUp) {
+                    ui.addLog(`🌟 <span class="log-crit">升级了！</span>你现在是 Lv.${this.player.level}！获得3点属性点！`, 'system');
+                }
+
+                this.endBattle(true, expGained);
+                ui.showVictory(expGained);
+            }
+
+            handlePlayerDefeat() {
+                ui.addLog(`💀 你被击败了...游戏结束`, 'system');
+                this.endBattle(false);
+                ui.disableBattle();
+            }
+
+            endBattle(victory, expGained = 0) {
+                this.inBattle = false;
+                ui.updatePlayerDisplay();
+            }
+        }
+
+        class UI {
+            constructor() {
+                this.player = null;
+                this.battleManager = null;
+            }
+
+            init(player, battleManager) {
+                this.player = player;
+                this.battleManager = battleManager;
+                this.updatePlayerDisplay();
+                this.updateAllocationDisplay();
+            }
+
+            updatePlayerDisplay() {
+                document.getElementById('playerName').textContent = this.player.name;
+                document.getElementById('playerLevel').textContent = this.player.level;
+                document.getElementById('currentExp').textContent = this.player.exp;
+                document.getElementById('expNeeded').textContent = this.player.expNeeded;
+                
+                const expPercent = (this.player.exp / this.player.expNeeded) * 100;
+                document.getElementById('expFill').style.width = expPercent + '%';
+                
+                document.getElementById('currentHp').textContent = this.player.currentHp;
+                document.getElementById('maxHp').textContent = this.player.maxHp;
+                document.getElementById('currentMp').textContent = this.player.currentMp;
+                document.getElementById('maxMp').textContent = this.player.maxMp;
+                
+                const hpPercent = this.player.maxHp > 0 ? (this.player.currentHp / this.player.maxHp) * 100 : 0;
+                const mpPercent = this.player.maxMp > 0 ? (this.player.currentMp / this.player.maxMp) * 100 : 0;
+                document.getElementById('hpFill').style.width = hpPercent + '%';
+                document.getElementById('mpFill').style.width = mpPercent + '%';
+                
+                document.getElementById('strValue').textContent = this.player.str;
+                document.getElementById('agiValue').textContent = this.player.agi;
+                document.getElementById('intValue').textContent = this.player.int;
+            }
+
+            updateAllocationDisplay() {
+                document.getElementById('remainingPoints').textContent = this.player.remainingPoints;
+                document.getElementById('allocStr').textContent = this.player.allocatedStr;
+                document.getElementById('allocAgi').textContent = this.player.allocatedAgi;
+                document.getElementById('allocInt').textContent = this.player.allocatedInt;
+                
+                document.getElementById('calcHp').textContent = this.player.maxHp;
+                document.getElementById('calcMp').textContent = this.player.maxMp;
+                document.getElementById('calcAtk').textContent = this.player.attackDamage;
+                document.getElementById('calcCrit').textContent = this.player.critRate.toFixed(1);
+                document.getElementById('calcDodge').textContent = this.player.dodgeRate.toFixed(1);
+
+                const hasPoints = this.player.remainingPoints > 0;
+                document.getElementById('strPlus').disabled = !hasPoints;
+                document.getElementById('agiPlus').disabled = !hasPoints;
+                document.getElementById('intPlus').disabled = !hasPoints;
+
+                document.getElementById('strMinus').disabled = this.player.allocatedStr <= 0;
+                document.getElementById('agiMinus').disabled = this.player.allocatedAgi <= 0;
+                document.getElementById('intMinus').disabled = this.player.allocatedInt <= 0;
+            }
+
+            allocAttr(attr, delta) {
+                this.player.allocatePoint(attr, delta);
+                this.updatePlayerDisplay();
+                this.updateAllocationDisplay();
+            }
+
+            updateMonsterDisplay() {
+                if (!this.battleManager.monster) return;
+                
+                const monster = this.battleManager.monster;
+                document.getElementById('monsterName').textContent = monster.name;
+                document.getElementById('monsterLevel').textContent = monster.level;
+                document.getElementById('monsterCurrentHp').textContent = monster.currentHp;
+                document.getElementById('monsterMaxHp').textContent = monster.maxHp;
+                document.getElementById('monsterAtk').textContent = monster.attack;
+                document.getElementById('monsterExp').textContent = monster.expReward;
+                
+                const hpPercent = (monster.currentHp / monster.maxHp) * 100;
+                document.getElementById('monsterHpFill').style.width = hpPercent + '%';
+            }
+
+            showMonster() {
+                document.getElementById('noMonster').classList.add('hidden');
+                document.getElementById('monsterDead').classList.add('hidden');
+                document.getElementById('hasMonster').classList.remove('hidden');
+            }
+
+            hideMonster() {
+                document.getElementById('hasMonster').classList.add('hidden');
+                document.getElementById('monsterDead').classList.add('hidden');
+                document.getElementById('noMonster').classList.remove('hidden');
+            }
+
+            showVictory(expGained) {
+                document.getElementById('hasMonster').classList.add('hidden');
+                document.getElementById('noMonster').classList.add('hidden');
+                document.getElementById('monsterDead').classList.remove('hidden');
+                document.getElementById('gainedExp').textContent = expGained;
+            }
+
+            disableBattle() {
+                document.getElementById('btnAttack').disabled = true;
+                document.getElementById('btnEscape').disabled = true;
+            }
+
+            addLog(message, type) {
+                const log = document.getElementById('battleLog');
+                const entry = document.createElement('div');
+                entry.className = `log-entry log-${type}`;
+                entry.innerHTML = message;
+                log.appendChild(entry);
+                log.scrollTop = log.scrollHeight;
+            }
+        }
+
+        const player = new Player();
+        const battleManager = new BattleManager();
+        const ui = new UI();
+
+        battleManager.init(player);
+        ui.init(player, battleManager);
+    </script>
+</body>
+</html>

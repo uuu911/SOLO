@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>格斗对战游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        .game-container {
+            position: relative;
+        }
+        #gameCanvas {
+            border: 4px solid #16213e;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+        }
+        .hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+        }
+        .player-hud {
+            width: 250px;
+        }
+        .player-hud.right {
+            text-align: right;
+        }
+        .health-bar-container {
+            height: 25px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #fff;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .health-bar {
+            height: 100%;
+            transition: width 0.1s;
+        }
+        .player1 .health-bar {
+            background: linear-gradient(90deg, #00d4ff, #0099cc);
+        }
+        .player2 .health-bar {
+            background: linear-gradient(90deg, #ff4444, #cc0000);
+        }
+        .energy-bar-container {
+            height: 15px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #fff;
+            border-radius: 4px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+        .energy-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ffdd00, #ffaa00);
+            transition: width 0.1s;
+        }
+        .energy-bar.full {
+            animation: energyGlow 0.5s infinite alternate;
+        }
+        @keyframes energyGlow {
+            from { box-shadow: 0 0 5px #ffdd00; }
+            to { box-shadow: 0 0 20px #ffdd00, 0 0 30px #ffaa00; }
+        }
+        .player-name {
+            color: #fff;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        .timer {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-size: 32px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        .wins {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .player-hud.right .wins {
+            justify-content: flex-end;
+        }
+        .win-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            background: transparent;
+        }
+        .win-dot.active {
+            background: #ffdd00;
+            box-shadow: 0 0 10px #ffdd00;
+        }
+        .combo-display {
+            position: absolute;
+            color: #fff;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+        }
+        .menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .menu-title {
+            font-size: 48px;
+            color: #00d4ff;
+            text-shadow: 0 0 20px #00d4ff;
+            margin-bottom: 40px;
+            animation: titlePulse 2s infinite;
+        }
+        @keyframes titlePulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .menu-btn {
+            padding: 15px 40px;
+            font-size: 20px;
+            background: linear-gradient(135deg, #16213e, #0f3460);
+            color: #fff;
+            border: 2px solid #00d4ff;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+            pointer-events: auto;
+        }
+        .menu-btn:hover {
+            background: linear-gradient(135deg, #0f3460, #16213e);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+            transform: scale(1.05);
+        }
+        .controls-info {
+            position: absolute;
+            bottom: 20px;
+            color: #888;
+            font-size: 12px;
+            text-align: center;
+        }
+        .round-announcement {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 64px;
+            font-weight: bold;
+            text-shadow: 0 0 20px #ff0000;
+            animation: announcementFade 2s forwards;
+            pointer-events: none;
+        }
+        @keyframes announcementFade {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        <div class="hud">
+            <div class="player-hud player1">
+                <div class="player-name">玩家1 (蓝)</div>
+                <div class="health-bar-container">
+                    <div class="health-bar" id="p1-health" style="width: 100%"></div>
+                </div>
+                <div class="energy-bar-container">
+                    <div class="energy-bar" id="p1-energy" style="width: 0%"></div>
+                </div>
+                <div class="wins" id="p1-wins">
+                    <div class="win-dot"></div>
+                    <div class="win-dot"></div>
+                </div>
+            </div>
+            <div class="timer" id="timer">99</div>
+            <div class="player-hud player2 right">
+                <div class="player-name">玩家2 / AI (红)</div>
+                <div class="health-bar-container">
+                    <div class="health-bar" id="p2-health" style="width: 100%"></div>
+                </div>
+                <div class="energy-bar-container">
+                    <div class="energy-bar" id="p2-energy" style="width: 0%"></div>
+                </div>
+                <div class="wins" id="p2-wins">
+                    <div class="win-dot"></div>
+                    <div class="win-dot"></div>
+                </div>
+            </div>
+        </div>
+        <div class="combo-display" id="p1-combo" style="display: none;">连击</div>
+        <div class="combo-display" id="p2-combo" style="display: none;">连击</div>
+        <div class="menu-screen" id="menu">
+            <div class="menu-title">⚔️ 格斗对战 ⚔️</div>
+            <button class="menu-btn" onclick="startGame('pvp')">双人对战</button>
+            <button class="menu-btn" onclick="startGame('pve')">单人对战AI</button>
+            <div class="controls-info">
+                玩家1: W/A/S/D 移动, J/K/L 轻拳/重拳/防御<br>
+                玩家2: ↑/←/↓/→ 移动, 1/2/3 轻拳/重拳/防御
+            </div>
+        </div>
+        <div class="round-announcement" id="announcement" style="display: none;"></div>
+    </div>
+</body>
+
+<script>
+const DEBUG = false;
+const FPS = 60;
+const FRAME_TIME = 1000 / FPS;
+const CANVAS_WIDTH = 800;
+const CANVAS_HEIGHT = 400;
+const GROUND_Y = 320;
+const GRAVITY = 1800;
+const BOUNDARY_LEFT = 60;
+const BOUNDARY_RIGHT = 740;
+</script>
+
+<script>
+const InputModule = (function() {
+    const keys = {};
+    const keyDownTime = {};
+    
+    const KEY_MAP = {
+        P1: { UP: 'KeyW', DOWN: 'KeyS', LEFT: 'KeyA', RIGHT: 'KeyD', LP: 'KeyJ', HP: 'KeyK', BLOCK: 'KeyL' },
+        P2: { UP: 'ArrowUp', DOWN: 'ArrowDown', LEFT: 'ArrowLeft', RIGHT: 'ArrowRight', LP: 'Digit1', HP: 'Digit2', BLOCK: 'Digit3' }
+    };
+
+    function init() {
+        window.addEventListener('keydown', (e) => {
+            if (!keys[e.code]) {
+                keyDownTime[e.code] = Date.now();
+            }
+            keys[e.code] = true;
+            e.preventDefault();
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+            delete keyDownTime[e.code];
+        });
+    }
+
+    function isKeyPressed(code) {
+        return keys[code] || false;
+    }
+
+    function getKeyDownTime(code) {
+        return keyDownTime[code] || 0;
+    }
+
+    function getPlayerInput(player) {
+        const map = player === 1 ? KEY_MAP.P1 : KEY_MAP.P2;
+        return {
+            up: isKeyPressed(map.UP),
+            down: isKeyPressed(map.DOWN),
+            left: isKeyPressed(map.LEFT),
+            right: isKeyPressed(map.RIGHT),
+            lp: isKeyPressed(map.LP),
+            hp: isKeyPressed(map.HP),
+            block: isKeyPressed(map.BLOCK)
+        };
+    }
+
+    return { init, getPlayerInput, isKeyPressed, getKeyDownTime, KEY_MAP };
+})();
+</script>
+
+<script>
+const CommandInputModule = (function() {
+    const BUFFER_WINDOW = 300;
+    const playerBuffers = { 1: [], 2: [] };
+
+    const COMMANDS = {
+        QCF_PUNCH: { pattern: ['D', 'D/R', 'R', 'PUNCH'], name: '波动拳' },
+        DP_PUNCH: { pattern: ['R', 'D', 'D/R', 'PUNCH'], name: '升龙拳' },
+        QCF_QCF_PUNCH: { pattern: ['D', 'D/R', 'R', 'D', 'D/R', 'R', 'PUNCH'], name: '超必杀' }
+    };
+
+    function addInput(player, input) {
+        const now = Date.now();
+        playerBuffers[player].push({ input, time: now });
+        playerBuffers[player] = playerBuffers[player].filter(e => now - e.time < BUFFER_WINDOW);
+    }
+
+    function checkCommand(player, facingRight) {
+        const buffer = playerBuffers[player];
+        const now = Date.now();
+        const recentInputs = buffer.filter(e => now - e.time < BUFFER_WINDOW);
+        
+        if (recentInputs.length < 3) return null;
+
+        const inputs = recentInputs.map(e => e.input);
+        
+        if (matchCommandPattern(inputs, ['D', 'D/R', 'R', 'D', 'D/R', 'R', 'PUNCH'), facingRight) {
+            return 'SUPER';
+        }
+        if (matchCommandPattern(inputs, ['D', 'D/R', 'R', 'PUNCH'), facingRight) {
+            return 'QCF';
+        }
+        if (matchCommandPattern(inputs, ['R', 'D', 'D/R', 'PUNCH'], facingRight)) {
+            return 'DP';
+        }
+        return null;
+    }
+
+    function matchCommandPattern(inputs, pattern, facingRight) {
+        if (inputs.length < pattern.length) return false;
+        
+        for (let i = 0; i < pattern.length; i++) {
+            const input = inputs[inputs.length - pattern.length + i];
+            const pat = pattern[i];
+            
+            if (pat === 'PUNCH') {
+                if (input !== 'LP' && input !== 'HP') return false;
+            } else if (pat === 'D/R' || pat === 'D/L') {
+                    const target = facingRight ? 'D/R' : 'D/L';
+                    if (input !== target && input !== 'D' && input !== (facingRight ? 'R' : 'L')) return false;
+                } else {
+                    const actualPat = facingRight ? pat : (pat === 'R' ? 'L' : (pat === 'L' ? 'R' : pat);
+                    if (input !== actualPat) return false;
+                }
+        }
+        return true;
+    }
+
+    function clearBuffer(player) {
+        playerBuffers[player] = [];
+    }
+
+    function getDirectionalInput(input, prevInput) {
+        let dir = '';
+        if (input.down) dir += 'D';
+        if (input.up) dir += 'U';
+        if (input.left) dir += 'L';
+        if (input.right) dir += 'R';
+        return dir || 'N';
+    }
+
+    return { addInput, checkCommand, clearBuffer, getDirectionalInput };
+})();
+</script>
+
+<script>
+const CollisionModule = (function() {
+    function AABB(box1, box2) {
+        return box1.x < box2.x + box2.width &&
+               box1.x + box1.width > box2.x &&
+               box1.y < box2.y + box2.height &&
+               box1.y + box1.height > box2.y;
+    }
+
+    function getHurtbox(character) {
+        const baseHeight = character.state === 'CROUCH' ? 40 : 70;
+        const baseY = character.state === 'CROUCH' ? GROUND_Y - 40 : GROUND_Y - 70;
+        return {
+            x: character.x - 20,
+            y: baseY,
+            width: 40,
+            height: baseHeight
+        };
+    }
+
+    function getUpperHurtbox(character) {
+        if (character.state === 'CROUCH') return null;
+        return {
+            x: character.x - 15,
+            y: GROUND_Y - 70,
+            width: 30,
+            height: 35
+        };
+    }
+
+    function getAttackbox(character, attack) {
+        const facing = character.facingRight ? 1 : -1;
+        const offsetX = attack.offsetX * facing;
+        return {
+            x: character.x + offsetX,
+            y: GROUND_Y - attack.offsetY,
+            width: attack.width,
+            height: attack.height
+        };
+    }
+
+    function checkAttackHit(attacker, defender, attack) {
+        const attackBox = getAttackbox(attacker, attack);
+        const hurtBox = getHurtbox(defender);
+        return AABB(attackBox, hurtBox);
+    }
+
+    function checkProjectileHit(projectile, character) {
+        const hurtBox = getHurtbox(character);
+        return AABB(projectile, hurtBox);
+    }
+
+    function checkHighProjectileHit(projectile, character) {
+        if (character.state === 'CROUCH') {
+            return false;
+        }
+        const upperBox = getUpperHurtbox(character);
+        if (!upperBox) return false;
+        return AABB(projectile, upperBox);
+    }
+
+    return { 
+        AABB, getHurtbox, getAttackbox, checkAttackHit, checkProjectileHit, checkHighProjectileHit };
+})();
+</script>
+
+<script>
+const AudioModule = (function() {
+    let audioContext = null;
+
+    function init() {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    function playSound(type) {
+        if (!audioContext) init();
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        switch(type) {
+            case 'light':
+                oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.1);
+                break;
+            case 'heavy':
+                oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.2);
+                gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.2);
+                break;
+            case 'special':
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.15);
+                oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+                break;
+            case 'super':
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
+                for (let i = 0; i < 5; i++) {
+                    oscillator.frequency.setValueAtTime(150 + i * 100, audioContext.currentTime + i * 0.1);
+                }
+                gainNode.gain.setValueAtTime(0.6, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.8);
+                break;
+            case 'block':
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.05);
+                gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.05);
+                break;
+        }
+    }
+
+    return { init, playSound };
+})();
+</script>
+
+<script>
+const CharacterStateMachine = (function() {
+    const ATTACKS = {
+        LP: { damage: 80, hitstun: 0.25, startup: 0.05, active: 0.1, recovery: 0.15, offsetX: 35, offsetY: 40, width: 40, height: 30, type: 'light' },
+        HP: { damage: 150, hitstun: 0.5, startup: 0.12, active: 0.15, recovery: 0.25, offsetX: 45, offsetY: 45, width: 50, height: 35, type: 'heavy' },
+        LK: { damage: 90, hitstun: 0.3, startup: 0.08, active: 0.12, recovery: 0.2, offsetX: 40, offsetY: 20, width: 45, height: 25, type: 'light' },
+        HK: { damage: 160, hitstun: 0.5, startup: 0.15, active: 0.18, recovery: 0.3, offsetX: 50, offsetY: 25, width: 55, height: 30, type: 'heavy' },
+        QCF: { damage: 250, hitstun: 0.4, startup: 0.15, active: 0.2, recovery: 0.3, offsetX: 0, offsetY: 0, width: 0, height: 0, type: 'special', energyCost: 200 },
+        DP: { damage: 300, hitstun: 0.6, startup: 0.08, active: 0.25, recovery: 0.4, offsetX: 30, offsetY: 60, width: 50, height: 80, type: 'special', energyCost: 200, invincible: 0.1 },
+        SUPER: { damage: 500, hitstun: 1.0, startup: 0.5, active: 0.5, recovery: 0.8, offsetX: 0, offsetY: 0, width: 0, height: 0, type: 'super', energyCost: 1000, invincible: 999 },
+        THROW: { damage: 200, hitstun: 0.6, startup: 0.1, active: 0.1, recovery: 0.3, offsetX: 30, offsetY: 50, width: 60, height: 60, type: 'throw' }
+    };
+
+    function createCharacter(playerNum) {
+        return {
+            player: playerNum,
+            x: playerNum === 1 ? 200 : 600,
+            vx: 0,
+            vy: 0,
+            health: 1000,
+            energy: 0,
+            state: 'IDLE',
+            prevState: 'IDLE',
+            facingRight: playerNum === 1,
+            stateTimer: 0,
+            attackTimer: 0,
+            attackPhase: 'idle',
+            currentAttack: null,
+            combo: 0,
+            comboTimer: 0,
+            hitFlash: 0,
+            knockback: 0,
+            knockbackVelocity: 0,
+            airborn: false,
+            jumpPressed: false,
+            invincibleTime: 0,
+            lastInput: { up: false, down: false, left: false, right: false, lp: false, hp: false, block: false },
+            attackConnected: false
+        };
+    }
+
+    function updateState(char, deltaTime, opponent, gameState) {
+        char.prevState = char.state;
+        char.stateTimer += deltaTime;
+        
+        if (char.invincibleTime > 0) {
+            char.invincibleTime -= deltaTime;
+        }
+
+        if (char.comboTimer > 0) {
+            char.comboTimer -= deltaTime;
+            if (char.comboTimer <= 0) {
+                char.combo = 0;
+            }
+        }
+
+        if (char.hitFlash > 0) {
+            char.hitFlash -= deltaTime;
+        }
+
+        if (char.knockback > 0) {
+            char.knockback -= deltaTime;
+            char.x += char.knockbackVelocity * deltaTime;
+            char.knockbackVelocity *= 0.95;
+            if (char.knockback <= 0) {
+                char.knockbackVelocity = 0;
+            }
+        }
+
+        updateFacingDirection(char, opponent);
+
+        switch(char.state) {
+            case 'IDLE':
+            case 'WALK_FORWARD':
+            case 'WALK_BACKWARD':
+            case 'CROUCH':
+                handleMovement(char, deltaTime, opponent, gameState);
+                break;
+            case 'JUMP':
+                handleJump(char, deltaTime, opponent, gameState);
+                break;
+            case 'ATTACK':
+                handleAttack(char, deltaTime, opponent, gameState);
+                break;
+            case 'HITSTUN':
+                handleHitstun(char, deltaTime);
+                break;
+            case 'BLOCK':
+                handleBlock(char, deltaTime, opponent, gameState);
+                break;
+            case 'LANDING':
+                handleLanding(char, deltaTime);
+                break;
+        }
+
+        applyBoundaryConstraints(char);
+    }
+
+    function updateFacingDirection(char, opponent) {
+        if (char.state !== 'ATTACK' && char.state !== 'HITSTUN') {
+            char.facingRight = opponent.x > char.x;
+        }
+    }
+
+    function handleMovement(char, deltaTime, opponent, gameState) {
+        const input = InputModule.getPlayerInput(char.player);
+        const speed = 180;
+        const backSpeed = 120;
+
+        if (input.block && char.state !== 'CROUCH') {
+            char.state = 'BLOCK';
+            char.stateTimer = 0;
+            return;
+        }
+
+        if (input.up && !char.airborn && !char.jumpPressed) {
+            char.state = 'JUMP';
+            char.vy = -800;
+            char.airborn = true;
+            char.jumpPressed = true;
+            char.stateTimer = 0;
+            CommandInputModule.addInput(char.player, char.facingRight ? 'U' : 'U');
+            return;
+        }
+        if (!input.up) char.jumpPressed = false;
+
+        if (input.down && !char.airborn) {
+            char.state = 'CROUCH';
+        } else if (char.state === 'CROUCH') {
+            char.state = 'IDLE';
+        }
+
+        if (char.state !== 'CROUCH') {
+            const moveDir = 0;
+            if (input.left) moveDir -= 1;
+            if (input.right) moveDir += 1;
+
+            if (moveDir !== 0) {
+                const isForward = (moveDir > 0 && char.facingRight) || (moveDir < 0 && !char.facingRight);
+                char.x += moveDir * (isForward ? speed : backSpeed) * deltaTime;
+                char.state = isForward ? 'WALK_FORWARD' : 'WALK_BACKWARD';
+                
+                if (moveDir > 0) CommandInputModule.addInput(char.player, char.facingRight ? 'R' : 'L');
+                if (moveDir < 0) CommandInputModule.addInput(char.player, char.facingRight ? 'L' : 'R');
+            } else if (char.state !== 'CROUCH') {
+                char.state = 'IDLE';
+            }
+        } else {
+            CommandInputModule.addInput(char.player, 'D');
+        }
+
+        checkAttackInput(char, input, opponent, gameState);
+    }
+
+    function handleJump(char, deltaTime, opponent, gameState) {
+        char.vy += GRAVITY * deltaTime;
+        char.y += char.vy * deltaTime;
+
+        if (char.y >= GROUND_Y) {
+            char.y = GROUND_Y;
+            char.vy = 0;
+            char.airborn = false;
+            char.state = 'LANDING';
+            char.stateTimer = 0;
+        }
+
+        const input = InputModule.getPlayerInput(char.player);
+        const moveSpeed = 100;
+        if (input.left) char.x -= moveSpeed * deltaTime;
+        if (input.right) char.x += moveSpeed * deltaTime;
+
+        checkAttackInput(char, input, opponent, gameState);
+    }
+
+    function handleAttack(char, deltaTime, opponent, gameState) {
+        const attack = ATTACKS[char.currentAttack];
+        char.attackTimer += deltaTime;
+
+        if (char.attackPhase === 'startup') {
+            if (char.attackTimer >= attack.startup) {
+                char.attackPhase = 'active';
+                char.attackTimer = 0;
+            }
+        } else if (char.attackPhase === 'active') {
+            if (char.attackTimer >= attack.active) {
+                char.attackPhase = 'recovery';
+                char.attackTimer = 0;
+            } else if (!char.attackConnected) {
+                if (char.currentAttack === 'QCF' && gameState.projectiles.filter(p => p.owner === char.player).length === 0) {
+                    gameState.projectiles.push({
+                        owner: char.player,
+                        x: char.x + (char.facingRight ? 50 : -50),
+                        y: GROUND_Y - 50,
+                        vx: char.facingRight ? 400 : -400,
+                        width: 40,
+                        height: 30,
+                        damage: attack.damage,
+                        hitstun: attack.hitstun,
+                        high: true
+                    });
+                    char.attackConnected = true;
+                } else if (char.currentAttack !== 'QCF') {
+                    if (CollisionModule.checkAttackHit(char, opponent, attack)) {
+                        applyDamage(char, opponent, attack, gameState);
+                        char.attackConnected = true;
+                    }
+                }
+            }
+        } else if (char.attackPhase === 'recovery') {
+            if (char.attackTimer >= attack.recovery) {
+                char.state = 'IDLE';
+                char.attackPhase = 'idle';
+                char.currentAttack = null;
+                char.attackConnected = false;
+            }
+        }
+    }
+
+    function handleHitstun(char, deltaTime) {
+        if (char.stateTimer >= char.hitstunDuration) {
+            char.state = 'IDLE';
+        }
+    }
+
+    function handleBlock(char, deltaTime, opponent, gameState) {
+        const input = InputModule.getPlayerInput(char.player);
+        
+        if (!input.block) {
+            char.state = 'IDLE';
+            return;
+        }
+
+        if (input.down) {
+            char.state = 'CROUCH_BLOCK';
+        }
+    }
+
+    function handleLanding(char, deltaTime) {
+        if (char.stateTimer >= 0.15) {
+            char.state = 'IDLE';
+        }
+    }
+
+    function checkAttackInput(char, input, opponent, gameState) {
+        if (char.state === 'ATTACK' || char.state === 'HITSTUN' || char.state === 'LANDING') return;
+
+        const command = CommandInputModule.checkCommand(char.player, char.facingRight);
+        
+        if (command === 'SUPER' && char.energy >= 1000) {
+            startAttack(char, 'SUPER', gameState);
+            gameState.screenShake = 0.8;
+            gameState.freezeTime = 0.5;
+            return;
+        }
+        
+        if (command === 'QCF' && char.energy >= 200) {
+            startAttack(char, 'QCF', gameState);
+            return;
+        }
+        
+        if (command === 'DP' && char.energy >= 200) {
+            startAttack(char, 'DP', gameState);
+            char.invincibleTime = ATTACKS.DP.invincible;
+            return;
+        }
+
+        const distance = Math.abs(char.x - opponent.x);
+        const throwDir = (char.facingRight && input.right) || (!char.facingRight && input.left);
+        
+        if (input.hp && throwDir && distance < 80 && !opponent.airborn) {
+            startAttack(char, 'THROW', gameState);
+            return;
+        }
+
+        if (input.lp && !char.lastInput.lp !== input.lp) {
+            startAttack(char, 'LP', gameState);
+            CommandInputModule.addInput(char.player, 'PUNCH');
+        }
+        if (input.hp && !char.lastInput.hp !== input.hp) {
+            startAttack(char, 'HP', gameState);
+            CommandInputModule.addInput(char.player, 'PUNCH');
+        }
+
+        char.lastInput = { ...input };
+    }
+
+    function startAttack(char, attackName, gameState) {
+        const attack = ATTACKS[attackName];
+        if (attack.energyCost && char.energy < attack.energyCost) return;
+        
+        if (attack.energyCost) {
+            char.energy -= attack.energyCost;
+        }
+
+        char.state = 'ATTACK';
+        char.currentAttack = attackName;
+        char.attackPhase = 'startup';
+        char.attackTimer = 0;
+        char.stateTimer = 0;
+        char.attackConnected = false;
+
+        AudioModule.playSound(attack.type);
+    }
+
+    function applyDamage(attacker, defender, attack, gameState) {
+        let damage = attack.damage;
+        let blocked = false;
+
+        const facingAttacker = attacker.x < defender.x;
+        const correctSide = (facingAttacker && defender.facingRight) || (!facingAttacker && !defender.facingRight);
+        
+        if ((defender.state === 'BLOCK' || defender.state === 'CROUCH_BLOCK') && correctSide && attack.type !== 'throw') {
+            damage *= 0.3;
+            blocked = true;
+            AudioModule.playSound('block');
+        } else {
+            defender.hitFlash = 0.1;
+            defender.energy = Math.min(1000, defender.energy + 40);
+        }
+
+        attacker.energy = Math.min(1000, attacker.energy + 80);
+
+        attacker.combo++;
+        attacker.comboTimer = 1.0;
+        const comboMultiplier = Math.max(0.5 + 1 / (attacker.combo * 0.5 + 1));
+        damage *= comboMultiplier;
+
+        defender.health -= damage;
+        
+        if (!blocked) {
+            defender.state = 'HITSTUN';
+            defender.stateTimer = 0;
+            defender.hitstunDuration = attack.hitstun;
+            
+            if (attack.type === 'heavy' || attack.type === 'special') {
+                defender.knockback = 0.3;
+                defender.knockbackVelocity = attacker.facingRight ? 200 : -200;
+            }
+        }
+
+        gameState.hitStop = 0.1;
+    }
+
+    function applyBoundaryConstraints(char) {
+        char.x = Math.max(BOUNDARY_LEFT, Math.min(BOUNDARY_RIGHT, char.x));
+    }
+
+    return { createCharacter, updateState, ATTACKS };
+})();
+</script>
+
+<script>
+const AIModule = (function() {
+    let actionTimer = 0;
+    let currentAction = 'IDLE';
+    let actionDuration = 0;
+
+    const AI_ACTIONS = ['IDLE', 'WALK_FORWARD', 'WALK_BACKWARD', 'JUMP', 'CROUCH', 'LP', 'HP', 'BLOCK', 'SPECIAL'];
+
+    function update(ai, opponent, deltaTime) {
+        actionTimer -= deltaTime;
+        const distance = Math.abs(ai.x - opponent.x);
+
+        if (actionTimer <= 0) {
+            decideAction(ai, opponent, distance);
+        }
+
+        executeAction(ai, opponent, distance);
+    }
+
+    function decideAction(ai, opponent, distance) {
+        const rand = Math.random();
+        const healthFactor = ai.health / 1000;
+
+        if (opponent.state === 'ATTACK' && distance < 150) {
+            if (rand < 0.6) {
+                currentAction = 'BLOCK';
+                actionDuration = 0.5;
+            } else if (rand < 0.8) {
+                currentAction = 'JUMP';
+                actionDuration = 0.3;
+            } else {
+                currentAction = 'WALK_BACKWARD';
+                actionDuration = 0.3;
+            }
+            return;
+        }
+
+        if (ai.energy >= 1000 && distance < 200 && rand < 0.3) {
+            currentAction = 'SPECIAL';
+            actionDuration = 0.5;
+            return;
+        }
+
+        if (ai.energy >= 200 && distance > 150 && rand < 0.15) {
+            currentAction = 'SPECIAL';
+            actionDuration = 0.3;
+            return;
+        }
+
+        if (distance > 250) {
+            currentAction = 'WALK_FORWARD';
+            actionDuration = 0.3 + Math.random() * 0.3;
+        } else if (distance < 100) {
+            if (rand < 0.4) {
+                currentAction = rand < 0.5 ? 'LP' : 'HP';
+                actionDuration = 0.4;
+            } else if (rand < 0.6) {
+                currentAction = 'WALK_BACKWARD';
+                actionDuration = 0.2;
+            } else {
+                currentAction = 'BLOCK';
+                actionDuration = 0.3;
+            }
+        } else {
+            const actions = ['WALK_FORWARD', 'WALK_BACKWARD', 'JUMP', 'CROUCH', 'LP', 'HP'];
+            currentAction = actions[Math.floor(Math.random() * actions.length)];
+            actionDuration = 0.2 + Math.random() * 0.3;
+        }
+
+        actionTimer = actionDuration;
+    }
+
+    function executeAction(ai, opponent, distance) {
+        const input = {
+            up: false,
+            down: false,
+            left: false,
+            right: false,
+            lp: false,
+            hp: false,
+            block: false
+        };
+
+        const moveDir = ai.facingRight ? 1 : -1;
+
+        switch(currentAction) {
+            case 'WALK_FORWARD':
+                if (ai.facingRight) input.right = true;
+                else input.left = true;
+                break;
+            case 'WALK_BACKWARD':
+                if (ai.facingRight) input.left = true;
+                else input.right = true;
+                break;
+            case 'JUMP':
+                input.up = true;
+                break;
+            case 'CROUCH':
+                input.down = true;
+                break;
+            case 'LP':
+                input.lp = true;
+                break;
+            case 'HP':
+                input.hp = true;
+                break;
+            case 'BLOCK':
+                input.block = true;
+                break;
+            case 'SPECIAL':
+                input.down = true;
+                if (ai.facingRight) input.right = true;
+                else input.left = true;
+                input.hp = true;
+                break;
+        }
+
+        Object.keys(input).forEach(key => {
+            const event = new Event(input[key] ? 'keydown' : 'keyup');
+            const map = InputModule.KEY_MAP.P2;
+            const keyCode = map[key.toUpperCase()] || map[key.toUpperCase()];
+            if (keyCode) {
+                event.code = keyCode;
+                window.dispatchEvent(event);
+            }
+        });
+    }
+
+    return { update };
+})();
+</script>
+
+<script>
+const RendererModule = (function() {
+    let canvas, ctx;
+
+    function init() {
+        canvas = document.getElementById('gameCanvas');
+        ctx = canvas.getContext('2d');
+    }
+
+    function render(gameState) {
+        ctx.save();
+        
+        if (gameState.screenShake > 0) {
+            const shakeX = (Math.random() - 0.5) * 10 * gameState.screenShake;
+            const shakeY = (Math.random() - 0.5) * 10 * gameState.screenShake;
+            ctx.translate(shakeX, shakeY);
+        }
+
+        ctx.fillStyle = '#16213e';
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+        drawBackground();
+        drawGround();
+
+        gameState.projectiles.forEach(p => drawProjectile(p));
+
+        drawCharacter(gameState.player1, '#00d4ff', gameState);
+        drawCharacter(gameState.player2, '#ff4444', gameState);
+
+        if (DEBUG) {
+            drawDebugInfo(gameState);
+        }
+
+        ctx.restore();
+
+        updateHUD(gameState);
+    }
+
+    function drawBackground() {
+        ctx.fillStyle = '#1a1a2e';
+        for (let i = 0; i < 5; i++) {
+            ctx.fillRect(100 + i * 150, 100 + (i % 2) * 50, 80, 150 - (i % 2) * 50);
+        }
+    }
+
+    function drawGround() {
+        ctx.fillStyle = '#2d3436';
+        ctx.fillRect(0, GROUND_Y, CANVAS_WIDTH, CANVAS_HEIGHT - GROUND_Y);
+        
+        ctx.strokeStyle = '#636e72';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, GROUND_Y);
+        ctx.lineTo(CANVAS_WIDTH, GROUND_Y);
+        ctx.stroke();
+    }
+
+    function drawCharacter(char, color, gameState) {
+        ctx.save();
+        ctx.translate(char.x, GROUND_Y);
+
+        if (char.hitFlash > 0 && Math.floor(char.hitFlash * 60) % 2 === 0) {
+            ctx.fillStyle = '#ffffff';
+        } else {
+            ctx.fillStyle = color;
+        }
+
+        const isCrouch = char.state === 'CROUCH' || char.state === 'CROUCH_BLOCK';
+        const bodyHeight = isCrouch ? 40 : 60;
+        const bodyY = isCrouch ? -40 : -60;
+
+        ctx.fillRect(-15, bodyY, 30, bodyHeight);
+
+        ctx.beginPath();
+        ctx.arc(0, bodyY - 10, 15, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (char.state === 'ATTACK' && char.attackPhase === 'active') {
+            const attack = CharacterStateMachine.ATTACKS[char.currentAttack];
+            const facing = char.facingRight ? 1 : -1;
+            
+            ctx.fillStyle = char.player === 1 ? '#00ffff' : '#ff6666';
+            ctx.fillRect(
+                attack.offsetX * facing - attack.width / 2,
+                -attack.offsetY - attack.height / 2,
+                attack.width,
+                attack.height
+            );
+        } else {
+            const armY = bodyY + 10;
+            ctx.fillRect(char.facingRight ? 15 : -35, armY, 20, 8);
+            ctx.fillRect(char.facingRight ? -35 : 15, armY, 20, 8);
+        }
+
+        const legWidth = 10;
+        const legY = bodyY + bodyHeight - 15;
+        ctx.fillRect(-12, legY, legWidth, 15);
+        ctx.fillRect(2, legY, legWidth, 15);
+
+        if (char.state === 'BLOCK' || char.state === 'CROUCH_BLOCK') {
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, bodyY - 10, 25, -Math.PI * 0.7, Math.PI * 0.7);
+            ctx.stroke();
+        }
+
+        if (char.combo > 1) {
+            ctx.fillStyle = '#ffdd00';
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${char.combo} HIT`, 0, bodyY - 35);
+        }
+
+        ctx.restore();
+    }
+
+    function drawProjectile(p) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 25);
+        gradient.addColorStop(0, p.owner === 1 ? '#00ffff' : '#ff6666');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, 25, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = p.owner === 1 ? '#00ffff' : '#ff6666';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 20, 15, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    function drawDebugInfo(gameState) {
+        [gameState.player1, gameState.player2].forEach(char => {
+            const hurtbox = CollisionModule.getHurtbox(char);
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(hurtbox.x, hurtbox.y, hurtbox.width, hurtbox.height);
+
+            if (char.state === 'ATTACK' && char.attackPhase === 'active') {
+                const attack = CharacterStateMachine.ATTACKS[char.currentAttack];
+                if (attack.width > 0) {
+                    const attackbox = CollisionModule.getAttackbox(char, attack);
+                    ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+                    ctx.strokeRect(attackbox.x, attackbox.y, attackbox.width, attackbox.height);
+                }
+            }
+        });
+    }
+
+    function updateHUD(gameState) {
+        document.getElementById('p1-health').style.width = `${(gameState.player1.health / 1000) * 100}%`;
+        document.getElementById('p2-health').style.width = `${(gameState.player2.health / 1000) * 100}%`;
+        
+        const p1EnergyBar = document.getElementById('p1-energy');
+        const p2EnergyBar = document.getElementById('p2-energy');
+        p1EnergyBar.style.width = `${(gameState.player1.energy / 1000) * 100}%`;
+        p2EnergyBar.style.width = `${(gameState.player2.energy / 1000) * 100}%`;
+        
+        p1EnergyBar.classList.toggle('full', gameState.player1.energy >= 1000);
+        p2EnergyBar.classList.toggle('full', gameState.player2.energy >= 1000);
+
+        document.getElementById('timer').textContent = Math.ceil(gameState.roundTimer);
+
+        const p1Wins = document.getElementById('p1-wins').children;
+        const p2Wins = document.getElementById('p2-wins').children;
+        for (let i = 0; i < 2; i++) {
+            p1Wins[i].classList.toggle('active', i < gameState.player1Wins);
+            p2Wins[i].classList.toggle('active', i < gameState.player2Wins);
+        }
+    }
+
+    return { init, render };
+})();
+</script>
+
+<script>
+const GameModule = (function() {
+    let gameState = {
+        player1: null,
+        player2: null,
+        player1Wins: 0,
+        player2Wins: 0,
+        roundTimer: 99,
+        projectiles: [],
+        gameMode: 'pvp',
+        gamePhase: 'menu',
+        roundPhase: 'idle',
+        screenShake: 0,
+        freezeTime: 0,
+        hitStop: 0,
+        announcementTimer: 0,
+        announcementText: ''
+    };
+
+    let lastTime = 0;
+    let accumulator = 0;
+
+    function init() {
+        InputModule.init();
+        RendererModule.init();
+        AudioModule.init();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function startGame(mode) {
+        gameState.gameMode = mode;
+        gameState.player1Wins = 0;
+        gameState.player2Wins = 0;
+        startRound();
+        document.getElementById('menu').style.display = 'none';
+    }
+
+    function startRound() {
+        gameState.player1 = CharacterStateMachine.createCharacter(1);
+        gameState.player2 = CharacterStateMachine.createCharacter(2);
+        gameState.roundTimer = 99;
+        gameState.projectiles = [];
+        gameState.roundPhase = 'countdown';
+        gameState.announcementText = 'ROUND ' + (gameState.player1Wins + gameState.player2Wins + 1);
+        gameState.announcementTimer = 2;
+        showAnnouncement(gameState.announcementText);
+    }
+
+    function showAnnouncement(text) {
+        const el = document.getElementById('announcement');
+        el.textContent = text;
+        el.style.display = 'block';
+        el.style.animation = 'none';
+        el.offsetHeight;
+        el.style.animation = 'announcementFade 2s forwards';
+        setTimeout(() => {
+            el.style.display = 'none';
+        }, 2000);
+    }
+
+    function gameLoop(timestamp) {
+        if (lastTime === 0) lastTime = timestamp;
+        const deltaTime = Math.min((timestamp - lastTime) / 1000, 0.1);
+        lastTime = timestamp;
+
+        if (gameState.freezeTime > 0) {
+            gameState.freezeTime -= deltaTime;
+        } else if (gameState.hitStop > 0) {
+            gameState.hitStop -= deltaTime;
+        } else if (gameState.gamePhase !== 'menu') {
+            accumulator += deltaTime;
+            while (accumulator >= FRAME_TIME / 1000) {
+                update(FRAME_TIME / 1000);
+                accumulator -= FRAME_TIME / 1000;
+            }
+        }
+
+        if (gameState.screenShake > 0) {
+            gameState.screenShake -= deltaTime;
+        }
+
+        RendererModule.render(gameState);
+        requestAnimationFrame(gameLoop);
+    }
+
+    function update(deltaTime) {
+        if (gameState.announcementTimer > 0) {
+            gameState.announcementTimer -= deltaTime;
+            if (gameState.announcementTimer <= 0) {
+                gameState.roundPhase = 'fighting';
+            }
+            return;
+        }
+
+        if (gameState.roundPhase !== 'fighting') return;
+
+        gameState.roundTimer -= deltaTime;
+
+        CharacterStateMachine.updateState(gameState.player1, deltaTime, gameState.player2, gameState);
+        
+        if (gameState.gameMode === 'pve') {
+            AIModule.update(gameState.player2, gameState.player1, deltaTime);
+        }
+        CharacterStateMachine.updateState(gameState.player2, deltaTime, gameState.player1, gameState);
+
+        updateProjectiles(deltaTime);
+        checkRoundEnd();
+    }
+
+    function updateProjectiles(deltaTime) {
+        gameState.projectiles = gameState.projectiles.filter(p => {
+            p.x += p.vx * deltaTime;
+
+            const target = p.owner === 1 ? gameState.player2 : gameState.player1;
+            
+            if (p.high) {
+                if (CollisionModule.checkHighProjectileHit(p, target)) {
+                    applyProjectileHit(p, target);
+                    return false;
+                }
+            } else if (CollisionModule.checkProjectileHit(p, target)) {
+                applyProjectileHit(p, target);
+                return false;
+            }
+
+            return p.x > BOUNDARY_LEFT - 50 && p.x < BOUNDARY_RIGHT + 50;
+        });
+    }
+
+    function applyProjectileHit(projectile, target) {
+        let damage = projectile.damage;
+        const attacker = projectile.owner === 1 ? gameState.player1 : gameState.player2;
+        
+        const facingAttacker = attacker.x < target.x;
+        const correctSide = (facingAttacker && target.facingRight) || (!facingAttacker && !target.facingRight);
+        
+        if ((target.state === 'BLOCK' || target.state === 'CROUCH_BLOCK') && correctSide) {
+            damage *= 0.3;
+            AudioModule.playSound('block');
+        } else {
+            target.hitFlash = 0.1;
+            target.state = 'HITSTUN';
+            target.stateTimer = 0;
+            target.hitstunDuration = projectile.hitstun;
+            target.energy = Math.min(1000, target.energy + 40);
+        }
+
+        target.health -= damage;
+        attacker.energy = Math.min(1000, attacker.energy + 80);
+        gameState.hitStop = 0.1;
+    }
+
+    function checkRoundEnd() {
+        const p1Dead = gameState.player1.health <= 0;
+        const p2Dead = gameState.player2.health <= 0;
+        const timeUp = gameState.roundTimer <= 0;
+
+        if (p1Dead || p2Dead || timeUp) {
+            gameState.roundPhase = 'ended';
+            
+            let winner = null;
+            if (p1Dead && p2Dead) {
+                gameState.announcementText = 'DOUBLE KO!';
+            } else if (p1Dead) {
+                winner = 2;
+                gameState.player2Wins++;
+                gameState.announcementText = '玩家2 获胜!';
+            } else if (p2Dead) {
+                winner = 1;
+                gameState.player1Wins++;
+                gameState.announcementText = '玩家1 获胜!';
+            } else {
+                if (gameState.player1.health > gameState.player2.health) {
+                    winner = 1;
+                    gameState.player1Wins++;
+                    gameState.announcementText = '玩家1 获胜!';
+                } else if (gameState.player2.health > gameState.player1.health) {
+                    winner = 2;
+                    gameState.player2Wins++;
+                    gameState.announcementText = '玩家2 获胜!';
+                } else {
+                    gameState.announcementText = '平局!';
+                }
+            }
+
+            showAnnouncement(gameState.announcementText);
+            gameState.announcementTimer = 3;
+
+            setTimeout(() => {
+                if (gameState.player1Wins >= 2 || gameState.player2Wins >= 2) {
+                    gameState.gamePhase = 'menu';
+                    document.getElementById('menu').style.display = 'flex';
+                    showAnnouncement(gameState.player1Wins >= 2 ? '玩家1 胜利!' : '玩家2 胜利!');
+                } else {
+                    setTimeout(() => startRound(), 1000);
+                }
+            }, 3000);
+        }
+    }
+
+    return { init, startGame };
+})();
+
+window.startGame = GameModule.startGame;
+window.onload = GameModule.init;
+</script>
+</html>

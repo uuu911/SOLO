@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>六边形策略战棋</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: #fff;
+        }
+
+        .game-container {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+
+        .map-container {
+            position: relative;
+        }
+
+        .hex-grid {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hex-row {
+            display: flex;
+        }
+
+        .hex-row:nth-child(even) {
+            margin-left: 44px;
+        }
+
+        .hex {
+            width: 88px;
+            height: 76px;
+            position: relative;
+            margin: -10px 2px;
+            cursor: pointer;
+            transition: transform 0.2s, filter 0.3s;
+        }
+
+        .hex:hover {
+            transform: scale(1.08);
+            z-index: 10;
+        }
+
+        .hex-inner {
+            width: 100%;
+            height: 100%;
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        .hex-grass .hex-inner { background: #7cb342; }
+        .hex-forest .hex-inner { background: #2e7d32; }
+        .hex-mountain .hex-inner { background: #78909c; }
+
+        .hex-fog .hex-inner { background: #1a1a2e !important; }
+        .hex-explored .hex-inner { filter: brightness(0.5); }
+
+        .hex-move-range .hex-inner {
+            box-shadow: inset 0 0 0 4px rgba(33, 150, 243, 0.7);
+        }
+
+        .hex-attack-range .hex-inner {
+            box-shadow: inset 0 0 0 4px rgba(244, 67, 54, 0.7);
+        }
+
+        .hex-selected .hex-inner {
+            box-shadow: inset 0 0 0 4px rgba(255, 193, 7, 0.9);
+        }
+
+        .hex-base-p1 .hex-inner { border: 3px solid #2196f3; }
+        .hex-base-p2 .hex-inner { border: 3px solid #f44336; }
+
+        .unit {
+            font-size: 32px;
+            position: relative;
+            z-index: 5;
+            transition: opacity 0.3s;
+        }
+
+        .unit-acted {
+            opacity: 0.5;
+            filter: grayscale(50%);
+        }
+
+        .unit-p1 { color: #2196f3; text-shadow: 0 0 5px rgba(33, 150, 243, 0.5); }
+        .unit-p2 { color: #f44336; text-shadow: 0 0 5px rgba(244, 67, 54, 0.5); }
+
+        .hp-bar {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .hp-fill {
+            height: 100%;
+            background: #4caf50;
+            transition: width 0.3s;
+        }
+
+        .hp-fill.low { background: #ff9800; }
+        .hp-fill.critical { background: #f44336; }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            width: 280px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .panel-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .current-player {
+            font-size: 18px;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .current-player.p1 { background: rgba(33, 150, 243, 0.3); }
+        .current-player.p2 { background: rgba(244, 67, 54, 0.3); }
+
+        .unit-info {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .unit-info h3 {
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+
+        .info-label {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .info-value {
+            font-weight: bold;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .btn-end-turn {
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            color: white;
+        }
+
+        .btn-end-turn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(255, 152, 0, 0.4);
+        }
+
+        .terrain-legend {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .terrain-legend h4 {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .modal-content h2 {
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .modal-content p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .btn-restart {
+            background: linear-gradient(135deg, #4caf50, #388e3c);
+            color: white;
+            padding: 15px 40px;
+            font-size: 18px;
+        }
+
+        .btn-restart:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(76, 175, 80, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="map-container" id="mapContainer"></div>
+        
+        <div class="panel">
+            <div class="panel-title">⚔️ 战棋游戏</div>
+            <div class="current-player p1" id="currentPlayer">玩家 1 回合 (蓝)</div>
+            
+            <button class="btn btn-end-turn" id="endTurnBtn">结束回合</button>
+            
+            <div class="unit-info" id="unitInfo">
+                <h3>选中单位</h3>
+                <div class="info-row">
+                    <span class="info-label">名称:</span>
+                    <span class="info-value" id="unitName">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">HP:</span>
+                    <span class="info-value" id="unitHP">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">攻击力:</span>
+                    <span class="info-value" id="unitAtk">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">剩余移动力:</span>
+                    <span class="info-value" id="unitMove">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">地形防御:</span>
+                    <span class="info-value" id="unitDef">-</span>
+                </div>
+            </div>
+
+            <div class="terrain-legend">
+                <h4>地形说明</h4>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #7cb342;"></div>
+                    <span>草地: 移动1, 防御0</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #2e7d32;"></div>
+                    <span>树林: 移动2, 防御+1</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #78909c;"></div>
+                    <span>山丘: 不可通行</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="gameOverModal">
+        <div class="modal-content">
+            <h2 id="winnerText">游戏结束</h2>
+            <p id="winReason">恭喜获胜！</p>
+            <button class="btn btn-restart" id="restartBtn">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        const GRID_SIZE = 12;
+        const TERRAIN = { GRASS: 'grass', FOREST: 'forest', MOUNTAIN: 'mountain' };
+
+        const UNIT_TYPES = {
+            swordsman: { name: '剑士', emoji: '⚔️', move: 3, maxHP: 12, attack: 6, minRange: 1, maxRange: 1, vision: 4 },
+            archer: { name: '弓箭手', emoji: '🏹', move: 2, maxHP: 8, attack: 4, minRange: 2, maxRange: 3, vision: 5 },
+            cavalry: { name: '骑兵', emoji: '🐴', move: 5, maxHP: 9, attack: 5, minRange: 1, maxRange: 1, vision: 3 },
+            scout: { name: '侦察兵', emoji: '🔍', move: 4, maxHP: 6, attack: 2, minRange: 1, maxRange: 1, vision: 6 }
+        };
+
+        const COUNTER_BONUS = {
+            swordsman: { cavalry: 3 },
+            cavalry: { archer: 3 },
+            archer: { swordsman: 2 }
+        };
+
+        const TERRAIN_COST = { grass: 1, forest: 2, mountain: Infinity };
+        const TERRAIN_DEFENSE = { grass: 0, forest: 1, mountain: 0 };
+
+        let gameState = {
+            currentPlayer: 1,
+            turn: 1,
+            selectedUnit: null,
+            map: [],
+            units: [],
+            explored: { 1: new Set(), 2: new Set() },
+            gameOver: false
+        };
+
+        let audioContext = null;
+
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            initAudio();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            if (type === 'attack') {
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.2);
+            } else if (type === 'move') {
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.05);
+                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.1);
+            } else if (type === 'select') {
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(500, audioContext.currentTime);
+                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.05);
+            }
+        }
+
+        function getHexNeighbors(q, r) {
+            const directions = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+            return directions.map(([dq, dr]) => ({ q: q + dq, r: r + dr }))
+                .filter(n => n.q >= 0 && n.q < GRID_SIZE && n.r >= 0 && n.r < GRID_SIZE);
+        }
+
+        function hexDistance(q1, r1, q2, r2) {
+            return (Math.abs(q1 - q2) + Math.abs(q1 + r1 - q2 - r2) + Math.abs(r1 - r2)) / 2;
+        }
+
+        function generateMap() {
+            const map = [];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                map[r] = [];
+                for (let q = 0; q < GRID_SIZE; q++) {
+                    let terrain = TERRAIN.GRASS;
+                    if (q > 1 && q < GRID_SIZE - 2) {
+                        const rand = Math.random();
+                        if (rand < 0.15) terrain = TERRAIN.MOUNTAIN;
+                        else if (rand < 0.35) terrain = TERRAIN.FOREST;
+                    }
+                    map[r][q] = { q, r, terrain };
+                }
+            }
+            return map;
+        }
+
+        function initUnits() {
+            const units = [];
+            const p1Units = [
+                { type: 'swordsman', q: 1, r: 2 },
+                { type: 'archer', q: 1, r: 5 },
+                { type: 'cavalry', q: 0, r: 8 },
+                { type: 'scout', q: 0, r: 4 }
+            ];
+            const p2Units = [
+                { type: 'swordsman', q: 10, r: 3 },
+                { type: 'archer', q: 10, r: 6 },
+                { type: 'cavalry', q: 11, r: 9 },
+                { type: 'scout', q: 11, r: 5 }
+            ];
+
+            p1Units.forEach((u, i) => {
+                const type = UNIT_TYPES[u.type];
+                units.push({
+                    id: 'p1_' + i, player: 1, type: u.type, ...type,
+                    q: u.q, r: u.r, hp: type.maxHP,
+                    remainingMove: type.move, hasAttacked: false, hasMoved: false
+                });
+            });
+
+            p2Units.forEach((u, i) => {
+                const type = UNIT_TYPES[u.type];
+                units.push({
+                    id: 'p2_' + i, player: 2, type: u.type, ...type,
+                    q: u.q, r: u.r, hp: type.maxHP,
+                    remainingMove: type.move, hasAttacked: false, hasMoved: false
+                });
+            });
+
+            return units;
+        }
+
+        function calculateMoveRange(unit) {
+            if (unit.hasMoved) return new Set();
+            
+            const visited = new Map();
+            const queue = [{ q: unit.q, r: unit.r, cost: 0 }];
+            visited.add(`${unit.q},${unit.r}`, 0);
+
+            while (queue.length > 0) {
+                const current = queue.shift();
+                const neighbors = getHexNeighbors(current.q, current.r);
+                
+                for (const n of neighbors) {
+                    const terrain = gameState.map[n.r][n.q].terrain;
+                    const cost = TERRAIN_COST[terrain];
+                    const totalCost = current.cost + cost;
+                    const key = `${n.q},${n.r}`;
+                    
+                    if (cost !== Infinity && totalCost <= unit.remainingMove && 
+                        (!visited.has(key) || visited.get(key) > totalCost)) {
+                        const occupyingUnit = gameState.units.find(u => u.q === n.q && u.r === n.r);
+                        if (!occupyingUnit) {
+                            visited.set(key, totalCost);
+                            queue.push({ q: n.q, r: n.r, cost: totalCost });
+                        }
+                    }
+                }
+            }
+            
+            visited.delete(`${unit.q},${unit.r}`);
+            return new Set(visited.keys());
+        }
+
+        function calculateAttackRange(unit, fromQ = unit.q, fromR = unit.r) {
+            if (unit.hasAttacked) return new Set();
+            
+            const range = new Set();
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let q = 0; q < GRID_SIZE; q++) {
+                    const dist = hexDistance(fromQ, fromR, q, r);
+                    if (dist >= unit.minRange && dist <= unit.maxRange) {
+                        const target = gameState.units.find(u => u.q === q && u.r === r && u.player !== unit.player);
+                        if (target && hasLineOfSight(fromQ, fromR, q, r)) {
+                            range.add(`${q},${r}`);
+                        }
+                    }
+                }
+            }
+            return range;
+        }
+
+        function hasLineOfSight(q1, r1, q2, r2) {
+            const dist = hexDistance(q1, r1, q2, r2);
+            if (dist === 0) return true;
+
+            for (let i = 1; i < dist; i++) {
+                const t = i / dist;
+                const q = Math.round(q1 * (1 - t) + q2 * t);
+                const r = Math.round(r1 * (1 - t) + r2 * t);
+                
+                if (q >= 0 && q < GRID_SIZE && r >= 0 && r < GRID_SIZE) {
+                    const terrain = gameState.map[r][q].terrain;
+                    if (terrain === TERRAIN.MOUNTAIN || terrain === TERRAIN.FOREST) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function updateVision(player) {
+            const visible = new Set();
+            const playerUnits = gameState.units.filter(u => u.player === player);
+            
+            for (const unit of playerUnits) {
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let q = 0; q < GRID_SIZE; q++) {
+                        const dist = hexDistance(unit.q, unit.r, q, r);
+                        if (dist <= unit.vision && hasLineOfSight(unit.q, unit.r, q, r)) {
+                            visible.add(`${q},${r}`);
+                            gameState.explored[player].add(`${q},${r}`);
+                        }
+                    }
+                }
+            }
+            return visible;
+        }
+
+        function renderMap() {
+            const container = document.getElementById('mapContainer');
+            container.innerHTML = '';
+            
+            const visible = updateVision(gameState.currentPlayer);
+            const explored = gameState.explored[gameState.currentPlayer];
+            
+            const grid = document.createElement('div');
+            grid.className = 'hex-grid';
+
+            for (let r = 0; r < GRID_SIZE; r++) {
+                const row = document.createElement('div');
+                row.className = 'hex-row';
+                
+                for (let q = 0; q < GRID_SIZE; q++) {
+                    const cell = gameState.map[r][q];
+                    const hex = document.createElement('div');
+                    hex.className = `hex hex-${cell.terrain}`;
+                    hex.dataset.q = q;
+                    hex.dataset.r = r;
+                    
+                    const key = `${q},${r}`;
+                    if (!visible.has(key)) {
+                        if (explored.has(key)) {
+                            hex.classList.add('hex-explored');
+                        } else {
+                            hex.classList.add('hex-fog');
+                        }
+                    }
+                    
+                    if (q === 0) hex.classList.add('hex-base-p1');
+                    if (q === GRID_SIZE - 1) hex.classList.add('hex-base-p2');
+                    
+                    const inner = document.createElement('div');
+                    inner.className = 'hex-inner';
+                    
+                    const unit = gameState.units.find(u => u.q === q && u.r === r);
+                    if (unit && (visible.has(key) || explored.has(key))) {
+                        const unitDiv = document.createElement('div');
+                        unitDiv.className = `unit unit-p${unit.player}`;
+                        if (unit.hasAttacked && unit.hasMoved) {
+                            unitDiv.classList.add('unit-acted');
+                        }
+                        unitDiv.textContent = unit.emoji;
+                        
+                        const hpBar = document.createElement('div');
+                        hpBar.className = 'hp-bar';
+                        const hpFill = document.createElement('div');
+                        const hpPercent = (unit.hp / unit.maxHP) * 100;
+                        hpFill.className = 'hp-fill';
+                        if (hpPercent < 30) hpFill.classList.add('critical');
+                        else if (hpPercent < 60) hpFill.classList.add('low');
+                        hpFill.style.width = hpPercent + '%';
+                        hpBar.appendChild(hpFill);
+                        
+                        inner.appendChild(unitDiv);
+                        inner.appendChild(hpBar);
+                    }
+                    
+                    hex.appendChild(inner);
+                    hex.addEventListener('click', () => handleHexClick(q, r));
+                    row.appendChild(hex);
+                }
+                grid.appendChild(row);
+            }
+            container.appendChild(grid);
+            highlightRanges();
+        }
+
+        function highlightRanges() {
+            if (!gameState.selectedUnit) return;
+            
+            const moveRange = calculateMoveRange(gameState.selectedUnit);
+            const attackRange = calculateAttackRange(gameState.selectedUnit);
+            
+            document.querySelectorAll('.hex').forEach(hex => {
+                const key = `${hex.dataset.q},${hex.dataset.r}`;
+                if (moveRange.has(key)) {
+                    hex.classList.add('hex-move-range');
+                }
+                if (attackRange.has(key)) {
+                    hex.classList.add('hex-attack-range');
+                }
+                if (gameState.selectedUnit.q == hex.dataset.q && gameState.selectedUnit.r == hex.dataset.r) {
+                    hex.classList.add('hex-selected');
+                }
+            });
+        }
+
+        function handleHexClick(q, r) {
+            if (gameState.gameOver) return;
+            
+            const clickedUnit = gameState.units.find(u => u.q === q && u.r === r);
+            
+            if (clickedUnit && clickedUnit.player === gameState.currentPlayer) {
+                playSound('select');
+                gameState.selectedUnit = clickedUnit;
+                renderMap();
+                updatePanel();
+                return;
+            }
+            
+            if (gameState.selectedUnit) {
+                const key = `${q},${r}`;
+                const moveRange = calculateMoveRange(gameState.selectedUnit);
+                const attackRange = calculateAttackRange(gameState.selectedUnit);
+                
+                if (moveRange.has(key)) {
+                    moveUnit(gameState.selectedUnit, q, r);
+                    return;
+                }
+                
+                if (attackRange.has(key) && clickedUnit) {
+                    attackUnit(gameState.selectedUnit, clickedUnit);
+                    return;
+                }
+            }
+        }
+
+        function moveUnit(unit, q, r) {
+            const cost = TERRAIN_COST[gameState.map[r][q].terrain];
+            unit.remainingMove -= cost;
+            unit.hasMoved = true;
+            unit.q = q;
+            unit.r = r;
+            playSound('move');
+            
+            renderMap();
+            updatePanel();
+            checkVictory();
+        }
+
+        function attackUnit(attacker, target) {
+            let damage = attacker.attack;
+            const bonus = COUNTER_BONUS[attacker.type];
+            if (bonus && bonus[target.type]) {
+                damage += bonus[target.type];
+            }
+            
+            const terrainDef = TERRAIN_DEFENSE[gameState.map[target.r][target.q].terrain];
+            damage -= terrainDef;
+            damage += Math.floor(Math.random() * 3) - 1;
+            damage = Math.max(1, damage);
+            
+            target.hp -= damage;
+            attacker.hasAttacked = true;
+            playSound('attack');
+            
+            if (target.hp <= 0) {
+                gameState.units = gameState.units.filter(u => u.id !== target.id);
+            }
+            
+            gameState.selectedUnit = null;
+            renderMap();
+            updatePanel();
+            checkVictory();
+        }
+
+        function endTurn() {
+            gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+            if (gameState.currentPlayer === 1) {
+                gameState.turn++;
+            }
+            
+            gameState.units.filter(u => u.player === gameState.currentPlayer).forEach(u => {
+                u.remainingMove = u.move;
+                u.hasAttacked = false;
+                u.hasMoved = false;
+            });
+            
+            gameState.selectedUnit = null;
+            renderMap();
+            updatePanel();
+        }
+
+        function checkVictory() {
+            const p1Units = gameState.units.filter(u => u.player === 1);
+            const p2Units = gameState.units.filter(u => u.player === 2);
+            
+            if (p1Units.length === 0) {
+                endGame(2, '消灭了所有敌方单位！');
+                return;
+            }
+            if (p2Units.length === 0) {
+                endGame(1, '消灭了所有敌方单位！');
+                return;
+            }
+            
+            for (const unit of p1Units) {
+                if (unit.q === GRID_SIZE - 1) {
+                    endGame(1, '占领了敌方基地！');
+                    return;
+                }
+            }
+            for (const unit of p2Units) {
+                if (unit.q === 0) {
+                    endGame(2, '占领了敌方基地！');
+                    return;
+                }
+            }
+        }
+
+        function endGame(winner, reason) {
+            gameState.gameOver = true;
+            document.getElementById('winnerText').textContent = `玩家 ${winner} 获胜！`;
+            document.getElementById('winReason').textContent = reason;
+            document.getElementById('gameOverModal').classList.add('active');
+        }
+
+        function updatePanel() {
+            const playerEl = document.getElementById('currentPlayer');
+            playerEl.className = `current-player p${gameState.currentPlayer}`;
+            playerEl.textContent = `玩家 ${gameState.currentPlayer} 回合 (${gameState.currentPlayer === 1 ? '蓝' : '红'})`;
+            
+            if (gameState.selectedUnit) {
+                const unit = gameState.selectedUnit;
+                const terrain = gameState.map[unit.r][unit.q].terrain;
+                const def = TERRAIN_DEFENSE[terrain];
+                
+                document.getElementById('unitName').textContent = unit.name;
+                document.getElementById('unitHP').textContent = `${unit.hp}/${unit.maxHP}`;
+                document.getElementById('unitAtk').textContent = unit.attack;
+                document.getElementById('unitMove').textContent = unit.remainingMove;
+                document.getElementById('unitDef').textContent = '+' + def;
+            } else {
+                document.getElementById('unitName').textContent = '-';
+                document.getElementById('unitHP').textContent = '-';
+                document.getElementById('unitAtk').textContent = '-';
+                document.getElementById('unitMove').textContent = '-';
+                document.getElementById('unitDef').textContent = '-';
+            }
+        }
+
+        function restartGame() {
+            document.getElementById('gameOverModal').classList.remove('active');
+            gameState = {
+                currentPlayer: 1,
+                turn: 1,
+                selectedUnit: null,
+                map: generateMap(),
+                units: initUnits(),
+                explored: { 1: new Set(), 2: new Set() },
+                gameOver: false
+            };
+            renderMap();
+            updatePanel();
+        }
+
+        document.getElementById('endTurnBtn').addEventListener('click', endTurn);
+        document.getElementById('restartBtn').addEventListener('click', restartGame);
+
+        gameState.map = generateMap();
+        gameState.units = initUnits();
+        renderMap();
+        updatePanel();
+    </script>
+</body>
+</html>

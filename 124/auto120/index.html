@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星际废品回收站</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 50%, #0a1a2a 100%);
+            color: #e0e0ff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 2s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        #gameContainer {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: rgba(20, 30, 60, 0.9);
+            border: 2px solid #4a9eff;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            box-shadow: 0 0 20px rgba(74, 158, 255, 0.3);
+        }
+
+        .title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00ffaa;
+            text-shadow: 0 0 10px #00ffaa;
+        }
+
+        .stats {
+            display: flex;
+            gap: 30px;
+            font-size: 16px;
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .gold { color: #ffd700; }
+        .day { color: #ff6b6b; }
+        .reputation { color: #9b59b6; }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 15px;
+        }
+
+        .game-area {
+            background: rgba(20, 30, 60, 0.9);
+            border: 2px solid #4a9eff;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 0 20px rgba(74, 158, 255, 0.3);
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            border-radius: 8px;
+            background: #0d1a2d;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00ffaa, #00cc88);
+            color: #0a0a1a;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 255, 170, 0.5);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #4a9eff, #2979ff);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(74, 158, 255, 0.5);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(255, 152, 0, 0.5);
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .panel {
+            background: rgba(20, 30, 60, 0.9);
+            border: 2px solid #4a9eff;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 0 20px rgba(74, 158, 255, 0.3);
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ffaa;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #4a9eff;
+        }
+
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .inventory-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .inventory-item:hover {
+            border-color: #4a9eff;
+        }
+
+        .inventory-icon {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .inventory-name {
+            font-size: 11px;
+            color: #aaa;
+            margin-bottom: 3px;
+        }
+
+        .inventory-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .order {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid;
+            transition: all 0.3s;
+        }
+
+        .order:hover {
+            transform: translateX(5px);
+        }
+
+        .order-alien {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .order-requirements {
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 8px;
+        }
+
+        .order-reward {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .order-timer {
+            font-size: 11px;
+            color: #ff6b6b;
+            margin-top: 5px;
+        }
+
+        .order-actions {
+            margin-top: 8px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .order-btn {
+            padding: 6px 12px;
+            font-size: 11px;
+            border-radius: 4px;
+        }
+
+        .shop-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .shop-item:hover {
+            background: rgba(74, 158, 255, 0.2);
+        }
+
+        .shop-info {
+            flex: 1;
+        }
+
+        .shop-name {
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .shop-desc {
+            font-size: 11px;
+            color: #aaa;
+        }
+
+        .shop-price {
+            color: #ffd700;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .event-notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 30, 60, 0.98);
+            border: 3px solid #ff9800;
+            border-radius: 15px;
+            padding: 30px;
+            z-index: 1000;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 0 50px rgba(255, 152, 0, 0.5);
+            display: none;
+        }
+
+        .event-title {
+            font-size: 24px;
+            color: #ff9800;
+            margin-bottom: 15px;
+        }
+
+        .event-desc {
+            font-size: 14px;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .tutorial-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .tutorial-box {
+            background: rgba(20, 30, 60, 0.98);
+            border: 3px solid #00ffaa;
+            border-radius: 15px;
+            padding: 40px;
+            max-width: 600px;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(0, 255, 170, 0.5);
+        }
+
+        .tutorial-title {
+            font-size: 32px;
+            color: #00ffaa;
+            margin-bottom: 20px;
+        }
+
+        .tutorial-content {
+            font-size: 14px;
+            line-height: 1.8;
+            text-align: left;
+            margin-bottom: 25px;
+        }
+
+        .tutorial-content li {
+            margin: 10px 0;
+        }
+
+        .paused-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1500;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .paused-text {
+            font-size: 48px;
+            color: #ff9800;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #ff9800;
+        }
+
+        .paused-hint {
+            font-size: 18px;
+            color: #aaa;
+        }
+
+        .metal { color: #b0c4de; border-color: #b0c4de; }
+        .plastic { color: #ff69b4; border-color: #ff69b4; }
+        .electronic { color: #00ffff; border-color: #00ffff; }
+        .organic { color: #32cd32; border-color: #32cd32; }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+
+    <div id="gameContainer">
+        <div class="header">
+            <div class="title">🚀 星际废品回收站</div>
+            <div class="stats">
+                <div class="stat">
+                    <span>💰</span>
+                    <span class="stat-value gold" id="goldDisplay">200</span>
+                </div>
+                <div class="stat">
+                    <span>📅</span>
+                    <span class="stat-value day">第 <span id="dayDisplay">1</span> 天</span>
+                </div>
+                <div class="stat">
+                    <span>⭐</span>
+                    <span class="stat-value reputation" id="reputationDisplay">100</span>
+                </div>
+                <div class="stat">
+                    <span>⏱️</span>
+                    <span class="stat-value" id="timeDisplay">0%</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="game-area">
+                <canvas id="gameCanvas" width="800" height="500"></canvas>
+                <div class="controls">
+                    <button class="btn btn-primary" id="pauseBtn">⏸️ 暂停 (空格)</button>
+                    <button class="btn btn-secondary" id="shopBtn">🛒 商店</button>
+                    <button class="btn btn-warning" id="resetSorterBtn">🔧 重置分拣器位置</button>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="panel">
+                    <div class="panel-title">📦 材料库存</div>
+                    <div class="inventory-grid">
+                        <div class="inventory-item metal">
+                            <div class="inventory-icon">⚙️</div>
+                            <div class="inventory-name">精炼金属</div>
+                            <div class="inventory-value" id="metalStock">0</div>
+                        </div>
+                        <div class="inventory-item plastic">
+                            <div class="inventory-icon">🎀</div>
+                            <div class="inventory-name">高聚物</div>
+                            <div class="inventory-value" id="plasticStock">0</div>
+                        </div>
+                        <div class="inventory-item electronic">
+                            <div class="inventory-icon">💎</div>
+                            <div class="inventory-name">晶元芯片</div>
+                            <div class="inventory-value" id="electronicStock">0</div>
+                        </div>
+                        <div class="inventory-item organic">
+                            <div class="inventory-icon">🧬</div>
+                            <div class="inventory-name">生物质能</div>
+                            <div class="inventory-value" id="organicStock">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">📋 外星订单</div>
+                    <div id="ordersPanel"></div>
+                </div>
+
+                <div class="panel hidden" id="shopPanel">
+                    <div class="panel-title">🛒 升级商店</div>
+                    <div id="shopItems"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="event-notification" id="eventNotification">
+        <div class="event-title" id="eventTitle">⚠️ 随机事件</div>
+        <div class="event-desc" id="eventDesc"></div>
+        <button class="btn btn-primary" id="eventCloseBtn">确定</button>
+    </div>
+
+    <div class="tutorial-overlay" id="tutorialOverlay">
+        <div class="tutorial-box">
+            <div class="tutorial-title">🌟 欢迎来到星际废品回收站！</div>
+            <div class="tutorial-content">
+                <p>作为新上任的回收站管理员，请熟悉以下操作：</p>
+                <ul>
+                    <li>🖱️ <strong>点击传送带上的废品</strong> - 手动分拣到对应收集区</li>
+                    <li>🔧 <strong>拖动分拣器</strong> - 将分拣器放到合适位置自动分拣</li>
+                    <li>⚗️ <strong>提炼炉</strong> - 收集区满后自动提炼成材料</li>
+                    <li>📋 <strong>完成订单</strong> - 点击"交付"按钮获得金币</li>
+                    <li>🛒 <strong>升级设备</strong> - 用金币购买更好的设备</li>
+                    <li>⏸️ <strong>按空格键</strong> - 暂停/恢复游戏</li>
+                </ul>
+                <p style="margin-top: 15px; color: #ffd700;">💡 提示：合理布置分拣器，及时完成订单，就能财源广进！</p>
+            </div>
+            <button class="btn btn-primary" id="startGameBtn">🚀 开始经营！</button>
+        </div>
+    </div>
+
+    <div class="paused-overlay" id="pausedOverlay">
+        <div class="paused-text">⏸️ 游戏暂停</div>
+        <div class="paused-hint">按空格键或点击任意位置继续</div>
+    </div>
+
+    <script>
+    // ==================== 游戏配置 ====================
+    const CONFIG = {
+        CANVAS_WIDTH: 800,
+        CANVAS_HEIGHT: 500,
+        DAY_DURATION: 20000,
+        MAINTENANCE_COST: 50,
+        INITIAL_GOLD: 200,
+        INITIAL_REPUTATION: 100,
+        
+        WASTE_TYPES: {
+            metal: { name: '金属', color: '#b0c4de', shape: 'hexagon', refineTime: 3000, value: 15 },
+            plastic: { name: '塑料', color: '#ff69b4', shape: 'circle', refineTime: 2500, value: 12 },
+            electronic: { name: '电子', color: '#00ffff', shape: 'diamond', refineTime: 4000, value: 20 },
+            organic: { name: '有机物', color: '#32cd32', shape: 'triangle', refineTime: 3500, value: 18 }
+        },
+
+        ALIEN_RACES: [
+            { name: '火焰星人', color: '#ff4500' },
+            { name: '水晶族', color: '#e0ffff' },
+            { name: '虫族联盟', color: '#9acd32' },
+            { name: '机械帝国', color: '#708090' },
+            { name: '暗影议会', color: '#4b0082' }
+        ],
+
+        CONVEYOR_Y: 100,
+        CONVEYOR_HEIGHT: 60,
+        COLLECTION_Y: 200,
+        FURNACE_Y: 320,
+        SORTER_HEIGHT: 80
+    };
+
+    // ==================== 游戏状态 ====================
+    const gameState = {
+        gold: CONFIG.INITIAL_GOLD,
+        day: 1,
+        dayProgress: 0,
+        reputation: CONFIG.INITIAL_REPUTATION,
+        isPaused: true,
+        isStarted: false,
+
+        conveyorSpeed: 1.5,
+        conveyorCount: 1,
+        wasteSpawnRate: 0.02,
+
+        sorters: [
+            { id: 1, x: 200, type: 'metal', isDragging: false },
+            { id: 2, x: 500, type: 'plastic', isDragging: false }
+        ],
+        maxSorters: 4,
+        sorterRange: 80,
+        sorterSpeed: 500,
+
+        collectionCapacity: 10,
+        collections: { metal: 0, plastic: 0, electronic: 0, organic: 0 },
+
+        furnaceSpeed: 1,
+        furnaces: {
+            metal: { active: false, progress: 0, waste: 0 },
+            plastic: { active: false, progress: 0, waste: 0 },
+            electronic: { active: false, progress: 0, waste: 0 },
+            organic: { active: false, progress: 0, waste: 0 }
+        },
+
+        inventoryCapacity: 50,
+        inventory: { metal: 0, plastic: 0, electronic: 0, organic: 0 },
+
+        wastes: [],
+        orders: [],
+
+        shopPrices: {
+            conveyor: 300,
+            furnace: 200,
+            sorter: 250,
+            collection: 150,
+            inventory: 180
+        }
+    };
+
+    // ==================== 工具函数 ====================
+    function random(min, max) {
+        return Math.random() * (max - min) + min;
+    }
+
+    function randomInt(min, max) {
+        return Math.floor(random(min, max + 1));
+    }
+
+    function randomChoice(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    // ==================== 画布与渲染模块 ====================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function drawBackground() {
+        ctx.fillStyle = '#0d1a2d';
+        ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+
+        ctx.strokeStyle = 'rgba(74, 158, 255, 0.1)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < CONFIG.CANVAS_WIDTH; i += 40) {
+            ctx.beginPath();
+            ctx.moveTo(i, 0);
+            ctx.lineTo(i, CONFIG.CANVAS_HEIGHT);
+            ctx.stroke();
+        }
+        for (let i = 0; i < CONFIG.CANVAS_HEIGHT; i += 40) {
+            ctx.beginPath();
+            ctx.moveTo(0, i);
+            ctx.lineTo(CONFIG.CANVAS_WIDTH, i);
+            ctx.stroke();
+        }
+    }
+
+    function drawConveyor() {
+        const y = CONFIG.CONVEYOR_Y;
+        const h = CONFIG.CONVEYOR_HEIGHT;
+
+        ctx.fillStyle = '#2a3a5a';
+        ctx.fillRect(0, y, CONFIG.CANVAS_WIDTH, h);
+
+        ctx.fillStyle = '#3a4a6a';
+        for (let i = 0; i < CONFIG.CANVAS_WIDTH; i += 30) {
+            ctx.fillRect(i + (gameState.dayProgress * 500) % 30, y + 10, 15, h - 20);
+        }
+
+        ctx.strokeStyle = '#4a9eff';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(0, y, CONFIG.CANVAS_WIDTH, h);
+
+        ctx.fillStyle = '#4a9eff';
+        ctx.font = 'bold 14px Courier New';
+        ctx.fillText('⬅️ 传送方向 ⬅️', CONFIG.CANVAS_WIDTH - 150, y + 35);
+    }
+
+    function drawWasteShape(x, y, type, size = 25) {
+        const wasteConfig = CONFIG.WASTE_TYPES[type];
+        ctx.fillStyle = wasteConfig.color;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+
+        switch (wasteConfig.shape) {
+            case 'hexagon':
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i * Math.PI / 3) - Math.PI / 2;
+                    const px = x + size * Math.cos(angle);
+                    const py = y + size * Math.sin(angle);
+                    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                break;
+            case 'circle':
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                break;
+            case 'diamond':
+                ctx.beginPath();
+                ctx.moveTo(x, y - size);
+                ctx.lineTo(x + size * 0.7, y);
+                ctx.lineTo(x, y + size);
+                ctx.lineTo(x - size * 0.7, y);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                break;
+            case 'triangle':
+                ctx.beginPath();
+                ctx.moveTo(x, y - size);
+                ctx.lineTo(x + size * 0.9, y + size * 0.8);
+                ctx.lineTo(x - size * 0.9, y + size * 0.8);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                break;
+        }
+    }
+
+    function drawWastes() {
+        gameState.wastes.forEach(waste => {
+            const y = CONFIG.CONVEYOR_Y + CONFIG.CONVEYOR_HEIGHT / 2;
+            drawWasteShape(waste.x, y, waste.type, 22);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(CONFIG.WASTE_TYPES[waste.type].name, waste.x, y + 35);
+        });
+    }
+
+    function drawSorters() {
+        gameState.sorters.forEach(sorter => {
+            const x = sorter.x;
+            const y = CONFIG.CONVEYOR_Y + CONFIG.CONVEYOR_HEIGHT + 10;
+            const h = CONFIG.SORTER_HEIGHT;
+            const type = sorter.type;
+            const color = CONFIG.WASTE_TYPES[type].color;
+
+            ctx.fillStyle = sorter.isDragging ? 'rgba(255, 255, 0, 0.3)' : 'rgba(74, 158, 255, 0.1)';
+            ctx.fillRect(x - gameState.sorterRange, y, gameState.sorterRange * 2, 5);
+
+            ctx.fillStyle = '#1a2a4a';
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x - 25, y);
+            ctx.lineTo(x - 30, y + h - 20);
+            ctx.lineTo(x + 30, y + h - 20);
+            ctx.lineTo(x + 25, y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y + 20, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(x, y + 35);
+            ctx.lineTo(x, y + h - 25);
+            ctx.stroke();
+
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(x - 10, y + h - 25);
+            ctx.lineTo(x, y + h - 10);
+            ctx.lineTo(x + 10, y + h - 25);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText(CONFIG.WASTE_TYPES[type].name, x, y + h + 5);
+        });
+    }
+
+    function drawCollections() {
+        const y = CONFIG.COLLECTION_Y;
+        const types = Object.keys(CONFIG.WASTE_TYPES);
+        const width = CONFIG.CANVAS_WIDTH / types.length - 10;
+
+        types.forEach((type, i) => {
+            const x = i * (width + 10) + 5;
+            const color = CONFIG.WASTE_TYPES[type].color;
+            const count = gameState.collections[type];
+            const capacity = gameState.collectionCapacity;
+            const percent = count / capacity;
+
+            ctx.fillStyle = '#1a2a4a';
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.fillRect(x, y, width, 60);
+            ctx.strokeRect(x, y, width, 60);
+
+            ctx.fillStyle = color + '80';
+            ctx.fillRect(x + 5, y + 25, (width - 10) * percent, 30);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText(`📥 ${CONFIG.WASTE_TYPES[type].name}`, x + 10, y + 18);
+
+            ctx.font = 'bold 14px Courier New';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${count}/${capacity}`, x + width - 10, y + 45);
+        });
+    }
+
+    function drawFurnaces() {
+        const y = CONFIG.FURNACE_Y;
+        const types = Object.keys(CONFIG.WASTE_TYPES);
+        const width = CONFIG.CANVAS_WIDTH / types.length - 10;
+
+        types.forEach((type, i) => {
+            const x = i * (width + 10) + 5;
+            const color = CONFIG.WASTE_TYPES[type].color;
+            const furnace = gameState.furnaces[type];
+            const isActive = furnace.active;
+
+            ctx.fillStyle = '#1a2a4a';
+            ctx.strokeStyle = isActive ? '#ff9800' : color;
+            ctx.lineWidth = 2;
+            ctx.fillRect(x, y, width, 70);
+            ctx.strokeRect(x, y, width, 70);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText(`⚗️ 精炼${CONFIG.WASTE_TYPES[type].name}`, x + 10, y + 18);
+
+            if (isActive) {
+                const progress = furnace.progress / (CONFIG.WASTE_TYPES[type].refineTime / gameState.furnaceSpeed);
+                ctx.fillStyle = '#ff9800';
+                ctx.fillRect(x + 10, y + 25, (width - 20) * progress, 15);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x + 10, y + 25, width - 20, 15);
+
+                ctx.fillStyle = '#ffff00';
+                for (let j = 0; j < 3; j++) {
+                    const sparkX = x + 20 + random(0, width - 40);
+                    const sparkY = y + 45 + random(-5, 5);
+                    ctx.beginPath();
+                    ctx.arc(sparkX, sparkY, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.fillStyle = '#ff9800';
+                ctx.font = 'bold 11px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('🔥 精炼中...', x + width / 2, y + 58);
+            } else {
+                ctx.fillStyle = '#666';
+                ctx.font = '11px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('等待输入', x + width / 2, y + 45);
+            }
+
+            ctx.fillStyle = '#aaa';
+            ctx.font = '10px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText(`待提炼: ${furnace.waste}`, x + 10, y + 65);
+        });
+    }
+
+    function render() {
+        drawBackground();
+        drawConveyor();
+        drawWastes();
+        drawSorters();
+        drawCollections();
+        drawFurnaces();
+    }
+
+    // ==================== 游戏逻辑模块 ====================
+    function spawnWaste() {
+        if (Math.random() < gameState.wasteSpawnRate * gameState.conveyorCount) {
+            const types = Object.keys(CONFIG.WASTE_TYPES);
+            gameState.wastes.push({
+                id: Date.now() + Math.random(),
+                x: CONFIG.CANVAS_WIDTH + 30,
+                type: randomChoice(types)
+            });
+        }
+    }
+
+    function updateWastes(deltaTime) {
+        const speed = gameState.conveyorSpeed * (deltaTime / 16);
+        
+        gameState.wastes.forEach(waste => {
+            waste.x -= speed;
+        });
+
+        gameState.wastes = gameState.wastes.filter(waste => waste.x > -50);
+    }
+
+    function checkSorters() {
+        const now = Date.now();
+        
+        gameState.sorters.forEach(sorter => {
+            if (!sorter.lastGrab || now - sorter.lastGrab > gameState.sorterSpeed) {
+                const rangeStart = sorter.x - gameState.sorterRange;
+                const rangeEnd = sorter.x + gameState.sorterRange;
+
+                for (let i = gameState.wastes.length - 1; i >= 0; i--) {
+                    const waste = gameState.wastes[i];
+                    if (waste.type === sorter.type && 
+                        waste.x >= rangeStart && 
+                        waste.x <= rangeEnd) {
+                        
+                        if (gameState.collections[waste.type] < gameState.collectionCapacity) {
+                            gameState.collections[waste.type]++;
+                            gameState.wastes.splice(i, 1);
+                            sorter.lastGrab = now;
+                        }
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    function checkFurnaces() {
+        const types = Object.keys(CONFIG.WASTE_TYPES);
+        
+        types.forEach(type => {
+            const furnace = gameState.furnaces[type];
+            const refineThreshold = 3;
+
+            if (!furnace.active && furnace.waste < refineThreshold) {
+                const toMove = Math.min(
+                    gameState.collections[type],
+                    refineThreshold - furnace.waste
+                );
+                if (toMove > 0) {
+                    gameState.collections[type] -= toMove;
+                    furnace.waste += toMove;
+                }
+            }
+
+            if (!furnace.active && furnace.waste >= refineThreshold) {
+                furnace.active = true;
+                furnace.progress = 0;
+            }
+        });
+    }
+
+    function updateFurnaces(deltaTime) {
+        const types = Object.keys(CONFIG.WASTE_TYPES);
+        
+        types.forEach(type => {
+            const furnace = gameState.furnaces[type];
+            if (furnace.active) {
+                furnace.progress += deltaTime * gameState.furnaceSpeed;
+                
+                const refineTime = CONFIG.WASTE_TYPES[type].refineTime;
+                if (furnace.progress >= refineTime) {
+                    furnace.active = false;
+                    furnace.progress = 0;
+                    furnace.waste = 0;
+                    
+                    if (gameState.inventory[type] < gameState.inventoryCapacity) {
+                        gameState.inventory[type]++;
+                    }
+                }
+            }
+        });
+    }
+
+    function updateDayProgress(deltaTime) {
+        gameState.dayProgress += deltaTime / CONFIG.DAY_DURATION;
+        
+        if (gameState.dayProgress >= 1) {
+            gameState.dayProgress = 0;
+            gameState.day++;
+            chargeMaintenance();
+            checkRandomEvent();
+        }
+    }
+
+    function chargeMaintenance() {
+        const cost = CONFIG.MAINTENANCE_COST + Math.floor(gameState.day / 5) * 10;
+        gameState.gold -= cost;
+        showNotification(`📅 第${gameState.day}天开始，扣除维护费 ${cost} 金币`);
+    }
+
+    // ==================== 订单系统 ====================
+    function createOrder() {
+        const alien = randomChoice(CONFIG.ALIEN_RACES);
+        const types = Object.keys(CONFIG.WASTE_TYPES);
+        const requirements = {};
+        
+        const numTypes = randomInt(1, 3);
+        const usedTypes = [];
+        for (let i = 0; i < numTypes; i++) {
+            let type;
+            do {
+                type = randomChoice(types);
+            } while (usedTypes.includes(type));
+            usedTypes.push(type);
+            
+            const baseAmount = 2 + Math.floor(gameState.day / 3);
+            requirements[type] = randomInt(baseAmount, baseAmount + 3);
+        }
+
+        let totalValue = 0;
+        Object.entries(requirements).forEach(([type, amount]) => {
+            totalValue += amount * CONFIG.WASTE_TYPES[type].value;
+        });
+
+        const difficultyMultiplier = 1 + gameState.day * 0.05;
+        const reward = Math.floor(totalValue * difficultyMultiplier * random(1.2, 1.8));
+
+        return {
+            id: Date.now() + Math.random(),
+            alien: alien.name,
+            alienColor: alien.color,
+            requirements,
+            reward,
+            daysLeft: randomInt(2, 5),
+            dayCreated: gameState.day
+        };
+    }
+
+    function initializeOrders() {
+        gameState.orders.push({
+            id: 'tutorial',
+            alien: '新手指南员',
+            alienColor: '#00ffaa',
+            requirements: { metal: 2, plastic: 2 },
+            reward: 100,
+            daysLeft: 3,
+            dayCreated: 1,
+            isTutorial: true
+        });
+
+        for (let i = 0; i < 2; i++) {
+            gameState.orders.push(createOrder());
+        }
+    }
+
+    function updateOrders() {
+        while (gameState.orders.length < 3) {
+            gameState.orders.push(createOrder());
+        }
+
+        gameState.orders = gameState.orders.filter(order => {
+            const age = gameState.day - order.dayCreated;
+            if (age >= order.daysLeft) {
+                gameState.reputation = Math.max(0, gameState.reputation - 5);
+                showNotification(`❌ 来自${order.alien}的订单逾期，信誉 -5`);
+                return false;
+            }
+            return true;
+        });
+    }
+
+    function canFulfillOrder(order) {
+        return Object.entries(order.requirements).every(
+            ([type, amount]) => gameState.inventory[type] >= amount
+        );
+    }
+
+    function fulfillOrder(orderId) {
+        const orderIndex = gameState.orders.findIndex(o => o.id === orderId);
+        if (orderIndex === -1) return;
+
+        const order = gameState.orders[orderIndex];
+        if (!canFulfillOrder(order)) {
+            showNotification('⚠️ 材料不足，无法完成订单！');
+            return;
+        }
+
+        Object.entries(order.requirements).forEach(([type, amount]) => {
+            gameState.inventory[type] -= amount;
+        });
+
+        gameState.gold += order.reward;
+        gameState.reputation = Math.min(150, gameState.reputation + 2);
+        gameState.orders.splice(orderIndex, 1);
+
+        showNotification(`✅ 完成${order.alien}订单！获得 ${order.reward} 金币，信誉 +2`);
+        updateOrders();
+        renderOrders();
+    }
+
+    function renderOrders() {
+        const panel = document.getElementById('ordersPanel');
+        panel.innerHTML = '';
+
+        gameState.orders.forEach(order => {
+            const age = gameState.day - order.dayCreated;
+            const daysLeft = order.daysLeft - age;
+            const canFulfill = canFulfillOrder(order);
+
+            const requirementsText = Object.entries(order.requirements)
+                .map(([type, amount]) => `${CONFIG.WASTE_TYPES[type].name}×${amount}`)
+                .join('、');
+
+            const div = document.createElement('div');
+            div.className = 'order';
+            div.style.borderLeftColor = order.alienColor;
+            div.innerHTML = `
+                <div class="order-alien" style="color: ${order.alienColor}">👽 ${order.alien}</div>
+                <div class="order-requirements">需要: ${requirementsText}</div>
+                <div class="order-reward">💰 ${order.reward} 金币</div>
+                <div class="order-timer">⏱️ 剩余 ${daysLeft} 天</div>
+                <div class="order-actions">
+                    <button class="btn ${canFulfill ? 'btn-primary' : 'btn-warning'} order-btn" 
+                            onclick="fulfillOrder('${order.id}')"
+                            ${!canFulfill ? 'disabled' : ''}>
+                        ${canFulfill ? '✅ 交付' : '❌ 材料不足'}
+                    </button>
+                </div>
+            `;
+            panel.appendChild(div);
+        });
+    }
+
+    // ==================== 商店系统 ====================
+    function renderShop() {
+        const shopItems = document.getElementById('shopItems');
+        shopItems.innerHTML = `
+            <div class="shop-item">
+                <div class="shop-info">
+                    <div class="shop-name">🔄 传送带升级</div>
+                    <div class="shop-desc">提高传送速度和废品生成率</div>
+                </div>
+                <span class="shop-price">${gameState.shopPrices.conveyor}💰</span>
+                <button class="btn btn-secondary order-btn" onclick="buyUpgrade('conveyor')">购买</button>
+            </div>
+            <div class="shop-item">
+                <div class="shop-info">
+                    <div class="shop-name">⚗️ 提炼炉升级</div>
+                    <div class="shop-desc">缩短提炼时间</div>
+                </div>
+                <span class="shop-price">${gameState.shopPrices.furnace}💰</span>
+                <button class="btn btn-secondary order-btn" onclick="buyUpgrade('furnace')">购买</button>
+            </div>
+            <div class="shop-item">
+                <div class="shop-info">
+                    <div class="shop-name">🔧 新增分拣器</div>
+                    <div class="shop-desc">当前: ${gameState.sorters.length}/${gameState.maxSorters}</div>
+                </div>
+                <span class="shop-price">${gameState.shopPrices.sorter}💰</span>
+                <button class="btn btn-secondary order-btn" onclick="buyUpgrade('sorter')" 
+                        ${gameState.sorters.length >= gameState.maxSorters ? 'disabled' : ''}>购买</button>
+            </div>
+            <div class="shop-item">
+                <div class="shop-info">
+                    <div class="shop-name">📥 收集区扩容</div>
+                    <div class="shop-desc">当前容量: ${gameState.collectionCapacity}</div>
+                </div>
+                <span class="shop-price">${gameState.shopPrices.collection}💰</span>
+                <button class="btn btn-secondary order-btn" onclick="buyUpgrade('collection')">购买</button>
+            </div>
+            <div class="shop-item">
+                <div class="shop-info">
+                    <div class="shop-name">📦 库存扩容</div>
+                    <div class="shop-desc">当前容量: ${gameState.inventoryCapacity}</div>
+                </div>
+                <span class="shop-price">${gameState.shopPrices.inventory}💰</span>
+                <button class="btn btn-secondary order-btn" onclick="buyUpgrade('inventory')">购买</button>
+            </div>
+        `;
+    }
+
+    function buyUpgrade(type) {
+        const price = gameState.shopPrices[type];
+        if (gameState.gold < price) {
+            showNotification('❌ 金币不足！');
+            return;
+        }
+
+        gameState.gold -= price;
+
+        switch (type) {
+            case 'conveyor':
+                gameState.conveyorCount++;
+                gameState.conveyorSpeed += 0.3;
+                gameState.wasteSpawnRate += 0.008;
+                gameState.shopPrices.conveyor = Math.floor(price * 1.5);
+                showNotification('✅ 传送带升级成功！');
+                break;
+            case 'furnace':
+                gameState.furnaceSpeed *= 1.3;
+                gameState.shopPrices.furnace = Math.floor(price * 1.5);
+                showNotification('✅ 提炼炉升级成功！');
+                break;
+            case 'sorter':
+                if (gameState.sorters.length < gameState.maxSorters) {
+                    const types = Object.keys(CONFIG.WASTE_TYPES);
+                    const nextType = types[gameState.sorters.length % types.length];
+                    gameState.sorters.push({
+                        id: Date.now(),
+                        x: 350 + gameState.sorters.length * 100,
+                        type: nextType,
+                        isDragging: false
+                    });
+                    gameState.shopPrices.sorter = Math.floor(price * 1.4);
+                    showNotification('✅ 新增分拣器成功！');
+                }
+                break;
+            case 'collection':
+                gameState.collectionCapacity += 5;
+                gameState.shopPrices.collection = Math.floor(price * 1.4);
+                showNotification('✅ 收集区扩容成功！');
+                break;
+            case 'inventory':
+                gameState.inventoryCapacity += 20;
+                gameState.shopPrices.inventory = Math.floor(price * 1.4);
+                showNotification('✅ 库存扩容成功！');
+                break;
+        }
+
+        updateUI();
+        renderShop();
+    }
+
+    // ==================== 随机事件系统 ====================
+    const RANDOM_EVENTS = [
+        {
+            title: '☄️ 流星雨袭击！',
+            desc: '一场小型流星雨击中了回收站，部分收集区受损，所有收集区材料减半。',
+            effect: () => {
+                Object.keys(gameState.collections).forEach(type => {
+                    gameState.collections[type] = Math.floor(gameState.collections[type] / 2);
+                });
+            },
+            chance: 0.1
+        },
+        {
+            title: '🎁 神秘访客',
+            desc: '一位神秘商人到访，赠送了一些稀有材料！每种材料 +3。',
+            effect: () => {
+                Object.keys(gameState.inventory).forEach(type => {
+                    gameState.inventory[type] = Math.min(
+                        gameState.inventoryCapacity,
+                        gameState.inventory[type] + 3
+                    );
+                });
+            },
+            chance: 0.08
+        },
+        {
+            title: '⚡ 能量波动',
+            desc: '宇宙能量波动影响了设备，传送带速度暂时提升50%，持续一天。',
+            effect: () => {
+                gameState.conveyorSpeed *= 1.5;
+                setTimeout(() => {
+                    gameState.conveyorSpeed /= 1.5;
+                }, CONFIG.DAY_DURATION);
+            },
+            chance: 0.12
+        },
+        {
+            title: '🐛 太空虫害',
+            desc: '太空虫子入侵了有机物储存区，生物质能材料 -5。',
+            effect: () => {
+                gameState.inventory.organic = Math.max(0, gameState.inventory.organic - 5);
+            },
+            chance: 0.08
+        },
+        {
+            title: '💎 矿脉发现',
+            desc: '在一批废品中发现了隐藏的稀有矿脉，金币 +100！',
+            effect: () => {
+                gameState.gold += 100;
+            },
+            chance: 0.06
+        }
+    ];
+
+    function checkRandomEvent() {
+        if (Math.random() < 0.25) {
+            const event = randomChoice(RANDOM_EVENTS);
+            showEvent(event.title, event.desc);
+            event.effect();
+        }
+    }
+
+    function showEvent(title, desc) {
+        document.getElementById('eventTitle').textContent = title;
+        document.getElementById('eventDesc').textContent = desc;
+        document.getElementById('eventNotification').style.display = 'block';
+        gameState.isPaused = true;
+    }
+
+    // ==================== UI更新 ====================
+    function updateUI() {
+        document.getElementById('goldDisplay').textContent = gameState.gold;
+        document.getElementById('dayDisplay').textContent = gameState.day;
+        document.getElementById('reputationDisplay').textContent = gameState.reputation;
+        document.getElementById('timeDisplay').textContent = Math.floor(gameState.dayProgress * 100) + '%';
+
+        document.getElementById('metalStock').textContent = 
+            `${gameState.inventory.metal}/${gameState.inventoryCapacity}`;
+        document.getElementById('plasticStock').textContent = 
+            `${gameState.inventory.plastic}/${gameState.inventoryCapacity}`;
+        document.getElementById('electronicStock').textContent = 
+            `${gameState.inventory.electronic}/${gameState.inventoryCapacity}`;
+        document.getElementById('organicStock').textContent = 
+            `${gameState.inventory.organic}/${gameState.inventoryCapacity}`;
+
+        renderOrders();
+    }
+
+    function showNotification(message) {
+        console.log(message);
+        updateUI();
+    }
+
+    // ==================== 输入处理 ====================
+    let mouseX = 0;
+    let mouseY = 0;
+    let draggingSorter = null;
+
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = (e.clientX - rect.left) * (CONFIG.CANVAS_WIDTH / rect.width);
+        mouseY = (e.clientY - rect.top) * (CONFIG.CANVAS_HEIGHT / rect.height);
+
+        if (draggingSorter) {
+            draggingSorter.x = clamp(mouseX, 60, CONFIG.CANVAS_WIDTH - 60);
+        }
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (gameState.isPaused) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const clickX = (e.clientX - rect.left) * (CONFIG.CANVAS_WIDTH / rect.width);
+        const clickY = (e.clientY - rect.top) * (CONFIG.CANVAS_HEIGHT / rect.height);
+
+        const sorterY = CONFIG.CONVEYOR_Y + CONFIG.CONVEYOR_HEIGHT + 10;
+        for (let sorter of gameState.sorters) {
+            if (Math.abs(clickX - sorter.x) < 40 && 
+                clickY >= sorterY && 
+                clickY <= sorterY + CONFIG.SORTER_HEIGHT) {
+                draggingSorter = sorter;
+                sorter.isDragging = true;
+                return;
+            }
+        }
+
+        const conveyorTop = CONFIG.CONVEYOR_Y;
+        const conveyorBottom = CONFIG.CONVEYOR_Y + CONFIG.CONVEYOR_HEIGHT;
+        if (clickY >= conveyorTop && clickY <= conveyorBottom) {
+            for (let i = gameState.wastes.length - 1; i >= 0; i--) {
+                const waste = gameState.wastes[i];
+                if (Math.abs(clickX - waste.x) < 30) {
+                    if (gameState.collections[waste.type] < gameState.collectionCapacity) {
+                        gameState.collections[waste.type]++;
+                        gameState.wastes.splice(i, 1);
+                    }
+                    return;
+                }
+            }
+        }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+        if (draggingSorter) {
+            draggingSorter.isDragging = false;
+            draggingSorter = null;
+        }
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        if (draggingSorter) {
+            draggingSorter.isDragging = false;
+            draggingSorter = null;
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && gameState.isStarted) {
+            e.preventDefault();
+            togglePause();
+        }
+    });
+
+    function togglePause() {
+        gameState.isPaused = !gameState.isPaused;
+        document.getElementById('pausedOverlay').style.display = 
+            gameState.isPaused ? 'flex' : 'none';
+        document.getElementById('pauseBtn').textContent = 
+            gameState.isPaused ? '▶️ 继续 (空格)' : '⏸️ 暂停 (空格)';
+    }
+
+    // ==================== 游戏主循环 ====================
+    let lastTime = 0;
+
+    function gameLoop(currentTime) {
+        const deltaTime = currentTime - lastTime;
+        lastTime = currentTime;
+
+        if (!gameState.isPaused && gameState.isStarted) {
+            spawnWaste();
+            updateWastes(deltaTime);
+            checkSorters();
+            checkFurnaces();
+            updateFurnaces(deltaTime);
+            updateDayProgress(deltaTime);
+            updateOrders();
+        }
+
+        render();
+        updateUI();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    // ==================== 初始化 ====================
+    function createStars() {
+        const starsContainer = document.getElementById('stars');
+        for (let i = 0; i < 100; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.left = random(0, 100) + '%';
+            star.style.top = random(0, 100) + '%';
+            star.style.width = random(1, 3) + 'px';
+            star.style.height = star.style.width;
+            star.style.animationDelay = random(0, 2) + 's';
+            starsContainer.appendChild(star);
+        }
+    }
+
+    function initialize() {
+        createStars();
+        initializeOrders();
+        renderShop();
+        updateUI();
+
+        document.getElementById('startGameBtn').addEventListener('click', () => {
+            document.getElementById('tutorialOverlay').style.display = 'none';
+            gameState.isStarted = true;
+            gameState.isPaused = false;
+            requestAnimationFrame(gameLoop);
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', togglePause);
+
+        document.getElementById('pausedOverlay').addEventListener('click', () => {
+            if (gameState.isPaused) togglePause();
+        });
+
+        document.getElementById('shopBtn').addEventListener('click', () => {
+            document.getElementById('shopPanel').classList.toggle('hidden');
+        });
+
+        document.getElementById('resetSorterBtn').addEventListener('click', () => {
+            gameState.sorters.forEach((sorter, i) => {
+                sorter.x = 150 + i * 180;
+            });
+        });
+
+        document.getElementById('eventCloseBtn').addEventListener('click', () => {
+            document.getElementById('eventNotification').style.display = 'none';
+            gameState.isPaused = false;
+        });
+    }
+
+    initialize();
+    </script>
+</body>
+</html>

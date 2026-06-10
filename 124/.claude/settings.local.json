@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -ExecutionPolicy Bypass -File check_windows.ps1)",
+      "Bash(powershell -ExecutionPolicy Bypass -File .\\\\auto_send_prompts.ps1)",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"d:/Desktop/公司项目/Solo/auto_demo/auto_send_prompts.ps1\")",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"d:/Desktop/公司项目/Solo/auto_demo/auto_send_prompts_simple.ps1\")",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"d:/Desktop/公司项目/Solo/auto_demo/auto_send_final.ps1\")",
+      "Bash(where trae *)",
+      "Bash(dir \"C:\\\\Users\\\\27857\\\\AppData\\\\Local\\\\Programs\\\\Trae CN\\\\Trae CN.exe\")",
+      "Bash(dir \"C:\\\\Users\\\\27857\\\\AppData\\\\Local\\\\Trae CN\\\\Trae CN.exe\")",
+      "Bash(dir /s /b \"C:\\\\Users\\\\27857\\\\AppData\\\\Local\\\\Programs\\\\Trae*\")",
+      "Bash(dir /s /b \"C:\\\\Users\\\\27857\\\\AppData\\\\Local\\\\Trae*\")",
+      "Read(//f/Program Files/Trae CN/**)",
+      "Read(//f/Program Files/Trae CN/bin/**)"
+    ]
+  }
+}

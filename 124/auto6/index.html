@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心动回忆 - 恋爱养成游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #ff6b9d;
+            --primary-light: #ff8fb3;
+            --secondary: #c44569;
+            --bg-gradient-start: #fef3f7;
+            --bg-gradient-end: #fce4ec;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --text-primary: #333;
+            --text-secondary: #666;
+            --success: #4caf50;
+            --danger: #f44336;
+            --event-border: #ffd700;
+            --event-bg: rgba(255, 215, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--card-bg);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(196, 69, 105, 0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            max-height: 95vh;
+        }
+
+        .status-panel {
+            padding: 15px 20px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+
+        .character-name {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .stat-item {
+            flex: 1;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .stat-bar {
+            height: 10px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 5px;
+        }
+
+        .stat-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.5s ease-out, background-color 0.3s ease;
+        }
+
+        .affection-fill {
+            background: linear-gradient(90deg, #ffeb3b, #ff9800);
+        }
+
+        .mood-fill {
+            background: linear-gradient(90deg, #2196f3, #03a9f4);
+        }
+
+        .stat-value {
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .stat-change {
+            font-size: 0.7rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            margin-left: 5px;
+        }
+
+        .stat-change.positive {
+            color: #c8e6c9;
+            opacity: 1;
+        }
+
+        .stat-change.negative {
+            color: #ffcdd2;
+            opacity: 1;
+        }
+
+        .character-display {
+            flex: 1;
+            min-height: 200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .character-avatar {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 4rem;
+            box-shadow: 0 10px 30px rgba(255, 107, 157, 0.3);
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .dialogue-section {
+            padding: 20px;
+            position: relative;
+        }
+
+        .dialogue-section.event-mode {
+            background: var(--event-bg);
+            border-top: 3px solid var(--event-border);
+        }
+
+        .dialogue-section.event-mode .dialogue-box {
+            border-color: var(--event-border);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        }
+
+        .dialogue-section.event-mode .event-badge {
+            display: block;
+        }
+
+        .event-badge {
+            display: none;
+            position: absolute;
+            top: 5px;
+            right: 20px;
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            color: #333;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .dialogue-box {
+            background: white;
+            border: 2px solid var(--primary-light);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            position: relative;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .dialogue-box::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 30px;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 10px solid var(--primary-light);
+        }
+
+        .dialogue-box::after {
+            content: '';
+            position: absolute;
+            top: -6px;
+            left: 32px;
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 8px solid white;
+        }
+
+        .speaker {
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .dialogue-text {
+            color: var(--text-primary);
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .option-btn {
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #fff 0%, #fce4ec 100%);
+            border: 2px solid var(--primary-light);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: left;
+            animation: slideIn 0.3s ease forwards;
+            opacity: 0;
+        }
+
+        .option-btn:nth-child(1) { animation-delay: 0.1s; }
+        .option-btn:nth-child(2) { animation-delay: 0.2s; }
+        .option-btn:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .option-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+            color: white;
+            transform: translateX(5px);
+            box-shadow: 0 5px 20px rgba(255, 107, 157, 0.3);
+        }
+
+        .option-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #f5f5f5;
+            border-color: #ddd;
+        }
+
+        .option-btn.hidden {
+            display: none;
+        }
+
+        .greeting-banner {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 0.9rem;
+            animation: greetingSlide 0.5s ease;
+        }
+
+        @keyframes greetingSlide {
+            from { opacity: 0; max-height: 0; }
+            to { opacity: 1; max-height: 50px; }
+        }
+
+        .ending-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.5s ease;
+        }
+
+        .ending-modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .ending-content {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+            animation: endingPop 0.5s ease;
+        }
+
+        @keyframes endingPop {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .ending-icon {
+            font-size: 5rem;
+            margin-bottom: 20px;
+        }
+
+        .ending-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .ending-title.love {
+            color: var(--primary);
+        }
+
+        .ending-title.stranger {
+            color: #999;
+        }
+
+        .ending-text {
+            color: var(--text-secondary);
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+
+        .reset-btn {
+            padding: 12px 40px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .reset-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(255, 107, 157, 0.4);
+        }
+
+        @media (max-width: 480px) {
+            .game-container {
+                max-height: 100vh;
+                border-radius: 0;
+            }
+
+            .character-avatar {
+                width: 150px;
+                height: 150px;
+                font-size: 3rem;
+            }
+
+            .stats {
+                gap: 10px;
+            }
+
+            .dialogue-section {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="status-panel">
+            <div class="character-name">林 悦</div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-label">好感度</div>
+                    <div class="stat-bar">
+                        <div class="stat-fill affection-fill" id="affection-bar" style="width: 50%"></div>
+                    </div>
+                    <div class="stat-value">
+                        <span id="affection-value">50</span>
+                        <span class="stat-change" id="affection-change"></span>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">心情值</div>
+                    <div class="stat-bar">
+                        <div class="stat-fill mood-fill" id="mood-bar" style="width: 50%"></div>
+                    </div>
+                    <div class="stat-value">
+                        <span id="mood-value">0</span>
+                        <span class="stat-change" id="mood-change"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="greeting-banner" id="greeting-banner" style="display: none;"></div>
+
+        <div class="character-display">
+            <div class="character-avatar">🌸</div>
+        </div>
+
+        <div class="dialogue-section" id="dialogue-section">
+            <div class="event-badge">✨ 特殊事件</div>
+            <div class="dialogue-box">
+                <div class="speaker" id="speaker">林悦</div>
+                <div class="dialogue-text" id="dialogue-text">你好，我是林悦。很高兴认识你~</div>
+            </div>
+            <div class="options-container" id="options-container"></div>
+        </div>
+    </div>
+
+    <div class="ending-modal" id="ending-modal">
+        <div class="ending-content">
+            <div class="ending-icon" id="ending-icon">💕</div>
+            <div class="ending-title" id="ending-title">恋人结局</div>
+            <div class="ending-text" id="ending-text">你们成为了恋人，从此幸福地生活在一起。</div>
+            <button class="reset-btn" onclick="SaveModule.resetGame()">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        const CharacterModule = (function() {
+            let character = {
+                name: '林悦',
+                affection: 50,
+                mood: 0,
+                triggeredEvents: [],
+                interactionCount: 0
+            };
+
+            return {
+                getName: function() { return character.name; },
+                getAffection: function() { return character.affection; },
+                getMood: function() { return character.mood; },
+                getInteractionCount: function() { return character.interactionCount; },
+                
+                updateAffection: function(delta) {
+                    const oldValue = character.affection;
+                    character.affection = Math.max(0, Math.min(100, character.affection + delta));
+                    const actualChange = character.affection - oldValue;
+                    
+                    document.dispatchEvent(new CustomEvent('affectionChanged', {
+                        detail: { oldValue, newValue: character.affection, change: actualChange }
+                    }));
+                    return actualChange;
+                },
+
+                updateMood: function(delta) {
+                    const oldValue = character.mood;
+                    character.mood = Math.max(-10, Math.min(10, character.mood + delta));
+                    const actualChange = character.mood - oldValue;
+                    
+                    document.dispatchEvent(new CustomEvent('moodChanged', {
+                        detail: { oldValue, newValue: character.mood, change: actualChange }
+                    }));
+                    return actualChange;
+                },
+
+                incrementInteraction: function() {
+                    character.interactionCount++;
+                },
+
+                hasTriggeredEvent: function(eventId) {
+                    return character.triggeredEvents.includes(eventId);
+                },
+
+                markEventTriggered: function(eventId) {
+                    if (!character.triggeredEvents.includes(eventId)) {
+                        character.triggeredEvents.push(eventId);
+                    }
+                },
+
+                getState: function() {
+                    return { ...character };
+                },
+
+                restoreState: function(state) {
+                    character = { ...state };
+                },
+
+                reset: function() {
+                    character = {
+                        name: '林悦',
+                        affection: 50,
+                        mood: 0,
+                        triggeredEvents: [],
+                        interactionCount: 0
+                    };
+                }
+            };
+        })();
+
+        const DialogueModule = (function() {
+            let currentNodeId = 'start';
+            let isProcessing = false;
+
+            const dialogueTree = {
+                start: {
+                    speaker: '林悦',
+                    text: '你好呀，我是林悦。今天天气真不错，你是刚来这里的吗？',
+                    options: [
+                        { text: '是的，刚来不久，还请多关照~', nextNode: 'friendly_1', affectionChange: 5, moodChange: 2 },
+                        { text: '嗯，随便逛逛。', nextNode: 'neutral_1', affectionChange: -2, moodChange: -1 },
+                        { text: '你好漂亮，能认识一下吗？', nextNode: 'flirt_1', affectionChange: 3, moodChange: 1, moodRequirement: -5 }
+                    ]
+                },
+
+                friendly_1: {
+                    speaker: '林悦',
+                    text: '太好了！我也是半年前才来的。如果有什么不知道的地方，尽管问我哦~',
+                    options: [
+                        { text: '谢谢你！你真热心~', nextNode: 'friendly_2', affectionChange: 5, moodChange: 2 },
+                        { text: '那附近有什么好吃的推荐吗？', nextNode: 'food_talk', affectionChange: 3, moodChange: 1 }
+                    ]
+                },
+
+                friendly_2: {
+                    speaker: '林悦',
+                    text: '嘿嘿，能帮到你我也很开心~ 以后我们就是朋友啦！',
+                    options: [
+                        { text: '能交到你这样的朋友真好！', nextNode: 'deep_talk_1', affectionChange: 5, moodChange: 2 },
+                        { text: '嗯，朋友。', nextNode: 'neutral_2', affectionChange: 0, moodChange: -1 }
+                    ]
+                },
+
+                neutral_1: {
+                    speaker: '林悦',
+                    text: '这样啊...那祝你逛得开心。',
+                    options: [
+                        { text: '等等，其实我想多了解你一下', nextNode: 'friendly_1', affectionChange: 3, moodChange: 1 },
+                        { text: '嗯，再见。', nextNode: 'end_chapter_1', affectionChange: -5, moodChange: -2 }
+                    ]
+                },
+
+                neutral_2: {
+                    speaker: '林悦',
+                    text: '...嗯，朋友。',
+                    options: [
+                        { text: '怎么了？不开心吗？', nextNode: 'comfort_1', affectionChange: 3, moodChange: 3 },
+                        { text: '那我先走了', nextNode: 'end_chapter_1', affectionChange: -3, moodChange: -2 }
+                    ]
+                },
+
+                flirt_1: {
+                    speaker: '林悦',
+                    text: '诶？！你、你怎么突然说这个...',
+                    options: [
+                        { text: '因为你真的很吸引人啊', nextNode: 'flirt_2', affectionChange: 8, moodChange: 3, moodRequirement: 0 },
+                        { text: '开玩笑的，别在意~', nextNode: 'neutral_1', affectionChange: -3, moodChange: -2 }
+                    ]
+                },
+
+                flirt_2: {
+                    speaker: '林悦',
+                    text: '你这个人...真是的，不过...谢谢你...',
+                    options: [
+                        { text: '我说的是真心话', nextNode: 'deep_talk_1', affectionChange: 10, moodChange: 3 },
+                        { text: '看你害羞真可爱', nextNode: 'flirt_3', affectionChange: 5, moodChange: 2, moodRequirement: 3 }
+                    ]
+                },
+
+                flirt_3: {
+                    speaker: '林悦',
+                    text: '哼！不许取笑我！',
+                    options: [
+                        { text: '好好好，我错了~', nextNode: 'deep_talk_1', affectionChange: 5, moodChange: 2 },
+                        { text: '但真的很可爱嘛', nextNode: 'deep_talk_1', affectionChange: 7, moodChange: 4, moodRequirement: 5 }
+                    ]
+                },
+
+                food_talk: {
+                    speaker: '林悦',
+                    text: '说到吃的！附近有一家超棒的甜品店！他们家的草莓蛋糕是我的最爱~',
+                    options: [
+                        { text: '哦？那有空带我去尝尝吧？', nextNode: 'invite_food', affectionChange: 5, moodChange: 2 },
+                        { text: '我不太喜欢甜食...', nextNode: 'neutral_2', affectionChange: -2, moodChange: -1 }
+                    ]
+                },
+
+                invite_food: {
+                    speaker: '林悦',
+                    text: '真的吗！那我们周末一起去怎么样？我知道他们家还有很多好吃的~',
+                    options: [
+                        { text: '好啊，就这么说定了！', nextNode: 'date_plan', affectionChange: 10, moodChange: 4 },
+                        { text: '这个周末可能没空...', nextNode: 'neutral_2', affectionChange: -3, moodChange: -2 }
+                    ]
+                },
+
+                date_plan: {
+                    speaker: '林悦',
+                    text: '太棒了！我会提前查好路线的，到时候见~',
+                    options: [
+                        { text: '很期待呢！', nextNode: 'deep_talk_1', affectionChange: 8, moodChange: 3 },
+                        { text: '嗯，到时候联系。', nextNode: 'end_chapter_1', affectionChange: 2, moodChange: 0 }
+                    ]
+                },
+
+                deep_talk_1: {
+                    speaker: '林悦',
+                    text: '说起来，你为什么会来到这个城市呢？',
+                    options: [
+                        { text: '为了追求梦想', nextNode: 'dream_talk', affectionChange: 5, moodChange: 2 },
+                        { text: '只是想换个环境', nextNode: 'casual_talk', affectionChange: 2, moodChange: 0 },
+                        { text: '因为有想见的人', nextNode: 'romantic_talk', affectionChange: 8, moodChange: 3, moodRequirement: 2 }
+                    ]
+                },
+
+                dream_talk: {
+                    speaker: '林悦',
+                    text: '追求梦想...真厉害！我也有自己的梦想呢，就是成为一名插画师！',
+                    options: [
+                        { text: '哇，好厉害！我相信你一定能做到', nextNode: 'encourage_1', affectionChange: 10, moodChange: 5 },
+                        { text: '插画师啊...挺好的', nextNode: 'casual_talk', affectionChange: 2, moodChange: -1 }
+                    ]
+                },
+
+                encourage_1: {
+                    speaker: '林悦',
+                    text: '谢谢你...你是第一个这么认真对我说这句话的人...',
+                    options: [
+                        { text: '我会一直支持你的', nextNode: 'bond_deep', affectionChange: 15, moodChange: 5 },
+                        { text: '加油吧', nextNode: 'end_chapter_1', affectionChange: 3, moodChange: 1 }
+                    ]
+                },
+
+                casual_talk: {
+                    speaker: '林悦',
+                    text: '这样啊...新环境确实能让人心情变好呢。',
+                    options: [
+                        { text: '遇到你之后，确实变好了很多', nextNode: 'romantic_talk', affectionChange: 8, moodChange: 3 },
+                        { text: '嗯，希望能越来越好吧', nextNode: 'end_chapter_1', affectionChange: 3, moodChange: 1 }
+                    ]
+                },
+
+                romantic_talk: {
+                    speaker: '林悦',
+                    text: '诶？！你...你是说...',
+                    options: [
+                        { text: '没错，就是你', nextNode: 'bond_deep', affectionChange: 15, moodChange: 5 },
+                        { text: '没什么，随口说说', nextNode: 'end_chapter_1', affectionChange: -5, moodChange: -3 }
+                    ]
+                },
+
+                comfort_1: {
+                    speaker: '林悦',
+                    text: '你...你居然注意到了...其实我今天心情确实不太好...',
+                    options: [
+                        { text: '愿意和我说说吗？', nextNode: 'comfort_2', affectionChange: 8, moodChange: 4 },
+                        { text: '别想太多，开心点', nextNode: 'end_chapter_1', affectionChange: 2, moodChange: 1 }
+                    ]
+                },
+
+                comfort_2: {
+                    speaker: '林悦',
+                    text: '谢谢你愿意听我说...其实是我的画稿被退回了...',
+                    options: [
+                        { text: '这不是你的错，是他们没眼光', nextNode: 'bond_deep', affectionChange: 12, moodChange: 5 },
+                        { text: '下次一定可以的', nextNode: 'end_chapter_1', affectionChange: 5, moodChange: 2 }
+                    ]
+                },
+
+                bond_deep: {
+                    speaker: '林悦',
+                    text: '和你聊天真的很开心...感觉我们认识很久了一样...',
+                    options: [
+                        { text: '我也是这么想的', nextNode: 'end_chapter_1', affectionChange: 10, moodChange: 4 },
+                        { text: '缘分真的很奇妙', nextNode: 'end_chapter_1', affectionChange: 8, moodChange: 3 }
+                    ]
+                },
+
+                end_chapter_1: {
+                    speaker: '林悦',
+                    text: '时间不早了，我该回去了。今天...谢谢你陪我聊天。',
+                    options: [
+                        { text: '我也很开心，下次再见！', nextNode: 'chapter_2_start', affectionChange: 5, moodChange: 2 },
+                        { text: '嗯，再见。', nextNode: 'chapter_2_start', affectionChange: 0, moodChange: -1 }
+                    ]
+                },
+
+                chapter_2_start: {
+                    speaker: '林悦',
+                    text: '是你啊！又见面了~ 今天有什么打算吗？',
+                    options: [
+                        { text: '来找你啊', nextNode: 'c2_flirt', affectionChange: 8, moodChange: 3, moodRequirement: 0 },
+                        { text: '随便逛逛，刚好遇到你', nextNode: 'c2_casual', affectionChange: 2, moodChange: 0 },
+                        { text: '我们去上次说的甜品店吧？', nextNode: 'c2_date', affectionChange: 10, moodChange: 4, moodRequirement: 2 }
+                    ]
+                },
+
+                c2_flirt: {
+                    speaker: '林悦',
+                    text: '你...你又来了！不过...我不讨厌就是了...',
+                    options: [
+                        { text: '那我要经常来了~', nextNode: 'c2_deep', affectionChange: 10, moodChange: 4 },
+                        { text: '哈哈，逗你的', nextNode: 'c2_casual', affectionChange: -3, moodChange: -2 }
+                    ]
+                },
+
+                c2_casual: {
+                    speaker: '林悦',
+                    text: '这样啊...那要一起走走吗？',
+                    options: [
+                        { text: '好啊，正好想找人说说话', nextNode: 'c2_deep', affectionChange: 5, moodChange: 2 },
+                        { text: '不了，我还有事', nextNode: 'c2_end', affectionChange: -5, moodChange: -3 }
+                    ]
+                },
+
+                c2_date: {
+                    speaker: '林悦',
+                    text: '真的吗！太好了，我都等不及了~ 快走吧快走吧！',
+                    options: [
+                        { text: '看你开心的样子真可爱', nextNode: 'c2_deep', affectionChange: 12, moodChange: 5 },
+                        { text: '嗯，走吧', nextNode: 'c2_deep', affectionChange: 5, moodChange: 2 }
+                    ]
+                },
+
+                c2_deep: {
+                    speaker: '林悦',
+                    text: '说起来...你有喜欢的人吗？',
+                    options: [
+                        { text: '有啊，就在我面前', nextNode: 'c2_confess', affectionChange: 15, moodChange: 5, moodRequirement: 3 },
+                        { text: '目前还没有', nextNode: 'c2_friend', affectionChange: 3, moodChange: 0 },
+                        { text: '你问这个做什么？', nextNode: 'c2_tease', affectionChange: 5, moodChange: 2 }
+                    ]
+                },
+
+                c2_confess: {
+                    speaker: '林悦',
+                    text: '诶？！我...我吗？！你是认真的吗？',
+                    options: [
+                        { text: '非常认真', nextNode: 'c2_romantic', affectionChange: 20, moodChange: 6 },
+                        { text: '你觉得呢~', nextNode: 'c2_tease', affectionChange: 8, moodChange: 3 }
+                    ]
+                },
+
+                c2_romantic: {
+                    speaker: '林悦',
+                    text: '其实...我也是...从第一次见到你，就觉得你很特别...',
+                    options: [
+                        { text: '那我们...在一起吧', nextNode: 'c2_end_love', affectionChange: 25, moodChange: 8 },
+                        { text: '让我们慢慢了解彼此', nextNode: 'c2_end', affectionChange: 15, moodChange: 5 }
+                    ]
+                },
+
+                c2_friend: {
+                    speaker: '林悦',
+                    text: '这样啊...那我们做好朋友吧！',
+                    options: [
+                        { text: '嗯，好朋友', nextNode: 'c2_end', affectionChange: 5, moodChange: 2 },
+                        { text: '但我不想只做朋友', nextNode: 'c2_confess', affectionChange: 10, moodChange: 3, moodRequirement: 2 }
+                    ]
+                },
+
+                c2_tease: {
+                    speaker: '林悦',
+                    text: '哼，不告诉我算了！',
+                    options: [
+                        { text: '好啦好啦，告诉你~', nextNode: 'c2_confess', affectionChange: 8, moodChange: 3 },
+                        { text: '别生气嘛~', nextNode: 'c2_end', affectionChange: 5, moodChange: 1 }
+                    ]
+                },
+
+                c2_end: {
+                    speaker: '林悦',
+                    text: '今天也很开心，我们下次再聊吧~',
+                    options: [
+                        { text: '好的，一定会的', nextNode: 'chapter_3_start', affectionChange: 5, moodChange: 2 },
+                        { text: '嗯', nextNode: 'chapter_3_start', affectionChange: 0, moodChange: -1 }
+                    ]
+                },
+
+                c2_end_love: {
+                    speaker: '林悦',
+                    text: '我...我愿意！从今以后，请多关照啦，男朋友~',
+                    options: [
+                        { text: '请多关照，女朋友~', nextNode: 'love_ending', affectionChange: 30, moodChange: 10 }
+                    ]
+                },
+
+                chapter_3_start: {
+                    speaker: '林悦',
+                    text: '是你...好久不见。最近还好吗？',
+                    options: [
+                        { text: '没有你在，不太好呢', nextNode: 'c3_romantic', affectionChange: 10, moodChange: 3, moodRequirement: 0 },
+                        { text: '挺好的，你呢？', nextNode: 'c3_normal', affectionChange: 3, moodChange: 1 },
+                        { text: '一般般吧', nextNode: 'c3_cold', affectionChange: -2, moodChange: -2 }
+                    ]
+                },
+
+                c3_romantic: {
+                    speaker: '林悦',
+                    text: '你还是这么会说话...不过，我又何尝不是呢...',
+                    options: [
+                        { text: '那我们不要再分开了', nextNode: 'c3_confession', affectionChange: 20, moodChange: 6 },
+                        { text: '我是认真的', nextNode: 'c3_confession', affectionChange: 15, moodChange: 4 }
+                    ]
+                },
+
+                c3_normal: {
+                    speaker: '林悦',
+                    text: '我也挺好的...就是有时候会想起你...',
+                    options: [
+                        { text: '我也是', nextNode: 'c3_confession', affectionChange: 15, moodChange: 4 },
+                        { text: '是吗', nextNode: 'c3_cold', affectionChange: -3, moodChange: -2 }
+                    ]
+                },
+
+                c3_cold: {
+                    speaker: '林悦',
+                    text: '这样啊...那...没什么事我先走了...',
+                    options: [
+                        { text: '等等，我有话对你说', nextNode: 'c3_confession', affectionChange: 8, moodChange: 2 },
+                        { text: '好的，再见', nextNode: 'stranger_ending', affectionChange: -10, moodChange: -5 }
+                    ]
+                },
+
+                c3_confession: {
+                    speaker: '林悦',
+                    text: '其实...这段时间我想了很多...我发现自己真的很喜欢你...',
+                    options: [
+                        { text: '我也是，我们在一起吧', nextNode: 'love_ending', affectionChange: 25, moodChange: 10 },
+                        { text: '让我再考虑考虑', nextNode: 'open_end', affectionChange: 5, moodChange: 0 }
+                    ]
+                },
+
+                open_end: {
+                    speaker: '林悦',
+                    text: '好...我等你。不管多久，我都会等你的...',
+                    options: [
+                        { text: '谢谢你，我不会让你等太久的', nextNode: 'chapter_3_start', affectionChange: 10, moodChange: 3 }
+                    ]
+                },
+
+                love_ending: {
+                    speaker: '林悦',
+                    text: '太好了...我终于等到这一天了...',
+                    options: [],
+                    isEnding: 'love'
+                },
+
+                stranger_ending: {
+                    speaker: '林悦',
+                    text: '...再见。',
+                    options: [],
+                    isEnding: 'stranger'
+                },
+
+                event_coffee: {
+                    speaker: '林悦',
+                    text: '那个...既然我们这么聊得来...要不要周末一起去喝杯咖啡？我知道一家很棒的店！',
+                    isEvent: true,
+                    eventType: 'coffee',
+                    options: [
+                        { text: '好啊，我很期待！', nextNode: 'event_coffee_yes', affectionChange: 10, moodChange: 5 },
+                        { text: '咖啡吗...可以啊', nextNode: 'event_coffee_yes', affectionChange: 5, moodChange: 2 },
+                        { text: '不好意思，周末可能没空', nextNode: 'event_coffee_no', affectionChange: -5, moodChange: -3 }
+                    ]
+                },
+
+                event_coffee_yes: {
+                    speaker: '林悦',
+                    text: '太棒了！那周六下午两点，在市中心的那家星空咖啡见？不见不散~',
+                    isEvent: true,
+                    eventType: 'coffee',
+                    options: [
+                        { text: '不见不散！', nextNode: 'chapter_2_start', affectionChange: 8, moodChange: 4 }
+                    ]
+                },
+
+                event_coffee_no: {
+                    speaker: '林悦',
+                    text: '这样啊...没关系，那下次有机会再说吧...',
+                    isEvent: true,
+                    eventType: 'coffee',
+                    options: [
+                        { text: '抱歉，下次一定', nextNode: 'chapter_2_start', affectionChange: 0, moodChange: -1 }
+                    ]
+                },
+
+                event_park: {
+                    speaker: '林悦',
+                    text: '最近公园的樱花开了，特别漂亮...那个...要不要一起去看看？',
+                    isEvent: true,
+                    eventType: 'park',
+                    options: [
+                        { text: '和你一起的话，一定要去！', nextNode: 'event_park_yes', affectionChange: 12, moodChange: 5 },
+                        { text: '赏花啊，听起来不错', nextNode: 'event_park_yes', affectionChange: 7, moodChange: 3 },
+                        { text: '我对花没什么兴趣', nextNode: 'event_park_no', affectionChange: -8, moodChange: -4 }
+                    ]
+                },
+
+                event_park_yes: {
+                    speaker: '林悦',
+                    text: '太好了！我还准备了便当呢，我们可以在樱花树下野餐~',
+                    isEvent: true,
+                    eventType: 'park',
+                    options: [
+                        { text: '真是太棒了，你太贴心了', nextNode: 'c2_deep', affectionChange: 15, moodChange: 6 }
+                    ]
+                },
+
+                event_park_no: {
+                    speaker: '林悦',
+                    text: '...是吗，那算了。',
+                    isEvent: true,
+                    eventType: 'park',
+                    options: [
+                        { text: '抱歉', nextNode: 'c2_casual', affectionChange: -3, moodChange: -2 }
+                    ]
+                },
+
+                event_dinner: {
+                    speaker: '林悦',
+                    text: '那个...今天是个特别的日子...我订了一家西餐厅，晚上...要不要一起去？',
+                    isEvent: true,
+                    eventType: 'dinner',
+                    options: [
+                        { text: '当然要去！和你约会是我的荣幸', nextNode: 'event_dinner_yes', affectionChange: 15, moodChange: 6 },
+                        { text: '这么正式吗？好啊', nextNode: 'event_dinner_yes', affectionChange: 10, moodChange: 4 },
+                        { text: '我不太习惯这种场合', nextNode: 'event_dinner_no', affectionChange: -10, moodChange: -5 }
+                    ]
+                },
+
+                event_dinner_yes: {
+                    speaker: '林悦',
+                    text: '太好了...其实，我有很重要的话想对你说...',
+                    isEvent: true,
+                    eventType: 'dinner',
+                    options: [
+                        { text: '我也有话想对你说', nextNode: 'c3_confession', affectionChange: 20, moodChange: 8 }
+                    ]
+                },
+
+                event_dinner_no: {
+                    speaker: '林悦',
+                    text: '这样...那好吧...是我太唐突了...',
+                    isEvent: true,
+                    eventType: 'dinner',
+                    options: [
+                        { text: '对不起', nextNode: 'c3_cold', affectionChange: -5, moodChange: -3 }
+                    ]
+                }
+            };
+
+            const greetings = {
+                lowAffection: {
+                    goodMood: ['你好。', '今天天气不错。', '又见面了。'],
+                    normalMood: ['...', '有事吗？', '嗯。'],
+                    badMood: ['...', '让我一个人待着。', '没心情说话。']
+                },
+                midAffection: {
+                    goodMood: ['早上好呀~', '今天精神不错！', '见到你真好~'],
+                    normalMood: ['嗨，又见面了', '今天过得怎么样？', '有什么事吗？'],
+                    badMood: ['...今天有点累', '不好意思，心情不太好', '让我静一静好吗']
+                },
+                highAffection: {
+                    goodMood: ['早安亲爱的~♡', '一见到你心情就变好啦！', '好想你呀~'],
+                    normalMood: ['又见到你了，开心~', '今天也要加油哦！', '有你在真好~'],
+                    badMood: ['抱抱我...今天好难过...', '能陪我一会儿吗...', '心情不好...但看到你好多了...']
+                }
+            };
+
+            return {
+                getCurrentNode: function() {
+                    return dialogueTree[currentNodeId];
+                },
+
+                getCurrentNodeId: function() {
+                    return currentNodeId;
+                },
+
+                setCurrentNodeId: function(id) {
+                    currentNodeId = id;
+                },
+
+                canShowOption: function(option) {
+                    if (option.moodRequirement !== undefined) {
+                        return CharacterModule.getMood() >= option.moodRequirement;
+                    }
+                    return true;
+                },
+
+                selectOption: function(optionIndex) {
+                    if (isProcessing) return null;
+                    
+                    const currentNode = dialogueTree[currentNodeId];
+                    const option = currentNode.options[optionIndex];
+                    
+                    if (!option) return null;
+                    
+                    isProcessing = true;
+                    
+                    if (option.affectionChange) {
+                        CharacterModule.updateAffection(option.affectionChange);
+                    }
+                    if (option.moodChange) {
+                        CharacterModule.updateMood(option.moodChange);
+                    }
+                    
+                    CharacterModule.incrementInteraction();
+                    
+                    currentNodeId = option.nextNode;
+                    
+                    const nextNode = dialogueTree[currentNodeId];
+                    if (nextNode && nextNode.isEnding) {
+                        document.dispatchEvent(new CustomEvent('endingTriggered', {
+                            detail: { type: nextNode.isEnding }
+                        }));
+                    }
+                    
+                    setTimeout(() => {
+                        isProcessing = false;
+                    }, 500);
+                    
+                    return option.nextNode;
+                },
+
+                isProcessing: function() {
+                    return isProcessing;
+                },
+
+                checkSpecialEvent: function() {
+                    const affection = CharacterModule.getAffection();
+                    
+                    if (affection >= 30 && affection <= 40 && !CharacterModule.hasTriggeredEvent('coffee')) {
+                        CharacterModule.markEventTriggered('coffee');
+                        return 'event_coffee';
+                    }
+                    
+                    if (affection >= 50 && affection <= 60 && !CharacterModule.hasTriggeredEvent('park')) {
+                        CharacterModule.markEventTriggered('park');
+                        return 'event_park';
+                    }
+                    
+                    if (affection >= 70 && affection <= 80 && !CharacterModule.hasTriggeredEvent('dinner')) {
+                        CharacterModule.markEventTriggered('dinner');
+                        return 'event_dinner';
+                    }
+                    
+                    return null;
+                },
+
+                checkEnding: function() {
+                    const affection = CharacterModule.getAffection();
+                    if (affection >= 80) return 'love';
+                    if (affection <= 20) return 'stranger';
+                    return null;
+                },
+
+                getGreeting: function() {
+                    const affection = CharacterModule.getAffection();
+                    const mood = CharacterModule.getMood();
+                    
+                    let affectionLevel, moodLevel;
+                    if (affection < 40) affectionLevel = 'lowAffection';
+                    else if (affection < 70) affectionLevel = 'midAffection';
+                    else affectionLevel = 'highAffection';
+                    
+                    if (mood > 3) moodLevel = 'goodMood';
+                    else if (mood < -3) moodLevel = 'badMood';
+                    else moodLevel = 'normalMood';
+                    
+                    const greetingList = greetings[affectionLevel][moodLevel];
+                    return greetingList[Math.floor(Math.random() * greetingList.length)];
+                },
+
+                reset: function() {
+                    currentNodeId = 'start';
+                    isProcessing = false;
+                }
+            };
+        })();
+
+        const UIModule = (function() {
+            const elements = {
+                affectionBar: document.getElementById('affection-bar'),
+                affectionValue: document.getElementById('affection-value'),
+                affectionChange: document.getElementById('affection-change'),
+                moodBar: document.getElementById('mood-bar'),
+                moodValue: document.getElementById('mood-value'),
+                moodChange: document.getElementById('mood-change'),
+                speaker: document.getElementById('speaker'),
+                dialogueText: document.getElementById('dialogue-text'),
+                optionsContainer: document.getElementById('options-container'),
+                dialogueSection: document.getElementById('dialogue-section'),
+                greetingBanner: document.getElementById('greeting-banner'),
+                endingModal: document.getElementById('ending-modal'),
+                endingIcon: document.getElementById('ending-icon'),
+                endingTitle: document.getElementById('ending-title'),
+                endingText: document.getElementById('ending-text')
+            };
+
+            return {
+                renderStatus: function() {
+                    const affection = CharacterModule.getAffection();
+                    const mood = CharacterModule.getMood();
+                    const moodPercent = ((mood + 10) / 20) * 100;
+                    
+                    elements.affectionBar.style.width = affection + '%';
+                    elements.affectionValue.textContent = affection;
+                    
+                    elements.moodBar.style.width = moodPercent + '%';
+                    elements.moodValue.textContent = mood;
+                },
+
+                showStatChange: function(type, change) {
+                    const changeEl = type === 'affection' ? elements.affectionChange : elements.moodChange;
+                    changeEl.textContent = (change > 0 ? '+' : '') + change;
+                    changeEl.className = 'stat-change ' + (change > 0 ? 'positive' : 'negative');
+                    
+                    setTimeout(() => {
+                        changeEl.className = 'stat-change';
+                    }, 1000);
+                },
+
+                renderDialogue: function(node) {
+                    elements.speaker.textContent = node.speaker;
+                    elements.dialogueText.textContent = node.text;
+                    
+                    if (node.isEvent) {
+                        elements.dialogueSection.classList.add('event-mode');
+                    } else {
+                        elements.dialogueSection.classList.remove('event-mode');
+                    }
+                },
+
+                renderOptions: function(options) {
+                    elements.optionsContainer.innerHTML = '';
+                    
+                    options.forEach((option, index) => {
+                        const btn = document.createElement('button');
+                        btn.className = 'option-btn';
+                        btn.textContent = option.text;
+                        
+                        if (!DialogueModule.canShowOption(option)) {
+                            btn.classList.add('hidden');
+                        }
+                        
+                        btn.addEventListener('click', () => {
+                            if (!DialogueModule.isProcessing()) {
+                                this.disableOptions();
+                                document.dispatchEvent(new CustomEvent('optionSelected', {
+                                    detail: { optionIndex: index }
+                                }));
+                            }
+                        });
+                        
+                        elements.optionsContainer.appendChild(btn);
+                    });
+                },
+
+                disableOptions: function() {
+                    const buttons = elements.optionsContainer.querySelectorAll('.option-btn');
+                    buttons.forEach(btn => {
+                        btn.disabled = true;
+                    });
+                },
+
+                enableOptions: function() {
+                    const buttons = elements.optionsContainer.querySelectorAll('.option-btn');
+                    buttons.forEach(btn => {
+                        btn.disabled = false;
+                    });
+                },
+
+                showGreeting: function(greeting) {
+                    elements.greetingBanner.textContent = '💬 ' + greeting;
+                    elements.greetingBanner.style.display = 'block';
+                    
+                    setTimeout(() => {
+                        elements.greetingBanner.style.display = 'none';
+                    }, 3000);
+                },
+
+                showEnding: function(type) {
+                    elements.endingModal.classList.add('show');
+                    
+                    if (type === 'love') {
+                        elements.endingIcon.textContent = '💕';
+                        elements.endingTitle.textContent = '恋人结局';
+                        elements.endingTitle.className = 'ending-title love';
+                        elements.endingText.textContent = '恭喜你！你和林悦成功走到了一起。从今以后，你们将携手走过每一个春夏秋冬，共同创造属于你们的美好回忆~';
+                    } else {
+                        elements.endingIcon.textContent = '💔';
+                        elements.endingTitle.textContent = '陌路结局';
+                        elements.endingTitle.className = 'ending-title stranger';
+                        elements.endingText.textContent = '很遗憾，你和林悦最终还是成为了陌生人。也许是缘分不够，也许是时机不对...但至少，你们曾经相遇过。';
+                    }
+                },
+
+                hideEnding: function() {
+                    elements.endingModal.classList.remove('show');
+                },
+
+                reset: function() {
+                    this.hideEnding();
+                    this.renderStatus();
+                }
+            };
+        })();
+
+        const SaveModule = (function() {
+            const STORAGE_KEY = 'dating_sim_save';
+
+            return {
+                saveGame: function() {
+                    const saveData = {
+                        currentNodeId: DialogueModule.getCurrentNodeId(),
+                        characterState: CharacterModule.getState(),
+                        timestamp: Date.now()
+                    };
+                    
+                    try {
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+                        return true;
+                    } catch (e) {
+                        console.error('Save failed:', e);
+                        return false;
+                    }
+                },
+
+                loadGame: function() {
+                    try {
+                        const data = localStorage.getItem(STORAGE_KEY);
+                        if (!data) return null;
+                        
+                        const saveData = JSON.parse(data);
+                        if (this.validateSave(saveData)) {
+                            return saveData;
+                        }
+                        return null;
+                    } catch (e) {
+                        console.error('Load failed:', e);
+                        return null;
+                    }
+                },
+
+                validateSave: function(data) {
+                    if (!data || typeof data !== 'object') return false;
+                    if (typeof data.currentNodeId !== 'string') return false;
+                    if (!data.characterState || typeof data.characterState !== 'object') return false;
+                    if (typeof data.characterState.affection !== 'number') return false;
+                    if (typeof data.characterState.mood !== 'number') return false;
+                    return true;
+                },
+
+                hasSaveData: function() {
+                    return localStorage.getItem(STORAGE_KEY) !== null;
+                },
+
+                resetGame: function() {
+                    localStorage.removeItem(STORAGE_KEY);
+                    CharacterModule.reset();
+                    DialogueModule.reset();
+                    UIModule.reset();
+                    initGame();
+                },
+
+                restoreFromSave: function(saveData) {
+                    CharacterModule.restoreState(saveData.characterState);
+                    DialogueModule.setCurrentNodeId(saveData.currentNodeId);
+                }
+            };
+        })();
+
+        function initGame() {
+            const saveData = SaveModule.loadGame();
+            if (saveData) {
+                SaveModule.restoreFromSave(saveData);
+            }
+
+            UIModule.renderStatus();
+            renderCurrentDialogue();
+
+            if (CharacterModule.getInteractionCount() > 0 && 
+                CharacterModule.getInteractionCount() % 3 === 0) {
+                const greeting = DialogueModule.getGreeting();
+                setTimeout(() => UIModule.showGreeting(greeting), 500);
+            }
+        }
+
+        function renderCurrentDialogue() {
+            const currentNode = DialogueModule.getCurrentNode();
+            
+            const eventNode = DialogueModule.checkSpecialEvent();
+            if (eventNode) {
+                DialogueModule.setCurrentNodeId(eventNode);
+                const eventData = DialogueModule.getCurrentNode();
+                UIModule.renderDialogue(eventData);
+                UIModule.renderOptions(eventData.options);
+                return;
+            }
+            
+            const ending = DialogueModule.checkEnding();
+            if (ending && !currentNode.isEnding) {
+                UIModule.showEnding(ending);
+                return;
+            }
+            
+            UIModule.renderDialogue(currentNode);
+            UIModule.renderOptions(currentNode.options);
+        }
+
+        document.addEventListener('affectionChanged', function(e) {
+            UIModule.renderStatus();
+            UIModule.showStatChange('affection', e.detail.change);
+            SaveModule.saveGame();
+        });
+
+        document.addEventListener('moodChanged', function(e) {
+            UIModule.renderStatus();
+            UIModule.showStatChange('mood', e.detail.change);
+            SaveModule.saveGame();
+        });
+
+        document.addEventListener('optionSelected', function(e) {
+            const nextNode = DialogueModule.selectOption(e.detail.optionIndex);
+            if (nextNode) {
+                SaveModule.saveGame();
+                setTimeout(() => {
+                    renderCurrentDialogue();
+                    UIModule.enableOptions();
+                }, 300);
+            }
+        });
+
+        document.addEventListener('endingTriggered', function(e) {
+            setTimeout(() => {
+                UIModule.showEnding(e.detail.type);
+            }, 500);
+        });
+
+        initGame();
+    </script>
+</body>
+</html>

@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>六边形战棋游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: #eee;
+        }
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 900px;
+            padding: 15px 25px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .turn-info {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        .turn-number {
+            color: #4ecdc4;
+        }
+        .turn-player {
+            color: #ff6b6b;
+        }
+        .turn-enemy {
+            color: #ffd93d;
+        }
+        #endTurnBtn {
+            padding: 12px 30px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: white;
+            box-shadow: 0 4px 15px rgba(78, 205, 196, 0.4);
+        }
+        #endTurnBtn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(78, 205, 196, 0.6);
+        }
+        #endTurnBtn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+        #gameCanvas {
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+        .unit-info {
+            display: flex;
+            gap: 30px;
+            padding: 15px 25px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .unit-card {
+            text-align: center;
+        }
+        .unit-card h4 {
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+        .unit-card p {
+            font-size: 0.9em;
+            color: #aaa;
+            margin: 3px 0;
+        }
+        .selected-info {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: rgba(78, 205, 196, 0.2);
+            border-radius: 10px;
+            border: 1px solid #4ecdc4;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .terrain-legend {
+            display: flex;
+            gap: 20px;
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            font-size: 0.9em;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <div class="turn-info">
+                回合: <span class="turn-number" id="turnNumber">1</span> | 
+                当前: <span id="currentPlayer" class="turn-player">玩家</span>
+            </div>
+            <button id="endTurnBtn">结束回合</button>
+        </div>
+        <canvas id="gameCanvas" width="900" height="600"></canvas>
+        <div class="selected-info" id="selectedInfo">点击单位选中，点击高亮格子移动或攻击</div>
+        <div class="terrain-legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #7cb342;"></div>
+                <span>草地 (移动1)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #2e7d32;"></div>
+                <span>森林 (移动2, 防御+2)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #757575;"></div>
+                <span>山地 (移动3, 防御+4)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #42a5f5;"></div>
+                <span>水域 (不可通行)</span>
+            </div>
+        </div>
+        <div class="unit-info">
+            <div class="unit-card">
+                <h4>⚔️ 剑士</h4>
+                <p>生命: 30 | 攻击: 15</p>
+                <p>移动: 4 | 攻击范围: 1</p>
+            </div>
+            <div class="unit-card">
+                <h4>🏹 弓箭手</h4>
+                <p>生命: 20 | 攻击: 12</p>
+                <p>移动: 3 | 攻击范围: 3</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const endTurnBtn = document.getElementById('endTurnBtn');
+        const turnNumberEl = document.getElementById('turnNumber');
+        const currentPlayerEl = document.getElementById('currentPlayer');
+        const selectedInfoEl = document.getElementById('selectedInfo');
+
+        const HEX_SIZE = 36;
+        const GRID_COLS = 10;
+        const GRID_ROWS = 8;
+        const OFFSET_X = 80;
+        const OFFSET_Y = 80;
+
+        const TERRAIN = {
+            GRASS: { name: '草地', color: '#7cb342', cost: 1, defense: 0 },
+            FOREST: { name: '森林', color: '#2e7d32', cost: 2, defense: 2 },
+            MOUNTAIN: { name: '山地', color: '#757575', cost: 3, defense: 4 },
+            WATER: { name: '水域', color: '#42a5f5', cost: Infinity, defense: 0 }
+        };
+
+        const UNIT_TYPES = {
+            SWORDSMAN: {
+                name: '剑士',
+                hp: 30,
+                maxHp: 30,
+                attack: 15,
+                moveRange: 4,
+                attackRange: 1,
+                symbol: '⚔️',
+                color: '#4ecdc4'
+            },
+            ARCHER: {
+                name: '弓箭手',
+                hp: 20,
+                maxHp: 20,
+                attack: 12,
+                moveRange: 3,
+                attackRange: 3,
+                symbol: '🏹',
+                color: '#ff6b6b'
+            },
+            ENEMY_SWORD: {
+                name: '敌方剑士',
+                hp: 30,
+                maxHp: 30,
+                attack: 15,
+                moveRange: 4,
+                attackRange: 1,
+                symbol: '👹',
+                color: '#ffd93d'
+            },
+            ENEMY_ARCHER: {
+                name: '敌方弓箭手',
+                hp: 20,
+                maxHp: 20,
+                attack: 12,
+                moveRange: 3,
+                attackRange: 3,
+                symbol: '🧙',
+                color: '#ff9f43'
+            }
+        };
+
+        let gameState = {
+            turn: 1,
+            isPlayerTurn: true,
+            selectedUnit: null,
+            movableHexes: [],
+            attackableHexes: [],
+            map: [],
+            units: [],
+            animations: []
+        };
+
+        function hexToPixel(q, r) {
+            const x = HEX_SIZE * (3/2 * q);
+            const y = HEX_SIZE * (Math.sqrt(3)/2 * q + Math.sqrt(3) * r);
+            return { x: x + OFFSET_X, y: y + OFFSET_Y };
+        }
+
+        function pixelToHex(x, y) {
+            const px = x - OFFSET_X;
+            const py = y - OFFSET_Y;
+            const q = (2/3 * px) / HEX_SIZE;
+            const r = (-1/3 * px + Math.sqrt(3)/3 * py) / HEX_SIZE;
+            return hexRound(q, r);
+        }
+
+        function hexRound(q, r) {
+            const s = -q - r;
+            let rq = Math.round(q);
+            let rr = Math.round(r);
+            let rs = Math.round(s);
+            const qDiff = Math.abs(rq - q);
+            const rDiff = Math.abs(rr - r);
+            const sDiff = Math.abs(rs - s);
+            if (qDiff > rDiff && qDiff > sDiff) {
+                rq = -rr - rs;
+            } else if (rDiff > sDiff) {
+                rr = -rq - rs;
+            }
+            return { q: rq, r: rr };
+        }
+
+        function hexDistance(a, b) {
+            return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
+        }
+
+        function getHexNeighbors(q, r) {
+            const directions = [
+                {q: 1, r: 0}, {q: 1, r: -1}, {q: 0, r: -1},
+                {q: -1, r: 0}, {q: -1, r: 1}, {q: 0, r: 1}
+            ];
+            return directions.map(d => ({ q: q + d.q, r: r + d.r }));
+        }
+
+        function isValidHex(q, r) {
+            return q >= 0 && q < GRID_COLS && r >= 0 && r < GRID_ROWS;
+        }
+
+        function drawHex(x, y, size, fillColor, strokeColor = '#333', lineWidth = 1) {
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle = Math.PI / 3 * i;
+                const hx = x + size * Math.cos(angle);
+                const hy = y + size * Math.sin(angle);
+                if (i === 0) ctx.moveTo(hx, hy);
+                else ctx.lineTo(hx, hy);
+            }
+            ctx.closePath();
+            ctx.fillStyle = fillColor;
+            ctx.fill();
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = lineWidth;
+            ctx.stroke();
+        }
+
+        function initMap() {
+            gameState.map = [];
+            for (let q = 0; q < GRID_COLS; q++) {
+                gameState.map[q] = [];
+                for (let r = 0; r < GRID_ROWS; r++) {
+                    const rand = Math.random();
+                    let terrain;
+                    if (rand < 0.5) terrain = TERRAIN.GRASS;
+                    else if (rand < 0.75) terrain = TERRAIN.FOREST;
+                    else if (rand < 0.9) terrain = TERRAIN.MOUNTAIN;
+                    else terrain = TERRAIN.WATER;
+                    
+                    if ((q < 2 && r > 2 && r < 6) || (q > 7 && r > 2 && r < 6)) {
+                        terrain = TERRAIN.GRASS;
+                    }
+                    
+                    gameState.map[q][r] = { terrain, q, r };
+                }
+            }
+        }
+
+        function initUnits() {
+            gameState.units = [
+                { id: 1, type: 'SWORDSMAN', ...UNIT_TYPES.SWORDSMAN, 
+                  q: 0, r: 3, isPlayer: true, hasMoved: false, hasAttacked: false },
+                { id: 2, type: 'SWORDSMAN', ...UNIT_TYPES.SWORDSMAN, 
+                  q: 0, r: 4, isPlayer: true, hasMoved: false, hasAttacked: false },
+                { id: 3, type: 'ARCHER', ...UNIT_TYPES.ARCHER, 
+                  q: 1, r: 3, isPlayer: true, hasMoved: false, hasAttacked: false },
+                { id: 4, type: 'ARCHER', ...UNIT_TYPES.ARCHER, 
+                  q: 1, r: 4, isPlayer: true, hasMoved: false, hasAttacked: false },
+                
+                { id: 5, type: 'ENEMY_SWORD', ...UNIT_TYPES.ENEMY_SWORD, 
+                  q: 9, r: 3, isPlayer: false, hasMoved: false, hasAttacked: false },
+                { id: 6, type: 'ENEMY_SWORD', ...UNIT_TYPES.ENEMY_SWORD, 
+                  q: 9, r: 4, isPlayer: false, hasMoved: false, hasAttacked: false },
+                { id: 7, type: 'ENEMY_ARCHER', ...UNIT_TYPES.ENEMY_ARCHER, 
+                  q: 8, r: 3, isPlayer: false, hasMoved: false, hasAttacked: false },
+                { id: 8, type: 'ENEMY_ARCHER', ...UNIT_TYPES.ENEMY_ARCHER, 
+                  q: 8, r: 4, isPlayer: false, hasMoved: false, hasAttacked: false }
+            ];
+        }
+
+        function calculateMovableHexes(unit) {
+            if (unit.hasMoved) return [];
+            
+            const movable = [];
+            const visited = new Map();
+            const queue = [{ q: unit.q, r: unit.r, cost: 0 }];
+            const key = (q, r) => `${q},${r}`;
+            
+            visited.set(key(unit.q, unit.r), 0);
+            
+            while (queue.length > 0) {
+                const current = queue.shift();
+                
+                for (const neighbor of getHexNeighbors(current.q, current.r)) {
+                    if (!isValidHex(neighbor.q, neighbor.r)) continue;
+                    
+                    const hex = gameState.map[neighbor.q][neighbor.r];
+                    const newCost = current.cost + hex.terrain.cost;
+                    
+                    if (newCost > unit.moveRange) continue;
+                    if (getUnitAt(neighbor.q, neighbor.r)) continue;
+                    
+                    const nKey = key(neighbor.q, neighbor.r);
+                    if (!visited.has(nKey) || visited.get(nKey) > newCost) {
+                        visited.set(nKey, newCost);
+                        movable.push({ q: neighbor.q, r: neighbor.r });
+                        queue.push({ q: neighbor.q, r: neighbor.r, cost: newCost });
+                    }
+                }
+            }
+            
+            return movable;
+        }
+
+        function calculateAttackableHexes(unit) {
+            if (unit.hasAttacked) return [];
+            
+            const attackable = [];
+            for (let q = 0; q < GRID_COLS; q++) {
+                for (let r = 0; r < GRID_ROWS; r++) {
+                    const dist = hexDistance({ q: unit.q, r: unit.r }, { q, r });
+                    if (dist > 0 && dist <= unit.attackRange) {
+                        const targetUnit = getUnitAt(q, r);
+                        if (targetUnit && targetUnit.isPlayer !== unit.isPlayer) {
+                            attackable.push({ q, r });
+                        }
+                    }
+                }
+            }
+            return attackable;
+        }
+
+        function getUnitAt(q, r) {
+            return gameState.units.find(u => u.q === q && u.r === r && u.hp > 0);
+        }
+
+        function selectUnit(unit) {
+            if (!unit || !unit.isPlayer || !gameState.isPlayerTurn) {
+                gameState.selectedUnit = null;
+                gameState.movableHexes = [];
+                gameState.attackableHexes = [];
+                selectedInfoEl.textContent = '点击单位选中，点击高亮格子移动或攻击';
+                return;
+            }
+            
+            gameState.selectedUnit = unit;
+            gameState.movableHexes = calculateMovableHexes(unit);
+            gameState.attackableHexes = calculateAttackableHexes(unit);
+            
+            const moveStatus = unit.hasMoved ? '已移动' : '可移动';
+            const attackStatus = unit.hasAttacked ? '已攻击' : '可攻击';
+            selectedInfoEl.textContent = `${unit.symbol} ${unit.name} | HP: ${unit.hp}/${unit.maxHp} | ${moveStatus} | ${attackStatus}`;
+        }
+
+        function moveUnit(unit, targetQ, targetR) {
+            addAnimation({
+                type: 'move',
+                unit: unit,
+                fromQ: unit.q,
+                fromR: unit.r,
+                toQ: targetQ,
+                toR: targetR,
+                progress: 0
+            });
+            
+            unit.q = targetQ;
+            unit.r = targetR;
+            unit.hasMoved = true;
+            
+            gameState.attackableHexes = calculateAttackableHexes(unit);
+        }
+
+        function attackUnit(attacker, defender) {
+            const terrain = gameState.map[defender.q][defender.r].terrain;
+            const defenseBonus = terrain.defense;
+            const damage = Math.max(1, attacker.attack - defenseBonus);
+            
+            defender.hp -= damage;
+            
+            const defPos = hexToPixel(defender.q, defender.r);
+            addAnimation({
+                type: 'hit',
+                x: defPos.x,
+                y: defPos.y,
+                damage: damage,
+                progress: 0,
+                target: defender
+            });
+            
+            addAnimation({
+                type: 'attack',
+                attacker: attacker,
+                defender: defender,
+                progress: 0
+            });
+            
+            attacker.hasAttacked = true;
+            
+            if (defender.hp <= 0) {
+                setTimeout(() => {
+                    const idx = gameState.units.findIndex(u => u.id === defender.id);
+                    if (idx !== -1) {
+                        gameState.units.splice(idx, 1);
+                    }
+                    checkWinCondition();
+                }, 500);
+            }
+            
+            gameState.movableHexes = [];
+        }
+
+        function addAnimation(anim) {
+            gameState.animations.push(anim);
+        }
+
+        function updateAnimations() {
+            for (let i = gameState.animations.length - 1; i >= 0; i--) {
+                const anim = gameState.animations[i];
+                anim.progress += 0.05;
+                
+                if (anim.progress >= 1) {
+                    gameState.animations.splice(i, 1);
+                }
+            }
+        }
+
+        function drawAnimations() {
+            for (const anim of gameState.animations) {
+                if (anim.type === 'hit') {
+                    ctx.save();
+                    ctx.globalAlpha = 1 - anim.progress;
+                    ctx.fillStyle = '#ff0000';
+                    ctx.font = 'bold 24px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`-${anim.damage}`, anim.x, anim.y - 30 - anim.progress * 30);
+                    ctx.restore();
+                }
+                
+                if (anim.type === 'attack') {
+                    const attPos = hexToPixel(anim.attacker.q, anim.attacker.r);
+                    const defPos = hexToPixel(anim.defender.q, anim.defender.r);
+                    
+                    ctx.save();
+                    ctx.globalAlpha = 1 - anim.progress;
+                    ctx.strokeStyle = '#ff6b6b';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(attPos.x, attPos.y);
+                    ctx.lineTo(
+                        attPos.x + (defPos.x - attPos.x) * anim.progress,
+                        attPos.y + (defPos.y - attPos.y) * anim.progress
+                    );
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+        }
+
+        function checkWinCondition() {
+            const playerUnits = gameState.units.filter(u => u.isPlayer && u.hp > 0);
+            const enemyUnits = gameState.units.filter(u => !u.isPlayer && u.hp > 0);
+            
+            if (playerUnits.length === 0) {
+                setTimeout(() => {
+                    alert('你输了！敌方获胜！');
+                    resetGame();
+                }, 300);
+            } else if (enemyUnits.length === 0) {
+                setTimeout(() => {
+                    alert('恭喜！你赢了！');
+                    resetGame();
+                }, 300);
+            }
+        }
+
+        function executeEnemyTurn() {
+            const enemyUnits = gameState.units.filter(u => !u.isPlayer && u.hp > 0);
+            const playerUnits = gameState.units.filter(u => u.isPlayer && u.hp > 0);
+            
+            if (enemyUnits.length === 0 || playerUnits.length === 0) {
+                endEnemyTurn();
+                return;
+            }
+            
+            let actionIndex = 0;
+            
+            function doNextAction() {
+                if (actionIndex >= enemyUnits.length) {
+                    endEnemyTurn();
+                    return;
+                }
+                
+                const enemy = enemyUnits[actionIndex];
+                if (enemy.hp <= 0) {
+                    actionIndex++;
+                    doNextAction();
+                    return;
+                }
+                
+                let nearestPlayer = null;
+                let nearestDist = Infinity;
+                
+                for (const player of playerUnits) {
+                    if (player.hp <= 0) continue;
+                    const dist = hexDistance({ q: enemy.q, r: enemy.r }, { q: player.q, r: player.r });
+                    if (dist < nearestDist) {
+                        nearestDist = dist;
+                        nearestPlayer = player;
+                    }
+                }
+                
+                if (!nearestPlayer) {
+                    actionIndex++;
+                    doNextAction();
+                    return;
+                }
+                
+                if (nearestDist <= enemy.attackRange) {
+                    attackUnit(enemy, nearestPlayer);
+                    enemy.hasAttacked = true;
+                    actionIndex++;
+                    setTimeout(doNextAction, 600);
+                } else {
+                    const movable = calculateEnemyMovableHexes(enemy);
+                    let bestMove = null;
+                    let bestDist = nearestDist;
+                    
+                    for (const hex of movable) {
+                        const dist = hexDistance(hex, { q: nearestPlayer.q, r: nearestPlayer.r });
+                        if (dist < bestDist) {
+                            bestDist = dist;
+                            bestMove = hex;
+                        }
+                    }
+                    
+                    if (bestMove) {
+                        moveUnit(enemy, bestMove.q, bestMove.r);
+                        
+                        const newDist = hexDistance({ q: enemy.q, r: enemy.r }, { q: nearestPlayer.q, r: nearestPlayer.r });
+                        if (newDist <= enemy.attackRange && nearestPlayer.hp > 0) {
+                            setTimeout(() => {
+                                attackUnit(enemy, nearestPlayer);
+                                actionIndex++;
+                                setTimeout(doNextAction, 600);
+                            }, 400);
+                        } else {
+                            actionIndex++;
+                            setTimeout(doNextAction, 400);
+                        }
+                    } else {
+                        actionIndex++;
+                        setTimeout(doNextAction, 300);
+                    }
+                }
+            }
+            
+            setTimeout(doNextAction, 500);
+        }
+
+        function calculateEnemyMovableHexes(unit) {
+            const movable = [];
+            const visited = new Map();
+            const queue = [{ q: unit.q, r: unit.r, cost: 0 }];
+            const key = (q, r) => `${q},${r}`;
+            
+            visited.set(key(unit.q, unit.r), 0);
+            
+            while (queue.length > 0) {
+                const current = queue.shift();
+                
+                for (const neighbor of getHexNeighbors(current.q, current.r)) {
+                    if (!isValidHex(neighbor.q, neighbor.r)) continue;
+                    
+                    const hex = gameState.map[neighbor.q][neighbor.r];
+                    const newCost = current.cost + hex.terrain.cost;
+                    
+                    if (newCost > unit.moveRange) continue;
+                    if (getUnitAt(neighbor.q, neighbor.r)) continue;
+                    
+                    const nKey = key(neighbor.q, neighbor.r);
+                    if (!visited.has(nKey) || visited.get(nKey) > newCost) {
+                        visited.set(nKey, newCost);
+                        movable.push({ q: neighbor.q, r: neighbor.r });
+                        queue.push({ q: neighbor.q, r: neighbor.r, cost: newCost });
+                    }
+                }
+            }
+            
+            return movable;
+        }
+
+        function endEnemyTurn() {
+            gameState.isPlayerTurn = true;
+            gameState.turn++;
+            
+            gameState.units.forEach(u => {
+                u.hasMoved = false;
+                u.hasAttacked = false;
+            });
+            
+            updateUI();
+            selectUnit(null);
+        }
+
+        function endPlayerTurn() {
+            if (!gameState.isPlayerTurn) return;
+            
+            gameState.isPlayerTurn = false;
+            selectUnit(null);
+            updateUI();
+            
+            executeEnemyTurn();
+        }
+
+        function updateUI() {
+            turnNumberEl.textContent = gameState.turn;
+            
+            if (gameState.isPlayerTurn) {
+                currentPlayerEl.textContent = '玩家';
+                currentPlayerEl.className = 'turn-player';
+                endTurnBtn.textContent = '结束回合';
+                endTurnBtn.disabled = false;
+            } else {
+                currentPlayerEl.textContent = '敌方';
+                currentPlayerEl.className = 'turn-enemy';
+                endTurnBtn.textContent = '敌方回合...';
+                endTurnBtn.disabled = true;
+            }
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let q = 0; q < GRID_COLS; q++) {
+                for (let r = 0; r < GRID_ROWS; r++) {
+                    const pos = hexToPixel(q, r);
+                    const hex = gameState.map[q][r];
+                    
+                    drawHex(pos.x, pos.y, HEX_SIZE - 1, hex.terrain.color, '#222', 2);
+                    
+                    if (gameState.selectedUnit && 
+                        gameState.movableHexes.some(h => h.q === q && h.r === r)) {
+                        ctx.save();
+                        ctx.globalAlpha = 0.5;
+                        drawHex(pos.x, pos.y, HEX_SIZE - 3, '#4ecdc4');
+                        ctx.restore();
+                    }
+                    
+                    if (gameState.selectedUnit && 
+                        gameState.attackableHexes.some(h => h.q === q && h.r === r)) {
+                        ctx.save();
+                        ctx.globalAlpha = 0.6;
+                        drawHex(pos.x, pos.y, HEX_SIZE - 3, '#ff6b6b');
+                        ctx.restore();
+                    }
+                }
+            }
+            
+            for (const unit of gameState.units) {
+                if (unit.hp <= 0) continue;
+                
+                const pos = hexToPixel(unit.q, unit.r);
+                
+                if (gameState.selectedUnit && gameState.selectedUnit.id === unit.id) {
+                    drawHex(pos.x, pos.y, HEX_SIZE + 2, 'transparent', '#fff', 3);
+                }
+                
+                ctx.save();
+                ctx.globalAlpha = (unit.hasMoved && unit.hasAttacked) ? 0.5 : 1;
+                
+                ctx.fillStyle = unit.isPlayer ? '#1a535c' : '#6b2d2d';
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, HEX_SIZE * 0.6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = unit.color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                ctx.font = '24px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(unit.symbol, pos.x, pos.y);
+                
+                const hpBarWidth = 40;
+                const hpBarHeight = 5;
+                const hpPercent = unit.hp / unit.maxHp;
+                
+                ctx.fillStyle = '#333';
+                ctx.fillRect(pos.x - hpBarWidth/2, pos.y + HEX_SIZE * 0.5, hpBarWidth, hpBarHeight);
+                
+                ctx.fillStyle = hpPercent > 0.5 ? '#4caf50' : hpPercent > 0.25 ? '#ff9800' : '#f44336';
+                ctx.fillRect(pos.x - hpBarWidth/2, pos.y + HEX_SIZE * 0.5, hpBarWidth * hpPercent, hpBarHeight);
+                
+                ctx.restore();
+            }
+            
+            drawAnimations();
+            updateAnimations();
+            
+            requestAnimationFrame(render);
+        }
+
+        function handleClick(e) {
+            if (!gameState.isPlayerTurn) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const hex = pixelToHex(x, y);
+            
+            if (!isValidHex(hex.q, hex.r)) return;
+            
+            const clickedUnit = getUnitAt(hex.q, hex.r);
+            
+            if (gameState.selectedUnit) {
+                if (clickedUnit && clickedUnit.id === gameState.selectedUnit.id) {
+                    selectUnit(null);
+                    return;
+                }
+                
+                if (gameState.attackableHexes.some(h => h.q === hex.q && h.r === hex.r) && clickedUnit) {
+                    attackUnit(gameState.selectedUnit, clickedUnit);
+                    selectUnit(gameState.selectedUnit);
+                    return;
+                }
+                
+                if (gameState.movableHexes.some(h => h.q === hex.q && h.r === hex.r)) {
+                    moveUnit(gameState.selectedUnit, hex.q, hex.r);
+                    selectUnit(gameState.selectedUnit);
+                    return;
+                }
+            }
+            
+            if (clickedUnit && clickedUnit.isPlayer) {
+                selectUnit(clickedUnit);
+            } else {
+                selectUnit(null);
+            }
+        }
+
+        function resetGame() {
+            initMap();
+            initUnits();
+            gameState.turn = 1;
+            gameState.isPlayerTurn = true;
+            gameState.selectedUnit = null;
+            gameState.movableHexes = [];
+            gameState.attackableHexes = [];
+            gameState.animations = [];
+            updateUI();
+            selectUnit(null);
+        }
+
+        canvas.addEventListener('click', handleClick);
+        endTurnBtn.addEventListener('click', endPlayerTurn);
+
+        initMap();
+        initUnits();
+        updateUI();
+        render();
+    </script>
+</body>
+</html>

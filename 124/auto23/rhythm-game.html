@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音乐节奏游戏</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #1a1a2e; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+            width: 800px;
+            height: 600px;
+        }
+        #gameCanvas {
+            border: 3px solid #16213e;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+        }
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 100;
+        }
+        #overlay.hidden { display: none; }
+        #overlay h1 {
+            font-size: 48px;
+            color: #00fff5;
+            text-shadow: 0 0 20px #00fff5;
+            margin-bottom: 20px;
+        }
+        #overlay .subtitle {
+            font-size: 18px;
+            color: #aaa;
+            margin-bottom: 40px;
+        }
+        #overlay button {
+            padding: 15px 50px;
+            font-size: 24px;
+            background: linear-gradient(135deg, #00fff5, #00d4aa);
+            border: none;
+            border-radius: 30px;
+            color: #1a1a2e;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        #overlay button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(0, 255, 245, 0.5);
+        }
+        #pauseOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 99;
+        }
+        #pauseOverlay.visible { display: flex; }
+        #pauseOverlay h2 {
+            font-size: 36px;
+            color: #ffd700;
+            margin-bottom: 30px;
+        }
+        #pauseOverlay button {
+            padding: 12px 40px;
+            font-size: 20px;
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            border: none;
+            border-radius: 25px;
+            color: #1a1a2e;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #resultOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 101;
+        }
+        #resultOverlay.visible { display: flex; }
+        #resultOverlay h2 {
+            font-size: 42px;
+            color: #00fff5;
+            margin-bottom: 30px;
+            text-shadow: 0 0 15px #00fff5;
+        }
+        .result-item {
+            font-size: 20px;
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+            width: 300px;
+        }
+        .result-label { color: #aaa; }
+        .result-value.perfect { color: #00ff88; font-weight: bold; }
+        .result-value.great { color: #00aaff; font-weight: bold; }
+        .result-value.miss { color: #ff4444; font-weight: bold; }
+        .result-value.score { color: #ffd700; font-weight: bold; font-size: 24px; }
+        .result-value.accuracy { color: #ff69b4; font-weight: bold; }
+        #resultOverlay button {
+            margin-top: 30px;
+            padding: 15px 50px;
+            font-size: 22px;
+            background: linear-gradient(135deg, #00fff5, #00d4aa);
+            border: none;
+            border-radius: 30px;
+            color: #1a1a2e;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+        #resultOverlay button:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="overlay">
+            <h1>🎵 节奏大师 🎵</h1>
+            <p class="subtitle">四轨道下落式节奏游戏</p>
+            <p class="subtitle">按键: D F J K</p>
+            <button id="startBtn">开始游戏</button>
+        </div>
+        
+        <div id="pauseOverlay">
+            <h2>⏸️ 游戏暂停</h2>
+            <button id="resumeBtn">继续游戏</button>
+        </div>
+        
+        <div id="resultOverlay">
+            <h2>🏆 游戏结束 🏆</h2>
+            <div class="result-item">
+                <span class="result-label">总分:</span>
+                <span class="result-value score" id="finalScore">0</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">最大连击:</span>
+                <span class="result-value" id="finalCombo">0</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Perfect:</span>
+                <span class="result-value perfect" id="finalPerfect">0</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Great:</span>
+                <span class="result-value great" id="finalGreat">0</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Miss:</span>
+                <span class="result-value miss" id="finalMiss">0</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">准确率:</span>
+                <span class="result-value accuracy" id="finalAccuracy">0%</span>
+            </div>
+            <button id="restartBtn">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = {
+            CANVAS_WIDTH: 800,
+            CANVAS_HEIGHT: 600,
+            TRACK_COUNT: 4,
+            TRACK_KEYS: ['d', 'f', 'j', 'k'],
+            NOTE_SPEED: 400,
+            JUDGE_LINE_X: 150,
+            PERFECT_WINDOW: 50,
+            GREAT_WINDOW: 100,
+            MISS_WINDOW: 150,
+            PERFECT_SCORE: 100,
+            GREAT_SCORE: 50,
+            MISS_SCORE: 0,
+            INITIAL_HP: 100,
+            HP_MAX: 100,
+            HP_MISS_DEDUCT: 10,
+            HP_GREAT_RECOVER: 2,
+            HP_PERFECT_RECOVER: 5,
+        };
+
+        const noteManager = (function() {
+            let notes = [];
+            let originalChart = [];
+            let currentChart = [];
+            let currentIndex = 0;
+            let noteIdCounter = 0;
+
+            function validateAndFixChart(chart) {
+                console.log('=== 谱面解析器开始校验 ===');
+                const fixedChart = [];
+                const trackTimestamps = new Map();
+                
+                chart.forEach((note, index) => {
+                    let fixed = { ...note };
+                    let hasError = false;
+                    let errorMsg = [];
+
+                    if (fixed.track === undefined || fixed.track === null) {
+                        fixed.track = 0;
+                        hasError = true;
+                        errorMsg.push('轨道缺失，默认设为0');
+                    }
+                    
+                    if (fixed.track < 0 || fixed.track >= CONFIG.TRACK_COUNT) {
+                        fixed.track = Math.max(0, Math.min(CONFIG.TRACK_COUNT - 1, fixed.track));
+                        hasError = true;
+                        errorMsg.push(`轨道越界，修正为${fixed.track}`);
+                    }
+
+                    if (fixed.time === undefined || fixed.time === null || isNaN(fixed.time)) {
+                        fixed.time = index * 500;
+                        hasError = true;
+                        errorMsg.push(`时间戳缺失，设为${fixed.time}ms`);
+                    }
+
+                    if (fixed.time < 0) {
+                        fixed.time = Math.abs(fixed.time);
+                        hasError = true;
+                        errorMsg.push(`时间戳为负，修正为${fixed.time}ms`);
+                    }
+
+                    const trackKey = fixed.track;
+                    if (!trackTimestamps.has(trackKey)) {
+                        trackTimestamps.set(trackKey, []);
+                    }
+                    const timestamps = trackTimestamps.get(trackKey);
+                    for (const ts of timestamps) {
+                        if (Math.abs(fixed.time - ts) < 100) {
+                            fixed.time = ts + 100;
+                            hasError = true;
+                            errorMsg.push(`与同轨道音符时间过近，调整为${fixed.time}ms`);
+                            break;
+                        }
+                    }
+                    timestamps.push(fixed.time);
+
+                    if (hasError) {
+                        console.warn(`音符${index}修正: ${errorMsg.join('; ')}`);
+                    }
+                    
+                    fixedChart.push(fixed);
+                });
+
+                fixedChart.sort((a, b) => a.time - b.time);
+                console.log(`谱面校验完成，共${fixedChart.length}个音符`);
+                console.log('=== 谱面解析器校验结束 ===');
+                return fixedChart;
+            }
+
+            function loadChart(chart) {
+                originalChart = JSON.parse(JSON.stringify(chart));
+                currentChart = validateAndFixChart(chart);
+                reset();
+            }
+
+            function reset() {
+                notes = [];
+                currentIndex = 0;
+                noteIdCounter = 0;
+            }
+
+            function update(currentTime, speedMultiplier = 1) {
+                while (currentIndex < currentChart.length) {
+                    const noteData = currentChart[currentIndex];
+                    const spawnTime = noteData.time - (CONFIG.CANVAS_WIDTH - CONFIG.JUDGE_LINE_X) / (CONFIG.NOTE_SPEED * speedMultiplier) * 1000;
+                    
+                    if (currentTime >= spawnTime) {
+                        notes.push({
+                            id: noteIdCounter++,
+                            track: noteData.track,
+                            targetTime: noteData.time,
+                            x: CONFIG.CANVAS_WIDTH,
+                            hit: false,
+                            missed: false
+                        });
+                        currentIndex++;
+                    } else {
+                        break;
+                    }
+                }
+
+                const speed = CONFIG.NOTE_SPEED * speedMultiplier;
+                notes.forEach(note => {
+                    if (!note.hit && !note.missed) {
+                        note.x -= speed / 60;
+                    }
+                });
+
+                notes = notes.filter(note => note.x > -50 && !note.missed);
+            }
+
+            function getActiveNotes() {
+                return notes.filter(n => !n.hit && !n.missed);
+            }
+
+            function getAllNotes() {
+                return notes;
+            }
+
+            function getTotalNotes() {
+                return currentChart.length;
+            }
+
+            function markHit(noteId) {
+                const note = notes.find(n => n.id === noteId);
+                if (note) note.hit = true;
+            }
+
+            function markMissed(noteId) {
+                const note = notes.find(n => n.id === noteId);
+                if (note) note.missed = true;
+            }
+
+            function applyDynamicAdjustment(performance) {
+                console.log(`动态谱面调整: 准确率${performance.accuracy.toFixed(1)}%, 连击${performance.combo}`);
+                
+                if (performance.accuracy > 90 && performance.combo > 20) {
+                    console.log('→ 高表现：提高后续音符密度');
+                    adjustNoteDensity(1.2);
+                } else if (performance.accuracy < 60) {
+                    console.log('→ 低表现：降低后续音符密度');
+                    adjustNoteDensity(0.7);
+                }
+            }
+
+            function adjustNoteDensity(factor) {
+                const remainingNotes = currentChart.slice(currentIndex);
+                if (remainingNotes.length < 10) return;
+
+                const avgInterval = remainingNotes.slice(0, Math.min(20, remainingNotes.length - 1))
+                    .map((n, i, arr) => i > 0 ? n.time - arr[i - 1].time : 0)
+                    .filter(t => t > 0)
+                    .reduce((a, b) => a + b, 0) / Math.min(19, remainingNotes.length - 1) || 500;
+
+                const newInterval = Math.max(200, Math.min(1000, avgInterval / factor));
+                
+                for (let i = currentIndex; i < currentChart.length; i++) {
+                    if (i > currentIndex) {
+                        const timeDiff = currentChart[i].time - currentChart[i - 1].time;
+                        if (timeDiff > 50) {
+                            currentChart[i].time = currentChart[i - 1].time + newInterval;
+                        }
+                    }
+                }
+            }
+
+            return {
+                loadChart,
+                reset,
+                update,
+                getActiveNotes,
+                getAllNotes,
+                getTotalNotes,
+                markHit,
+                markMissed,
+                applyDynamicAdjustment
+            };
+        })();
+
+        const judgeEngine = (function() {
+            let stats = {
+                perfect: 0,
+                great: 0,
+                miss: 0,
+                combo: 0,
+                maxCombo: 0,
+                score: 0,
+                hp: CONFIG.INITIAL_HP
+            };
+            let recentJudgements = [];
+            let gameOver = false;
+
+            function reset() {
+                stats = {
+                    perfect: 0,
+                    great: 0,
+                    miss: 0,
+                    combo: 0,
+                    maxCombo: 0,
+                    score: 0,
+                    hp: CONFIG.INITIAL_HP
+                };
+                recentJudgements = [];
+                gameOver = false;
+            }
+
+            function judge(note, currentTime, isPress = true) {
+                if (gameOver) return null;
+
+                const timeDiff = Math.abs(currentTime - note.targetTime);
+                let result = null;
+
+                if (isPress) {
+                    if (timeDiff <= CONFIG.PERFECT_WINDOW) {
+                        result = 'perfect';
+                    } else if (timeDiff <= CONFIG.GREAT_WINDOW) {
+                        result = 'great';
+                    } else if (timeDiff <= CONFIG.MISS_WINDOW) {
+                        result = 'miss';
+                    }
+                } else {
+                    if (timeDiff > CONFIG.MISS_WINDOW) {
+                        result = 'miss';
+                    }
+                }
+
+                if (result) {
+                    applyResult(result);
+                    recentJudgements.push({ result, timeDiff });
+                    if (recentJudgements.length > 10) {
+                        recentJudgements.shift();
+                    }
+                }
+
+                return result;
+            }
+
+            function applyResult(result) {
+                switch (result) {
+                    case 'perfect':
+                        stats.perfect++;
+                        stats.combo++;
+                        stats.score += CONFIG.PERFECT_SCORE * (1 + stats.combo * 0.01);
+                        stats.hp = Math.min(CONFIG.HP_MAX, stats.hp + CONFIG.HP_PERFECT_RECOVER);
+                        break;
+                    case 'great':
+                        stats.great++;
+                        stats.combo++;
+                        stats.score += CONFIG.GREAT_SCORE * (1 + stats.combo * 0.01);
+                        stats.hp = Math.min(CONFIG.HP_MAX, stats.hp + CONFIG.HP_GREAT_RECOVER);
+                        break;
+                    case 'miss':
+                        stats.miss++;
+                        stats.combo = 0;
+                        stats.hp -= CONFIG.HP_MISS_DEDUCT;
+                        break;
+                }
+
+                stats.maxCombo = Math.max(stats.maxCombo, stats.combo);
+                
+                if (stats.hp <= 0) {
+                    stats.hp = 0;
+                    gameOver = true;
+                }
+            }
+
+            function getStats() {
+                return { ...stats };
+            }
+
+            function isGameOver() {
+                return gameOver;
+            }
+
+            function getPerformance() {
+                const total = stats.perfect + stats.great + stats.miss;
+                const accuracy = total > 0 ? ((stats.perfect + stats.great) / total * 100) : 100;
+                return {
+                    accuracy,
+                    combo: stats.combo,
+                    recentAccuracy: getRecentAccuracy()
+                };
+            }
+
+            function getRecentAccuracy() {
+                if (recentJudgements.length === 0) return 100;
+                const good = recentJudgements.filter(j => j.result === 'perfect' || j.result === 'great').length;
+                return (good / recentJudgements.length) * 100;
+            }
+
+            function printFinalStats(totalNotes) {
+                console.log('========== 游戏评测 ==========');
+                console.log(`总音符数: ${totalNotes}`);
+                console.log(`Perfect: ${stats.perfect}`);
+                console.log(`Great: ${stats.great}`);
+                console.log(`Miss: ${stats.miss}`);
+                console.log(`最大连击: ${stats.maxCombo}`);
+                console.log(`最终得分: ${Math.floor(stats.score)}`);
+                const accuracy = totalNotes > 0 ? ((stats.perfect + stats.great) / totalNotes * 100).toFixed(2) : 0;
+                console.log(`准确率: ${accuracy}%`);
+                console.log('=============================');
+            }
+
+            return {
+                reset,
+                judge,
+                getStats,
+                isGameOver,
+                getPerformance,
+                printFinalStats
+            };
+        })();
+
+        const renderer = (function() {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const trackColors = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3'];
+            const keyNames = ['D', 'F', 'J', 'K'];
+            let activeKeys = [false, false, false, false];
+            let judgementEffects = [];
+            let comboPopup = null;
+
+            function drawBackground() {
+                const gradient = ctx.createLinearGradient(0, 0, 0, CONFIG.CANVAS_HEIGHT);
+                gradient.addColorStop(0, '#1a1a2e');
+                gradient.addColorStop(1, '#16213e');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+
+                const trackHeight = CONFIG.CANVAS_HEIGHT / CONFIG.TRACK_COUNT;
+                
+                for (let i = 0; i < CONFIG.TRACK_COUNT; i++) {
+                    const y = i * trackHeight;
+                    const trackGradient = ctx.createLinearGradient(0, y, 0, y + trackHeight);
+                    trackGradient.addColorStop(0, 'rgba(255,255,255,0.02)');
+                    trackGradient.addColorStop(0.5, 'rgba(255,255,255,0.05)');
+                    trackGradient.addColorStop(1, 'rgba(255,255,255,0.02)');
+                    ctx.fillStyle = trackGradient;
+                    ctx.fillRect(0, y, CONFIG.CANVAS_WIDTH, trackHeight);
+
+                    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(CONFIG.CANVAS_WIDTH, y);
+                    ctx.stroke();
+                }
+
+                ctx.strokeStyle = '#00fff5';
+                ctx.lineWidth = 4;
+                ctx.shadowColor = '#00fff5';
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.moveTo(CONFIG.JUDGE_LINE_X, 0);
+                ctx.lineTo(CONFIG.JUDGE_LINE_X, CONFIG.CANVAS_HEIGHT);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                for (let i = 0; i < CONFIG.TRACK_COUNT; i++) {
+                    const y = i * trackHeight + trackHeight / 2;
+                    const isActive = activeKeys[i];
+                    
+                    ctx.fillStyle = isActive ? trackColors[i] : 'rgba(255,255,255,0.3)';
+                    ctx.shadowColor = isActive ? trackColors[i] : 'transparent';
+                    ctx.shadowBlur = isActive ? 20 : 0;
+                    
+                    ctx.font = 'bold 24px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(keyNames[i], CONFIG.JUDGE_LINE_X - 50, y);
+                    
+                    ctx.shadowBlur = 0;
+
+                    if (isActive) {
+                        ctx.fillStyle = trackColors[i] + '40';
+                        ctx.fillRect(CONFIG.JUDGE_LINE_X - 10, i * trackHeight, 60, trackHeight);
+                    }
+                }
+            }
+
+            function drawNotes(notes) {
+                const trackHeight = CONFIG.CANVAS_HEIGHT / CONFIG.TRACK_COUNT;
+
+                notes.forEach(note => {
+                    if (note.hit) return;
+                    
+                    const trackY = note.track * trackHeight + trackHeight / 2;
+                    const color = trackColors[note.track];
+                    
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 15;
+                    
+                    const noteGradient = ctx.createLinearGradient(note.x - 25, 0, note.x + 25, 0);
+                    noteGradient.addColorStop(0, color + '00');
+                    noteGradient.addColorStop(0.5, color);
+                    noteGradient.addColorStop(1, color + '00');
+                    
+                    ctx.fillStyle = noteGradient;
+                    ctx.fillRect(note.x - 25, trackY - 20, 50, 40);
+                    
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(note.x - 20, trackY - 3, 40, 6);
+                    
+                    ctx.shadowBlur = 0;
+                });
+            }
+
+            function drawUI(stats) {
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(CONFIG.CANVAS_WIDTH - 200, 10, 190, 150);
+                ctx.strokeStyle = '#00fff5';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(CONFIG.CANVAS_WIDTH - 200, 10, 190, 150);
+
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                
+                ctx.fillStyle = '#ffd700';
+                ctx.fillText(`分数: ${Math.floor(stats.score)}`, CONFIG.CANVAS_WIDTH - 190, 20);
+                
+                if (stats.combo > 0) {
+                    ctx.fillStyle = '#ff69b4';
+                    ctx.font = 'bold 28px Arial';
+                    ctx.fillText(`${stats.combo} COMBO`, CONFIG.CANVAS_WIDTH - 190, 50);
+                }
+
+                ctx.font = 'bold 16px Arial';
+                ctx.fillStyle = '#00ff88';
+                ctx.fillText(`Perfect: ${stats.perfect}`, CONFIG.CANVAS_WIDTH - 190, 85);
+                ctx.fillStyle = '#00aaff';
+                ctx.fillText(`Great: ${stats.great}`, CONFIG.CANVAS_WIDTH - 190, 105);
+                ctx.fillStyle = '#ff4444';
+                ctx.fillText(`Miss: ${stats.miss}`, CONFIG.CANVAS_WIDTH - 190, 125);
+
+                const hpBarWidth = 180;
+                const hpBarHeight = 12;
+                const hpBarX = CONFIG.CANVAS_WIDTH - 190;
+                const hpBarY = 150;
+
+                ctx.fillStyle = '#333';
+                ctx.fillRect(hpBarX, hpBarY, hpBarWidth, hpBarHeight);
+
+                const hpRatio = stats.hp / CONFIG.HP_MAX;
+                const hpColor = hpRatio > 0.5 ? '#00ff88' : hpRatio > 0.25 ? '#ffaa00' : '#ff4444';
+                ctx.fillStyle = hpColor;
+                ctx.fillRect(hpBarX, hpBarY, hpBarWidth * hpRatio, hpBarHeight);
+
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(hpBarX, hpBarY, hpBarWidth, hpBarHeight);
+
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px Arial';
+                ctx.fillText('HP', hpBarX, hpBarY - 15);
+            }
+
+            function addJudgementEffect(result, track) {
+                const trackHeight = CONFIG.CANVAS_HEIGHT / CONFIG.TRACK_COUNT;
+                judgementEffects.push({
+                    result,
+                    x: CONFIG.JUDGE_LINE_X,
+                    y: track * trackHeight + trackHeight / 2,
+                    alpha: 1,
+                    scale: 1,
+                    offsetY: 0
+                });
+            }
+
+            function setComboPopup(combo) {
+                if (combo > 0 && combo % 10 === 0) {
+                    comboPopup = {
+                        combo,
+                        alpha: 1,
+                        scale: 1.5
+                    };
+                }
+            }
+
+            function updateEffects() {
+                judgementEffects = judgementEffects.filter(effect => {
+                    effect.alpha -= 0.02;
+                    effect.scale += 0.02;
+                    effect.offsetY -= 1;
+                    return effect.alpha > 0;
+                });
+
+                if (comboPopup) {
+                    comboPopup.alpha -= 0.01;
+                    comboPopup.scale = Math.max(1, comboPopup.scale - 0.02);
+                    if (comboPopup.alpha <= 0) {
+                        comboPopup = null;
+                    }
+                }
+            }
+
+            function drawEffects() {
+                judgementEffects.forEach(effect => {
+                    ctx.save();
+                    ctx.globalAlpha = effect.alpha;
+                    ctx.translate(effect.x + 50, effect.y + effect.offsetY);
+                    ctx.scale(effect.scale, effect.scale);
+
+                    let color, text;
+                    switch (effect.result) {
+                        case 'perfect':
+                            color = '#00ff88';
+                            text = 'PERFECT!';
+                            break;
+                        case 'great':
+                            color = '#00aaff';
+                            text = 'GREAT';
+                            break;
+                        case 'miss':
+                            color = '#ff4444';
+                            text = 'MISS';
+                            break;
+                    }
+
+                    ctx.fillStyle = color;
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 10;
+                    ctx.font = 'bold 24px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(text, 0, 0);
+
+                    ctx.restore();
+                });
+
+                if (comboPopup) {
+                    ctx.save();
+                    ctx.globalAlpha = comboPopup.alpha;
+                    ctx.translate(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
+                    ctx.scale(comboPopup.scale, comboPopup.scale);
+
+                    ctx.fillStyle = '#ff69b4';
+                    ctx.shadowColor = '#ff69b4';
+                    ctx.shadowBlur = 20;
+                    ctx.font = 'bold 48px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`${comboPopup.combo} COMBO!`, 0, 0);
+
+                    ctx.restore();
+                }
+            }
+
+            function setKeyActive(track, active) {
+                if (track >= 0 && track < CONFIG.TRACK_COUNT) {
+                    activeKeys[track] = active;
+                }
+            }
+
+            function render(notes, stats) {
+                ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+                drawBackground();
+                drawNotes(notes);
+                drawUI(stats);
+                drawEffects();
+                updateEffects();
+            }
+
+            return {
+                render,
+                setKeyActive,
+                addJudgementEffect,
+                setComboPopup
+            };
+        })();
+
+        const audioEngine = (function() {
+            let audioContext = null;
+            let startTime = 0;
+            let isPlaying = false;
+            let pauseTime = 0;
+            let totalPausedTime = 0;
+
+            function init() {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            function resume() {
+                if (audioContext && audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+            }
+
+            function createKick(time) {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                
+                osc.frequency.setValueAtTime(150, time);
+                osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.5);
+                
+                gain.gain.setValueAtTime(1, time);
+                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
+                
+                osc.start(time);
+                osc.stop(time + 0.5);
+            }
+
+            function createSnare(time) {
+                const noiseBuffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.2, audioContext.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < noiseBuffer.length; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+                
+                const noise = audioContext.createBufferSource();
+                noise.buffer = noiseBuffer;
+                
+                const noiseFilter = audioContext.createBiquadFilter();
+                noiseFilter.type = 'highpass';
+                noiseFilter.frequency.value = 1000;
+                
+                const noiseGain = audioContext.createGain();
+                noiseGain.gain.setValueAtTime(1, time);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
+                
+                noise.connect(noiseFilter);
+                noiseFilter.connect(noiseGain);
+                noiseGain.connect(audioContext.destination);
+                
+                noise.start(time);
+                
+                const osc = audioContext.createOscillator();
+                const oscGain = audioContext.createGain();
+                
+                osc.connect(oscGain);
+                oscGain.connect(audioContext.destination);
+                
+                osc.frequency.setValueAtTime(200, time);
+                osc.frequency.exponentialRampToValueAtTime(50, time + 0.1);
+                
+                oscGain.gain.setValueAtTime(0.5, time);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+                
+                osc.start(time);
+                osc.stop(time + 0.2);
+            }
+
+            function createBass(time, frequency) {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                const filter = audioContext.createBiquadFilter();
+                
+                osc.type = 'sawtooth';
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioContext.destination);
+                
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(800, time);
+                filter.frequency.exponentialRampToValueAtTime(200, time + 0.3);
+                
+                osc.frequency.setValueAtTime(frequency, time);
+                
+                gain.gain.setValueAtTime(0.3, time);
+                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.4);
+                
+                osc.start(time);
+                osc.stop(time + 0.4);
+            }
+
+            function createHihat(time) {
+                const noiseBuffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.05, audioContext.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < noiseBuffer.length; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+                
+                const noise = audioContext.createBufferSource();
+                noise.buffer = noiseBuffer;
+                
+                const filter = audioContext.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = 7000;
+                
+                const gain = audioContext.createGain();
+                gain.gain.setValueAtTime(0.3, time);
+                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
+                
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioContext.destination);
+                
+                noise.start(time);
+            }
+
+            function generateMusic() {
+                const now = audioContext.currentTime;
+                const bpm = 120;
+                const beatDuration = 60 / bpm;
+                
+                for (let i = 0; i < 70; i++) {
+                    const time = now + i * beatDuration / 2;
+                    
+                    if (i % 4 === 0 || i % 4 === 2) {
+                        createKick(time);
+                    }
+                    
+                    if (i % 4 === 2) {
+                        createSnare(time);
+                    }
+                    
+                    createHihat(time);
+                    
+                    if (i % 2 === 0) {
+                        const bassNotes = [55, 65.41, 73.42, 82.41];
+                        createBass(time, bassNotes[Math.floor(i / 8) % 4]);
+                    }
+                }
+            }
+
+            function start() {
+                init();
+                resume();
+                generateMusic();
+                startTime = audioContext.currentTime;
+                isPlaying = true;
+                totalPausedTime = 0;
+            }
+
+            function pause() {
+                if (isPlaying) {
+                    pauseTime = audioContext.currentTime;
+                    audioContext.suspend();
+                    isPlaying = false;
+                }
+            }
+
+            function resumePlay() {
+                if (!isPlaying && audioContext) {
+                    totalPausedTime += audioContext.currentTime - pauseTime;
+                    audioContext.resume();
+                    isPlaying = true;
+                }
+            }
+
+            function getCurrentTime() {
+                if (!audioContext || !isPlaying) {
+                    return (pauseTime - startTime - totalPausedTime) * 1000;
+                }
+                return (audioContext.currentTime - startTime - totalPausedTime) * 1000;
+            }
+
+            function isAudioPlaying() {
+                return isPlaying;
+            }
+
+            return {
+                init,
+                start,
+                pause,
+                resume: resumePlay,
+                getCurrentTime,
+                isPlaying: isAudioPlaying
+            };
+        })();
+
+        function generateChart() {
+            const chart = [];
+            const bpm = 120;
+            const beatMs = 60000 / bpm;
+            
+            for (let i = 0; i < 35; i++) {
+                const baseTime = i * beatMs / 2;
+                
+                const pattern = i % 8;
+                let notes = [];
+                
+                switch (pattern) {
+                    case 0:
+                        notes = [0, 2];
+                        break;
+                    case 1:
+                        notes = [1];
+                        break;
+                    case 2:
+                        notes = [3];
+                        break;
+                    case 3:
+                        notes = [0, 1];
+                        break;
+                    case 4:
+                        notes = [2, 3];
+                        break;
+                    case 5:
+                        notes = [1, 2];
+                        break;
+                    case 6:
+                        notes = [0];
+                        break;
+                    case 7:
+                        notes = [3];
+                        break;
+                }
+                
+                notes.forEach(track => {
+                    chart.push({
+                        time: baseTime + 1000,
+                        track: track
+                    });
+                });
+            }
+
+            for (let i = 35; i < 70; i++) {
+                const baseTime = i * beatMs / 2;
+                
+                const pattern = i % 4;
+                let notes = [];
+                
+                switch (pattern) {
+                    case 0:
+                        notes = [0, 3];
+                        break;
+                    case 1:
+                        notes = [1, 2];
+                        break;
+                    case 2:
+                        notes = [0, 1, 2];
+                        break;
+                    case 3:
+                        notes = [1, 2, 3];
+                        break;
+                }
+                
+                notes.forEach(track => {
+                    chart.push({
+                        time: baseTime + 1000,
+                        track: track
+                    });
+                });
+            }
+
+            for (let i = 70; i < 100; i++) {
+                const baseTime = i * beatMs / 2;
+                
+                const track = i % 4;
+                chart.push({
+                    time: baseTime + 1000,
+                    track: track
+                });
+            }
+
+            return chart;
+        }
+
+        (function main() {
+            const overlay = document.getElementById('overlay');
+            const pauseOverlay = document.getElementById('pauseOverlay');
+            const resultOverlay = document.getElementById('resultOverlay');
+            const startBtn = document.getElementById('startBtn');
+            const resumeBtn = document.getElementById('resumeBtn');
+            const restartBtn = document.getElementById('restartBtn');
+
+            let isGameRunning = false;
+            let isPaused = false;
+            let animationId = null;
+            let speedMultiplier = 1;
+            let lastAdjustmentTime = 0;
+
+            const chart = generateChart();
+            noteManager.loadChart(chart);
+
+            const keyMap = {
+                'd': 0,
+                'f': 1,
+                'j': 2,
+                'k': 3,
+                'D': 0,
+                'F': 1,
+                'J': 2,
+                'K': 3
+            };
+
+            function startGame() {
+                audioEngine.start();
+                noteManager.reset();
+                judgeEngine.reset();
+                isGameRunning = true;
+                isPaused = false;
+                overlay.classList.add('hidden');
+                pauseOverlay.classList.remove('visible');
+                resultOverlay.classList.remove('visible');
+                speedMultiplier = 1;
+                lastAdjustmentTime = 0;
+                gameLoop();
+            }
+
+            function pauseGame() {
+                if (!isGameRunning || isPaused) return;
+                isPaused = true;
+                audioEngine.pause();
+                pauseOverlay.classList.add('visible');
+                cancelAnimationFrame(animationId);
+            }
+
+            function resumeGame() {
+                if (!isPaused) return;
+                isPaused = false;
+                audioEngine.resume();
+                pauseOverlay.classList.remove('visible');
+                gameLoop();
+            }
+
+            function endGame() {
+                isGameRunning = false;
+                cancelAnimationFrame(animationId);
+                
+                const stats = judgeEngine.getStats();
+                const totalNotes = noteManager.getTotalNotes();
+                
+                document.getElementById('finalScore').textContent = Math.floor(stats.score);
+                document.getElementById('finalCombo').textContent = stats.maxCombo;
+                document.getElementById('finalPerfect').textContent = stats.perfect;
+                document.getElementById('finalGreat').textContent = stats.great;
+                document.getElementById('finalMiss').textContent = stats.miss;
+                const accuracy = totalNotes > 0 ? ((stats.perfect + stats.great) / totalNotes * 100).toFixed(2) : 0;
+                document.getElementById('finalAccuracy').textContent = accuracy + '%';
+                
+                resultOverlay.classList.add('visible');
+                judgeEngine.printFinalStats(totalNotes);
+            }
+
+            function gameLoop() {
+                if (!isGameRunning || isPaused) return;
+
+                const currentTime = audioEngine.getCurrentTime();
+                
+                noteManager.update(currentTime, speedMultiplier);
+                
+                const activeNotes = noteManager.getActiveNotes();
+                activeNotes.forEach(note => {
+                    const timeDiff = currentTime - note.targetTime;
+                    if (timeDiff > CONFIG.MISS_WINDOW) {
+                        const result = judgeEngine.judge(note, currentTime, false);
+                        if (result) {
+                            noteManager.markMissed(note.id);
+                            renderer.addJudgementEffect(result, note.track);
+                        }
+                    }
+                });
+
+                if (currentTime - lastAdjustmentTime > 5000) {
+                    const performance = judgeEngine.getPerformance();
+                    noteManager.applyDynamicAdjustment(performance);
+                    
+                    if (performance.accuracy > 90 && performance.combo > 30) {
+                        speedMultiplier = Math.min(1.5, speedMultiplier + 0.05);
+                    } else if (performance.accuracy < 60) {
+                        speedMultiplier = Math.max(0.7, speedMultiplier - 0.05);
+                    }
+                    
+                    lastAdjustmentTime = currentTime;
+                }
+
+                const notes = noteManager.getAllNotes();
+                const stats = judgeEngine.getStats();
+                renderer.render(notes, stats);
+
+                if (judgeEngine.isGameOver()) {
+                    endGame();
+                    return;
+                }
+
+                const totalNotes = noteManager.getTotalNotes();
+                const hitNotes = stats.perfect + stats.great + stats.miss;
+                if (hitNotes >= totalNotes && activeNotes.length === 0 && currentTime > 40000) {
+                    endGame();
+                    return;
+                }
+
+                animationId = requestAnimationFrame(gameLoop);
+            }
+
+            function handleKeyDown(e) {
+                e.preventDefault();
+                
+                if (!isGameRunning || isPaused) return;
+                
+                const track = keyMap[e.key];
+                if (track === undefined) return;
+
+                renderer.setKeyActive(track, true);
+
+                const currentTime = audioEngine.getCurrentTime();
+                const activeNotes = noteManager.getActiveNotes().filter(n => n.track === track);
+                
+                if (activeNotes.length > 0) {
+                    const closestNote = activeNotes.reduce((closest, note) => {
+                        const diff = Math.abs(note.targetTime - currentTime);
+                        const closestDiff = Math.abs(closest.targetTime - currentTime);
+                        return diff < closestDiff ? note : closest;
+                    });
+
+                    const result = judgeEngine.judge(closestNote, currentTime, true);
+                    if (result) {
+                        noteManager.markHit(closestNote.id);
+                        renderer.addJudgementEffect(result, track);
+                        
+                        const stats = judgeEngine.getStats();
+                        if (stats.combo > 0 && stats.combo % 10 === 0) {
+                            renderer.setComboPopup(stats.combo);
+                        }
+                    }
+                }
+            }
+
+            function handleKeyUp(e) {
+                e.preventDefault();
+                
+                const track = keyMap[e.key];
+                if (track !== undefined) {
+                    renderer.setKeyActive(track, false);
+                }
+            }
+
+            function handleVisibilityChange() {
+                if (document.hidden && isGameRunning && !isPaused) {
+                    pauseGame();
+                }
+            }
+
+            startBtn.addEventListener('click', startGame);
+            resumeBtn.addEventListener('click', resumeGame);
+            restartBtn.addEventListener('click', startGame);
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+
+            window.addEventListener('keydown', function(e) {
+                if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+        })();
+    </script>
+</body>
+</html>

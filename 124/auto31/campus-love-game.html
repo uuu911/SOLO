@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>樱花高校恋爱物语</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .game-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(252, 182, 159, 0.4);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+            padding: 15px;
+            text-align: center;
+            color: #fff;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+
+        .calendar-bar {
+            background: #ffeaa7;
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .progress-container {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .progress-label {
+            font-size: 0.9rem;
+            color: #636e72;
+            margin-bottom: 5px;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background: #dfe6e9;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #fd79a8, #e84393);
+            transition: width 0.5s ease;
+            border-radius: 10px;
+        }
+
+        .day-info {
+            font-weight: bold;
+            color: #e84393;
+            font-size: 1.1rem;
+        }
+
+        .action-period {
+            background: #a29bfe;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 0.9rem;
+        }
+
+        .main-content {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 15px;
+            gap: 15px;
+        }
+
+        .character-section {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .character-portrait {
+            width: 100%;
+            aspect-ratio: 3/4;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .character-portrait::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 100%);
+        }
+
+        .character-name {
+            font-size: 1.8rem;
+            font-weight: bold;
+            z-index: 1;
+        }
+
+        .character-tags {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+            z-index: 1;
+        }
+
+        .tag {
+            background: rgba(255,255,255,0.3);
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+        }
+
+        .character-favor {
+            margin-top: 15px;
+            z-index: 1;
+            text-align: center;
+        }
+
+        .favor-bar {
+            width: 150px;
+            height: 12px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 6px;
+            margin-top: 5px;
+        }
+
+        .favor-fill {
+            height: 100%;
+            background: #ffeaa7;
+            border-radius: 6px;
+            transition: width 0.3s;
+        }
+
+        .character-selector {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .char-btn {
+            flex: 1;
+            min-width: 60px;
+            padding: 8px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .char-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .char-btn.active {
+            box-shadow: 0 0 0 3px #fff, 0 0 0 5px currentColor;
+        }
+
+        .text-section {
+            flex: 2;
+            min-width: 280px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .story-text {
+            flex: 1;
+            min-height: 200px;
+            max-height: 300px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 15px;
+            overflow-y: auto;
+            line-height: 1.8;
+            color: #2d3436;
+            border: 2px solid #ffeaa7;
+        }
+
+        .story-text p {
+            margin-bottom: 10px;
+        }
+
+        .story-text .dialog {
+            color: #e84393;
+            font-weight: bold;
+        }
+
+        .story-text .event {
+            color: #6c5ce7;
+            font-weight: bold;
+            padding: 10px;
+            background: rgba(108, 92, 231, 0.1);
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .stats-section {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .stats-title {
+            font-weight: bold;
+            color: #2d3436;
+            margin-bottom: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #2d3436;
+        }
+
+        .actions-section {
+            padding: 0 15px 15px;
+        }
+
+        .actions-title {
+            font-weight: bold;
+            color: #2d3436;
+            margin-bottom: 10px;
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+        }
+
+        .action-btn {
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        }
+
+        .action-btn:active {
+            transform: translateY(0);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .action-btn.study { background: linear-gradient(135deg, #74b9ff, #0984e3); }
+        .action-btn.sports { background: linear-gradient(135deg, #55efc4, #00b894); }
+        .action-btn.club { background: linear-gradient(135deg, #fd79a8, #e84393); }
+        .action-btn.chat { background: linear-gradient(135deg, #a29bfe, #6c5ce7); }
+        .action-btn.gift { background: linear-gradient(135deg, #ffeaa7, #fdcb6e); color: #2d3436; }
+        .action-btn.work { background: linear-gradient(135deg, #b2bec3, #636e72); }
+
+        .save-section {
+            padding: 15px;
+            background: #dfe6e9;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .save-btn {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .save-btn.save {
+            background: linear-gradient(135deg, #00b894, #00cec9);
+            color: white;
+        }
+
+        .save-btn.load {
+            background: linear-gradient(135deg, #fdcb6e, #f39c12);
+            color: white;
+        }
+
+        .save-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            animation: modalIn 0.3s ease;
+        }
+
+        @keyframes modalIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-title {
+            font-size: 1.8rem;
+            color: #e84393;
+            margin-bottom: 15px;
+        }
+
+        .modal-text {
+            line-height: 1.8;
+            color: #2d3436;
+            margin-bottom: 20px;
+        }
+
+        .modal-btn {
+            padding: 12px 40px;
+            background: linear-gradient(135deg, #ff9a9e, #fecfef);
+            border: none;
+            border-radius: 25px;
+            color: white;
+            font-weight: bold;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .modal-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .gift-selector {
+            margin: 15px 0;
+        }
+
+        .gift-option {
+            padding: 10px;
+            margin: 5px;
+            border: 2px solid #ffeaa7;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .gift-option:hover {
+            background: #ffeaa7;
+        }
+
+        .gift-option.selected {
+            background: #fdcb6e;
+            border-color: #f39c12;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            z-index: 2000;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .notification.success { background: #00b894; }
+        .notification.error { background: #e17055; }
+
+        @media (max-width: 600px) {
+            .main-content {
+                flex-direction: column;
+            }
+
+            .character-portrait {
+                aspect-ratio: 4/3;
+            }
+
+            .actions-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .header h1 {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <h1>🌸 樱花高校恋爱物语 🌸</h1>
+        </div>
+
+        <div class="calendar-bar">
+            <div class="progress-container">
+                <div class="progress-label">学期进度</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="day-info">第 <span id="currentDay">1</span> 天 / 90天</div>
+            <div class="action-period" id="actionPeriod">早晨</div>
+        </div>
+
+        <div class="main-content">
+            <div class="character-section">
+                <div class="character-portrait" id="characterPortrait" style="background: linear-gradient(135deg, #74b9ff, #a29bfe);">
+                    <div class="character-name" id="charName">林雨萱</div>
+                    <div class="character-tags" id="charTags">
+                        <span class="tag">学生会会长</span>
+                        <span class="tag">优等生</span>
+                        <span class="tag">外冷内热</span>
+                    </div>
+                    <div class="character-favor">
+                        <div>好感度: <span id="charFavor">0</span>/100</div>
+                        <div class="favor-bar">
+                            <div class="favor-fill" id="favorFill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="character-selector">
+                    <button class="char-btn" data-char="lin" style="background: #74b9ff; color: white;">林雨萱</button>
+                    <button class="char-btn" data-char="wang" style="background: #55efc4; color: #2d3436;">王浩然</button>
+                    <button class="char-btn" data-char="zhang" style="background: #fd79a8; color: white;">张梦瑶</button>
+                    <button class="char-btn" data-char="hidden" style="background: #b2bec3; color: white;">?</button>
+                </div>
+            </div>
+
+            <div class="text-section">
+                <div class="stats-section">
+                    <div class="stats-title">📊 我的状态</div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-icon" style="background: #74b9ff;">智</div>
+                            <span>智力: <span class="stat-value" id="intelligence">50</span></span>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon" style="background: #00b894;">体</div>
+                            <span>体力: <span class="stat-value" id="vitality">50</span></span>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon" style="background: #e84393;">魅</div>
+                            <span>魅力: <span class="stat-value" id="charm">50</span></span>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon" style="background: #f39c12;">金</div>
+                            <span>金币: <span class="stat-value" id="gold">100</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="story-text" id="storyText">
+                    <p>欢迎来到樱花高校！作为一名转学生，你将在这里度过难忘的90天。</p>
+                    <p>在这三个月里，你可以通过学习提升智力，运动锻炼体力，参加社团活动培养魅力，或者打工赚取金币。</p>
+                    <p>学校里有几位引人注目的同学，也许你能和他们发展出美好的关系......</p>
+                    <p>每天分为早晨、下午、傍晚三个时段，每个时段可以选择一项行动。准备好了吗？开始你的校园生活吧！</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="actions-section">
+            <div class="actions-title">🎯 选择今日行动</div>
+            <div class="actions-grid">
+                <button class="action-btn study" data-action="study">📚 学习</button>
+                <button class="action-btn sports" data-action="sports">🏃 运动</button>
+                <button class="action-btn club" data-action="club">🎭 社团活动</button>
+                <button class="action-btn chat" data-action="chat">💬 交谈</button>
+                <button class="action-btn gift" data-action="gift">🎁 赠送礼物</button>
+                <button class="action-btn work" data-action="work">💰 打工</button>
+            </div>
+        </div>
+
+        <div class="save-section">
+            <button class="save-btn save" id="saveBtn">💾 保存游戏</button>
+            <button class="save-btn load" id="loadBtn">📂 读取存档</button>
+        </div>
+    </div>
+
+    <div class="modal" id="endModal">
+        <div class="modal-content">
+            <div class="modal-title" id="endTitle">游戏结束</div>
+            <div class="modal-text" id="endText"></div>
+            <button class="modal-btn" id="restartBtn">重新开始</button>
+        </div>
+    </div>
+
+    <div class="modal" id="giftModal">
+        <div class="modal-content">
+            <div class="modal-title">选择礼物</div>
+            <div class="gift-selector" id="giftSelector">
+                <div class="gift-option" data-gift="chocolate" data-price="30">🍫 巧克力 - 30金币</div>
+                <div class="gift-option" data-gift="flower" data-price="50">🌹 鲜花 - 50金币</div>
+                <div class="gift-option" data-gift="book" data-price="80">📖 精美书籍 - 80金币</div>
+                <div class="gift-option" data-gift="jewelry" data-price="150">💎 首饰 - 150金币</div>
+            </div>
+            <button class="modal-btn" id="confirmGift">确认赠送</button>
+            <button class="modal-btn" style="background: #b2bec3; margin-top: 10px;" id="cancelGift">取消</button>
+        </div>
+    </div>
+
+    <script type="module">
+        const ACTION_CONFIG = {
+            study: { intelligence: 5, vitality: -2, charm: 0, gold: 0, favor: 0, desc: '你认真学习了一上午，智力得到了提升！' },
+            sports: { intelligence: -1, vitality: 6, charm: 1, gold: 0, favor: 0, desc: '你在操场上挥洒汗水，体力变得更强了！' },
+            club: { intelligence: 1, vitality: -1, charm: 5, gold: 0, favor: 0, desc: '你参加了社团活动，魅力值提升了！' },
+            chat: { intelligence: 0, vitality: 0, charm: 0, gold: 0, favor: 5, desc: '你和TA聊了一会儿天，气氛还算愉快。' },
+            work: { intelligence: 1, vitality: -3, charm: 0, gold: 50, favor: 0, desc: '你辛苦工作了半天，赚到了一些金币。' }
+        };
+
+        const GIFT_CONFIG = {
+            chocolate: { price: 30, favor: 10, desc: '你送了巧克力，TA看起来很开心。' },
+            flower: { price: 50, favor: 18, desc: '你送了鲜花，TA的脸颊泛起了红晕。' },
+            book: { price: 80, favor: 25, desc: '你送了精美书籍，TA非常喜欢这个礼物！' },
+            jewelry: { price: 150, favor: 40, desc: '你送了首饰，TA感动得说不出话来！' }
+        };
+
+        const CHARACTER_CONFIG = {
+            lin: {
+                name: '林雨萱',
+                tags: ['学生会会长', '优等生', '外冷内热'],
+                color1: '#74b9ff',
+                color2: '#a29bfe',
+                preference: 'intelligence',
+                preferenceBonus: 1.5,
+                events: [
+                    { threshold: 20, dayRange: [1, 30], requiredStats: { intelligence: 60 }, text: '【特殊事件】在图书馆遇到了林雨萱，她正在认真学习。你悄悄递上一杯热饮，她抬头看了你一眼，说了声"谢谢"。' },
+                    { threshold: 50, dayRange: [20, 60], requiredStats: { intelligence: 80 }, text: '【特殊事件】学生会议事厅里，林雨萱正因工作烦恼。你提出了独到的见解，她第一次对你露出了微笑。' },
+                    { threshold: 80, dayRange: [50, 90], requiredStats: { intelligence: 95 }, text: '【特殊事件】毕业晚会前夕，林雨萱在天台独自看星星。她向你吐露了深藏已久的心事......' }
+                ]
+            },
+            wang: {
+                name: '王浩然',
+                tags: ['篮球社王牌', '阳光开朗', '热血少年'],
+                color1: '#55efc4',
+                color2: '#81ecec',
+                preference: 'vitality',
+                preferenceBonus: 1.5,
+                events: [
+                    { threshold: 20, dayRange: [1, 30], requiredStats: { vitality: 60 }, text: '【特殊事件】篮球场边，王浩然正独自加练。你递上毛巾，他爽朗地笑道："谢啦，哥们儿！"' },
+                    { threshold: 50, dayRange: [20, 60], requiredStats: { vitality: 80 }, text: '【特殊事件】重要比赛前夕，王浩然因受伤而焦虑。你陪他复健训练，他拍着你的肩膀说："你是我最好的朋友！"' },
+                    { threshold: 80, dayRange: [50, 90], requiredStats: { vitality: 95 }, text: '【特殊事件】决赛胜利后，王浩然在人群中找到了你，手里紧紧攥着什么......' }
+                ]
+            },
+            zhang: {
+                name: '张梦瑶',
+                tags: ['文艺社社长', '温柔体贴', '多才多艺'],
+                color1: '#fd79a8',
+                color2: '#fecfef',
+                preference: 'charm',
+                preferenceBonus: 1.5,
+                events: [
+                    { threshold: 20, dayRange: [1, 30], requiredStats: { charm: 60 }, text: '【特殊事件】音乐教室内，张梦瑶正在弹钢琴。你静静听完，她回头发现了你，害羞地笑了。' },
+                    { threshold: 50, dayRange: [20, 60], requiredStats: { charm: 80 }, text: '【特殊事件】文艺汇演筹备中，张梦瑶正为服装设计发愁。你提出了创意建议，她眼前一亮！' },
+                    { threshold: 80, dayRange: [50, 90], requiredStats: { charm: 95 }, text: '【特殊事件】樱花树下，张梦瑶为你画了一幅肖像画，画中的你眼中有某种特别的光芒......' }
+                ]
+            },
+            hidden: {
+                name: '陈老师',
+                tags: ['神秘校医', '知性成熟', '隐藏角色'],
+                color1: '#636e72',
+                color2: '#b2bec3',
+                preference: 'all',
+                preferenceBonus: 1.2,
+                events: [
+                    { threshold: 30, dayRange: [30, 90], requiredStats: { intelligence: 70, vitality: 70, charm: 70 }, text: '【隐藏事件】你因疲劳过度来到保健室，陈老师一边为你检查一边说："要注意身体哦，小笨蛋。"' },
+                    { threshold: 60, dayRange: [45, 90], requiredStats: { intelligence: 85, vitality: 85, charm: 85 }, text: '【隐藏事件】放学后你又来到保健室，发现陈老师正在看一些......很特别的医学书籍。' },
+                    { threshold: 90, dayRange: [70, 90], requiredStats: { intelligence: 95, vitality: 95, charm: 95 }, text: '【隐藏事件】最后一天，陈老师递给你一张纸条："毕业后，来医院找我。"' }
+                ]
+            }
+        };
+
+        const PERIODS = ['早晨', '下午', '傍晚'];
+        const RANDOM_GOLD_CHANCE = 0.1;
+        const RANDOM_GOLD_AMOUNT = [5, 15];
+        const CHAT_EVENT_CHANCE = 0.3;
+
+        class Character {
+            constructor(id, config) {
+                this.id = id;
+                this.name = config.name;
+                this.tags = config.tags;
+                this.color1 = config.color1;
+                this.color2 = config.color2;
+                this.preference = config.preference;
+                this.preferenceBonus = config.preferenceBonus;
+                this.events = config.events;
+                this.favor = 0;
+                this.triggeredEvents = [];
+            }
+
+            changeFavor(amount, playerStats = {}) {
+                let bonus = 1;
+                if (this.preference === 'all') {
+                    bonus = this.preferenceBonus;
+                } else if (playerStats[this.preference] >= 80) {
+                    bonus = this.preferenceBonus;
+                }
+                this.favor = Math.max(0, Math.min(100, this.favor + Math.floor(amount * bonus)));
+                return this.favor;
+            }
+
+            checkEvents(day, playerStats) {
+                const untriggeredEvents = this.events.filter(
+                    (e, i) => !this.triggeredEvents.includes(i) &&
+                        this.favor >= e.threshold &&
+                        day >= e.dayRange[0] &&
+                        day <= e.dayRange[1] &&
+                        this.checkRequiredStats(e.requiredStats, playerStats)
+                );
+
+                if (untriggeredEvents.length > 0) {
+                    const eventIndex = this.events.indexOf(untriggeredEvents[0]);
+                    this.triggeredEvents.push(eventIndex);
+                    return untriggeredEvents[0];
+                }
+                return null;
+            }
+
+            checkRequiredStats(required, actual) {
+                for (const [stat, value] of Object.entries(required)) {
+                    if (actual[stat] < value) return false;
+                }
+                return true;
+            }
+
+            getSaveData() {
+                return {
+                    favor: this.favor,
+                    triggeredEvents: [...this.triggeredEvents]
+                };
+            }
+
+            loadSaveData(data) {
+                this.favor = data.favor;
+                this.triggeredEvents = data.triggeredEvents || [];
+            }
+        }
+
+        export class GameLogic {
+            constructor() {
+                this.day = 1;
+                this.period = 0;
+                this.stats = { intelligence: 50, vitality: 50, charm: 50, gold: 100 };
+                this.characters = {};
+                this.currentCharacter = 'lin';
+                this.selectedGift = null;
+                this.gameEnded = false;
+
+                for (const [id, config] of Object.entries(CHARACTER_CONFIG)) {
+                    this.characters[id] = new Character(id, config);
+                }
+            }
+
+            executeAction(action) {
+                if (this.gameEnded) return { success: false, message: '游戏已结束' };
+
+                const config = ACTION_CONFIG[action];
+                if (!config) return { success: false, message: '无效行动' };
+
+                let result = { success: true, messages: [] };
+
+                for (const [stat, value] of Object.entries(config)) {
+                    if (stat === 'desc' || stat === 'favor') continue;
+                    if (stat === 'gold' && value > 0) {
+                        this.stats[stat] += value;
+                        result.messages.push(`💰 金币 +${value}`);
+                    } else if (stat === 'gold') {
+                    } else {
+                        this.stats[stat] = Math.max(0, Math.min(100, this.stats[stat] + value));
+                        if (value > 0) {
+                            const statNames = { intelligence: '智力', vitality: '体力', charm: '魅力' };
+                            result.messages.push(`${stat === 'intelligence' ? '📚' : stat === 'vitality' ? '🏃' : '✨'} ${statNames[stat]} +${value}`);
+                        }
+                    }
+                }
+
+                if (action === 'chat') {
+                    const char = this.characters[this.currentCharacter];
+                    let favorGain = config.favor;
+                    if (Math.random() < CHAT_EVENT_CHANCE) {
+                        favorGain += 3;
+                        result.messages.push(`💬 触发了有趣的话题！好感度额外提升！`);
+                    }
+                    char.changeFavor(favorGain, this.stats);
+                    result.messages.push(`💕 ${char.name}好感度 +${favorGain}`);
+                }
+
+                if (Math.random() < RANDOM_GOLD_CHANCE) {
+                    const amount = Math.floor(Math.random() * (RANDOM_GOLD_AMOUNT[1] - RANDOM_GOLD_AMOUNT[0] + 1)) + RANDOM_GOLD_AMOUNT[0];
+                    this.stats.gold += amount;
+                    result.messages.push(`🎁 幸运！在路边捡到了 ${amount} 金币`);
+                }
+
+                result.messages.unshift(config.desc);
+
+                const currentChar = this.characters[this.currentCharacter];
+                const event = currentChar.checkEvents(this.day, this.stats);
+                if (event) {
+                    result.event = event.text;
+                }
+
+                this.advanceTime();
+
+                return result;
+            }
+
+            giveGift(giftId) {
+                const gift = GIFT_CONFIG[giftId];
+                if (!gift) return { success: false, message: '无效礼物' };
+                if (this.stats.gold < gift.price) return { success: false, message: '金币不足' };
+
+                this.stats.gold -= gift.price;
+                const char = this.characters[this.currentCharacter];
+                const favorGain = gift.favor;
+                char.changeFavor(favorGain, this.stats);
+
+                this.advanceTime();
+
+                return {
+                    success: true,
+                    message: `${gift.desc}\n💰 金币 -${gift.price}\n💕 ${char.name}好感度 +${favorGain}`
+                };
+            }
+
+            advanceTime() {
+                this.period++;
+                if (this.period >= PERIODS.length) {
+                    this.period = 0;
+                    this.day++;
+                    if (this.day > 90) {
+                        this.endGame();
+                    }
+                }
+            }
+
+            endGame() {
+                this.gameEnded = true;
+                const maxFavor = Math.max(...Object.values(this.characters).map(c => c.favor));
+                const topChars = Object.values(this.characters).filter(c => c.favor === maxFavor);
+
+                let ending = { title: '', text: '' };
+
+                if (this.characters.hidden.favor >= 90 &&
+                    this.stats.intelligence >= 95 &&
+                    this.stats.vitality >= 95 &&
+                    this.stats.charm >= 95) {
+                    ending.title = '💝 隐藏结局：禁忌之恋';
+                    ending.text = '90天的校园生活结束了，但你的故事才刚刚开始。毕业后，你来到了那家医院，陈老师正站在门口等你。"我就知道你会来的，"她露出神秘的微笑，"接下来，让我们一起探索更深层次的医学知识吧......"';
+                } else if (maxFavor >= 80 && topChars.length === 1 && topChars[0].id !== 'hidden') {
+                    const char = topChars[0];
+                    ending.title = `💕 恋爱结局：与${char.name}在一起`;
+                    const endings = {
+                        lin: '毕业典礼那天，林雨萱牵起了你的手。"其实......我注意你很久了，"她红着脸说，"和你在一起的每一天，都是我最珍贵的回忆。"阳光下，你们的影子紧紧相依。',
+                        wang: '篮球场上，王浩然将冠军奖杯递给了你。"这个奖杯有你的一半，"他认真地说，"以后的人生，也想和你一起赢下去。"夕阳下，两个身影紧紧相拥。',
+                        zhang: '樱花树下，张梦瑶将最新的画作送给了你。画中的两人手牵着手，"这是我最满意的作品，"她温柔地说，"因为画里是我和你。"'
+                    };
+                    ending.text = endings[char.id];
+                } else if (maxFavor >= 80) {
+                    ending.title = '🌸 友情结局：大家的伙伴';
+                    ending.text = '90天里，你和每个人都建立了深厚的友谊。虽然没有发展出恋爱关系，但你收获了最珍贵的友情。毕业典礼上，大家约定要做一辈子的好朋友！';
+                } else {
+                    ending.title = '😔 单身结局：专注学业';
+                    ending.text = '校园生活结束了，你将全部精力都放在了学业上。虽然感情方面没有收获，但你的成绩非常优秀。相信在未来的日子里，你一定能遇到那个对的人！';
+                }
+
+                this.ending = ending;
+            }
+
+            saveGame() {
+                const saveData = {
+                    day: this.day,
+                    period: this.period,
+                    stats: { ...this.stats },
+                    currentCharacter: this.currentCharacter,
+                    characters: {},
+                    gameEnded: this.gameEnded,
+                    ending: this.ending
+                };
+
+                for (const [id, char] of Object.entries(this.characters)) {
+                    saveData.characters[id] = char.getSaveData();
+                }
+
+                localStorage.setItem('campusLoveGame_save', JSON.stringify(saveData));
+                return true;
+            }
+
+            loadGame() {
+                const saved = localStorage.getItem('campusLoveGame_save');
+                if (!saved) return false;
+
+                try {
+                    const saveData = JSON.parse(saved);
+                    this.day = saveData.day;
+                    this.period = saveData.period;
+                    this.stats = saveData.stats;
+                    this.currentCharacter = saveData.currentCharacter;
+                    this.gameEnded = saveData.gameEnded || false;
+                    this.ending = saveData.ending || null;
+
+                    for (const [id, data] of Object.entries(saveData.characters)) {
+                        if (this.characters[id]) {
+                            this.characters[id].loadSaveData(data);
+                        }
+                    }
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            hasSaveData() {
+                return localStorage.getItem('campusLoveGame_save') !== null;
+            }
+
+            resetGame() {
+                this.day = 1;
+                this.period = 0;
+                this.stats = { intelligence: 50, vitality: 50, charm: 50, gold: 100 };
+                this.currentCharacter = 'lin';
+                this.gameEnded = false;
+                this.ending = null;
+
+                for (const char of Object.values(this.characters)) {
+                    char.favor = 0;
+                    char.triggeredEvents = [];
+                }
+            }
+        }
+
+        export class UIModule {
+            constructor(gameLogic) {
+                this.game = gameLogic;
+                this.initElements();
+                this.bindEvents();
+                this.updateUI();
+            }
+
+            initElements() {
+                this.elements = {
+                    currentDay: document.getElementById('currentDay'),
+                    progressFill: document.getElementById('progressFill'),
+                    actionPeriod: document.getElementById('actionPeriod'),
+                    intelligence: document.getElementById('intelligence'),
+                    vitality: document.getElementById('vitality'),
+                    charm: document.getElementById('charm'),
+                    gold: document.getElementById('gold'),
+                    storyText: document.getElementById('storyText'),
+                    characterPortrait: document.getElementById('characterPortrait'),
+                    charName: document.getElementById('charName'),
+                    charTags: document.getElementById('charTags'),
+                    charFavor: document.getElementById('charFavor'),
+                    favorFill: document.getElementById('favorFill'),
+                    endModal: document.getElementById('endModal'),
+                    endTitle: document.getElementById('endTitle'),
+                    endText: document.getElementById('endText'),
+                    giftModal: document.getElementById('giftModal'),
+                    giftSelector: document.getElementById('giftSelector')
+                };
+            }
+
+            bindEvents() {
+                document.querySelectorAll('.action-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const action = e.target.dataset.action;
+                        if (action === 'gift') {
+                            this.showGiftModal();
+                        } else {
+                            this.handleAction(action);
+                        }
+                    });
+                });
+
+                document.querySelectorAll('.char-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.game.currentCharacter = e.target.dataset.char;
+                        this.updateCharacterDisplay();
+                        this.updateCharButtons();
+                    });
+                });
+
+                document.getElementById('saveBtn').addEventListener('click', () => {
+                    if (this.game.saveGame()) {
+                        this.showNotification('游戏保存成功！', 'success');
+                    }
+                });
+
+                document.getElementById('loadBtn').addEventListener('click', () => {
+                    if (this.game.loadGame()) {
+                        this.updateUI();
+                        this.showNotification('存档读取成功！', 'success');
+                    } else {
+                        this.showNotification('没有找到存档', 'error');
+                    }
+                });
+
+                document.getElementById('restartBtn').addEventListener('click', () => {
+                    this.game.resetGame();
+                    this.elements.endModal.classList.remove('active');
+                    this.updateUI();
+                    this.addStoryText('【新游戏开始】欢迎回到樱花高校！');
+                });
+
+                document.querySelectorAll('.gift-option').forEach(option => {
+                    option.addEventListener('click', (e) => {
+                        document.querySelectorAll('.gift-option').forEach(o => o.classList.remove('selected'));
+                        e.target.classList.add('selected');
+                        this.game.selectedGift = e.target.dataset.gift;
+                    });
+                });
+
+                document.getElementById('confirmGift').addEventListener('click', () => {
+                    if (this.game.selectedGift) {
+                        const result = this.game.giveGift(this.game.selectedGift);
+                        this.elements.giftModal.classList.remove('active');
+                        if (result.success) {
+                            this.addStoryText(result.message);
+                            this.updateUI();
+                        } else {
+                            this.showNotification(result.message, 'error');
+                        }
+                    }
+                });
+
+                document.getElementById('cancelGift').addEventListener('click', () => {
+                    this.elements.giftModal.classList.remove('active');
+                });
+            }
+
+            handleAction(action) {
+                const result = this.game.executeAction(action);
+                if (!result.success) {
+                    this.showNotification(result.message, 'error');
+                    return;
+                }
+
+                result.messages.forEach(msg => this.addStoryText(msg));
+                if (result.event) {
+                    this.addEventText(result.event);
+                }
+
+                this.updateUI();
+
+                if (this.game.gameEnded) {
+                    this.showEnding();
+                }
+            }
+
+            showGiftModal() {
+                this.game.selectedGift = null;
+                document.querySelectorAll('.gift-option').forEach(o => o.classList.remove('selected'));
+                this.elements.giftModal.classList.add('active');
+            }
+
+            showEnding() {
+                this.elements.endTitle.textContent = this.game.ending.title;
+                this.elements.endText.textContent = this.game.ending.text;
+                this.elements.endModal.classList.add('active');
+            }
+
+            addStoryText(text) {
+                const p = document.createElement('p');
+                p.textContent = `[第${this.game.day}天 ${PERIODS[this.game.period]}] ${text}`;
+                this.elements.storyText.appendChild(p);
+                this.elements.storyText.scrollTop = this.elements.storyText.scrollHeight;
+            }
+
+            addEventText(text) {
+                const div = document.createElement('div');
+                div.className = 'event';
+                div.textContent = text;
+                this.elements.storyText.appendChild(div);
+                this.elements.storyText.scrollTop = this.elements.storyText.scrollHeight;
+            }
+
+            updateUI() {
+                this.elements.currentDay.textContent = this.game.day;
+                this.elements.progressFill.style.width = `${(this.game.day / 90) * 100}%`;
+                this.elements.actionPeriod.textContent = PERIODS[this.game.period];
+
+                this.elements.intelligence.textContent = this.game.stats.intelligence;
+                this.elements.vitality.textContent = this.game.stats.vitality;
+                this.elements.charm.textContent = this.game.stats.charm;
+                this.elements.gold.textContent = this.game.stats.gold;
+
+                this.updateCharacterDisplay();
+                this.updateCharButtons();
+
+                document.querySelectorAll('.action-btn').forEach(btn => {
+                    btn.disabled = this.game.gameEnded;
+                });
+            }
+
+            updateCharacterDisplay() {
+                const char = this.game.characters[this.game.currentCharacter];
+                const config = CHARACTER_CONFIG[this.game.currentCharacter];
+
+                this.elements.characterPortrait.style.background = `linear-gradient(135deg, ${config.color1}, ${config.color2})`;
+                this.elements.charName.textContent = char.name;
+                this.elements.charTags.innerHTML = config.tags.map(t => `<span class="tag">${t}</span>`).join('');
+                this.elements.charFavor.textContent = char.favor;
+                this.elements.favorFill.style.width = `${char.favor}%`;
+            }
+
+            updateCharButtons() {
+                document.querySelectorAll('.char-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.char === this.game.currentCharacter);
+                });
+            }
+
+            showNotification(message, type) {
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.textContent = message;
+                document.body.appendChild(notification);
+
+                setTimeout(() => {
+                    notification.remove();
+                }, 3000);
+            }
+        }
+    </script>
+
+    <script type="module">
+        const gameLogic = new GameLogic();
+        const ui = new UIModule(gameLogic);
+
+        if (gameLogic.hasSaveData()) {
+            ui.showNotification('检测到存档，可点击读取存档继续游戏', 'success');
+        }
+    </script>
+</body>
+</html>

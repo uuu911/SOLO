@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>都市白领通勤生存游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .panel h2 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: #e94560;
+            border-bottom: 2px solid #e94560;
+            padding-bottom: 8px;
+        }
+
+        .status-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .status-label {
+            font-weight: 500;
+        }
+
+        .status-value {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .money-color { color: #4ecdc4; }
+        .happiness-color { color: #ffe66d; }
+        .stamina-color { color: #ff6b6b; }
+        .skill-color { color: #a855f7; }
+
+        .map-container {
+            text-align: center;
+        }
+
+        .map-svg {
+            width: 100%;
+            max-width: 500px;
+            height: auto;
+        }
+
+        .route-option {
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .route-option:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .route-option.selected {
+            border-color: #e94560;
+            background: rgba(233, 69, 96, 0.2);
+        }
+
+        .route-option h4 {
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+
+        .route-details {
+            display: flex;
+            justify-content: space-around;
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
+        .action-buttons {
+            display: grid;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #e94560, #ff6b6b);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(233, 69, 96, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #4ecdc4, #44a08d);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(78, 205, 196, 0.4);
+        }
+
+        .btn-option {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            text-align: left;
+        }
+
+        .btn-option:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .log-area {
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        .log-item {
+            padding: 8px;
+            margin-bottom: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            border-left: 3px solid #4ecdc4;
+        }
+
+        .log-item.event {
+            border-left-color: #ff6b6b;
+        }
+
+        .log-item.success {
+            border-left-color: #4ecdc4;
+        }
+
+        .log-item.warning {
+            border-left-color: #ffe66d;
+        }
+
+        .phase-indicator {
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, #e94560, #ff6b6b);
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .endgame-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .endgame-content {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 500px;
+            border: 2px solid #e94560;
+        }
+
+        .endgame-content h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: #e94560;
+        }
+
+        .endgame-stats {
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .endgame-stats p {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .choice-grid {
+            display: grid;
+            gap: 10px;
+        }
+
+        .choice-item {
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .choice-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(5px);
+        }
+
+        .choice-item h4 {
+            margin-bottom: 5px;
+        }
+
+        .choice-item p {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #e94560;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="panel">
+            <h2>📊 状态面板</h2>
+            <div class="status-grid">
+                <div class="status-item">
+                    <span class="status-label">📅 第</span>
+                    <span class="status-value" id="day">1</span>
+                    <span class="status-label">/ 30 天</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label money-color">💰 存款</span>
+                    <span class="status-value money-color" id="money">500</span>
+                    <span class="status-label money-color">元</span>
+                </div>
+                <div>
+                    <div class="status-item">
+                        <span class="status-label happiness-color">😊 幸福度</span>
+                        <span class="status-value happiness-color" id="happiness">70</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill happiness-color" id="happiness-bar" style="width: 70%; background: #ffe66d;"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="status-item">
+                        <span class="status-label stamina-color">⚡ 体力</span>
+                        <span class="status-value stamina-color" id="stamina">100</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill stamina-color" id="stamina-bar" style="width: 100%; background: #ff6b6b;"></div>
+                    </div>
+                </div>
+                <div class="status-item">
+                    <span class="status-label skill-color">📚 技能等级</span>
+                    <span class="status-value skill-color" id="skill-level">1</span>
+                </div>
+                <div>
+                    <div class="status-item">
+                        <span class="status-label skill-color">✨ 技能经验</span>
+                        <span class="status-value skill-color"><span id="skill-exp">0</span> / 3</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill skill-color" id="exp-bar" style="width: 0%; background: #a855f7;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="phase-indicator" id="phase-text">🌅 早晨 - 选择通勤路线</div>
+            
+            <div class="map-container">
+                <svg class="map-svg" viewBox="0 0 400 300">
+                    <defs>
+                        <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+                        </pattern>
+                    </defs>
+                    <rect width="400" height="300" fill="url(#grid)"/>
+                    
+                    <text x="50" y="260" fill="#4ecdc4" font-size="14" font-weight="bold">🏠 家</text>
+                    <circle cx="50" cy="250" r="15" fill="#4ecdc4" opacity="0.3"/>
+                    <circle cx="50" cy="250" r="8" fill="#4ecdc4"/>
+                    
+                    <text x="330" y="50" fill="#e94560" font-size="14" font-weight="bold">🏢 公司</text>
+                    <circle cx="350" cy="40" r="15" fill="#e94560" opacity="0.3"/>
+                    <circle cx="350" cy="40" r="8" fill="#e94560"/>
+                    
+                    <path id="route1-path" d="M 50 250 Q 200 200 350 40" fill="none" stroke="#4ecdc4" stroke-width="4" stroke-dasharray="10,5" opacity="0.8"/>
+                    <text x="180" y="200" fill="#4ecdc4" font-size="11">🚶 步行</text>
+                    
+                    <path id="route2-path" d="M 50 250 Q 200 150 350 40" fill="none" stroke="#ffe66d" stroke-width="4" stroke-dasharray="10,5" opacity="0.8"/>
+                    <text x="180" y="150" fill="#ffe66d" font-size="11">🚌 公交</text>
+                    
+                    <path id="route3-path" d="M 50 250 Q 200 100 350 40" fill="none" stroke="#ff6b6b" stroke-width="4" stroke-dasharray="10,5" opacity="0.8"/>
+                    <text x="180" y="95" fill="#ff6b6b" font-size="11">🚇 地铁</text>
+                    
+                    <circle cx="150" cy="180" r="4" fill="rgba(255,255,255,0.3)"/>
+                    <circle cx="250" cy="120" r="4" fill="rgba(255,255,255,0.3)"/>
+                    <circle cx="200" cy="80" r="4" fill="rgba(255,255,255,0.3)"/>
+                </svg>
+            </div>
+
+            <div id="commute-section">
+                <div id="route-options"></div>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" id="start-commute-btn" onclick="startCommute()" disabled>🚀 出发通勤</button>
+                </div>
+            </div>
+
+            <div id="work-section" class="hidden">
+                <div class="choice-grid" id="work-choices"></div>
+            </div>
+
+            <div id="evening-section" class="hidden">
+                <div class="choice-grid" id="evening-choices"></div>
+            </div>
+
+            <div id="next-day-section" class="hidden action-buttons">
+                <button class="btn btn-primary" onclick="nextDay()">⏭️ 进入下一天</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>📝 事件日志</h2>
+            <div class="log-area" id="log-area"></div>
+            <div class="action-buttons" style="margin-top: 15px;">
+                <button class="btn btn-secondary" onclick="resetGame()">🔄 重新开始</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="endgame-modal hidden" id="endgame-modal">
+        <div class="endgame-content">
+            <h1 id="endgame-title">游戏结束</h1>
+            <p id="endgame-desc" style="margin: 20px 0;"></p>
+            <div class="endgame-stats">
+                <p>💰 最终存款: <span id="final-money">0</span> 元</p>
+                <p>😊 最终幸福度: <span id="final-happiness">0</span></p>
+                <p>📚 最终技能等级: <span id="final-skill">0</span></p>
+                <p>🏆 历史最高存款: <span id="high-score">0</span> 元</p>
+            </div>
+            <button class="btn btn-primary" onclick="resetGame()">🔄 再来一次</button>
+        </div>
+    </div>
+
+    <script>
+        let gameState = {
+            day: 1,
+            money: 500,
+            happiness: 70,
+            stamina: 100,
+            skillLevel: 1,
+            skillExp: 0,
+            phase: 'commute',
+            selectedRoute: null,
+            logs: []
+        };
+
+        const routes = [
+            { id: 1, name: '🚶 步行', cost: 0, time: 40, staminaCost: 20, color: '#4ecdc4' },
+            { id: 2, name: '🚌 公交', cost: 4, time: 25, staminaCost: 10, color: '#ffe66d' },
+            { id: 3, name: '🚇 地铁', cost: 6, time: 20, staminaCost: 8, color: '#ff6b6b' }
+        ];
+
+        const eventScheduler = {
+            baseProbability: 0.3,
+            events: [
+                { name: '地铁故障', probability: 0.15, effect: { stamina: -15, money: -10 }, message: '🚇 地铁临时故障，被迫换乘，体力-15，额外花费10元打车', condition: (route) => route.id === 3 },
+                { name: '堵车', probability: 0.2, effect: { stamina: -10 }, message: '🚗 路上严重堵车，心情烦躁，体力-10', condition: (route) => route.id === 2 },
+                { name: '共享单车损坏', probability: 0.1, effect: { stamina: -5, money: -5 }, message: '🚲 扫码发现车坏了，浪费时间又浪费钱，体力-5，金钱-5', condition: (route) => route.id === 1 },
+                { name: '捡到钱包', probability: 0.05, effect: { money: 50, happiness: 10 }, message: '🎁 运气爆棚！在路上捡到50元！幸福度+10', condition: () => true },
+                { name: '遇到熟人', probability: 0.1, effect: { happiness: 5 }, message: '👋 路上遇到老朋友闲聊，心情变好了！幸福度+5', condition: () => true },
+                { name: '天降大雨', probability: 0.12, effect: { stamina: -12, happiness: -5 }, message: '🌧️ 突然下大雨被淋湿，体力-12，幸福度-5', condition: () => true },
+                { name: '座位让座', probability: 0.08, effect: { happiness: 8, stamina: -5 }, message: '💝 给老人让座被表扬，幸福度+8但有点累，体力-5', condition: (route) => route.id >= 2 }
+            ],
+
+            triggerEvents(route) {
+                const triggered = [];
+                const applicableEvents = this.events.filter(e => e.condition(route));
+                
+                for (const event of applicableEvents) {
+                    if (Math.random() < event.probability * this.baseProbability * 3) {
+                        triggered.push(event);
+                    }
+                }
+                
+                return triggered;
+            }
+        };
+
+        function initGame() {
+            gameState = {
+                day: 1,
+                money: 500,
+                happiness: 70,
+                stamina: 100,
+                skillLevel: 1,
+                skillExp: 0,
+                phase: 'commute',
+                selectedRoute: null,
+                logs: []
+            };
+            
+            document.getElementById('endgame-modal').classList.add('hidden');
+            addLog('🌟 欢迎来到大城市！开始你的30天奋斗之旅！', 'success');
+            addLog('💡 提示：合理管理体力、金钱和幸福度才能成功！', 'success');
+            updateUI();
+            renderRouteOptions();
+        }
+
+        function renderRouteOptions() {
+            const container = document.getElementById('route-options');
+            container.innerHTML = routes.map(route => `
+                <div class="route-option" data-route="${route.id}" onclick="selectRoute(${route.id})">
+                    <h4 style="color: ${route.color}">${route.name}</h4>
+                    <div class="route-details">
+                        <span>💰 花费: ${route.cost}元</span>
+                        <span>⏱️ 时间: ${route.time}分钟</span>
+                        <span>⚡ 体力: -${route.staminaCost}</span>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('commute-section').classList.remove('hidden');
+            document.getElementById('work-section').classList.add('hidden');
+            document.getElementById('evening-section').classList.add('hidden');
+            document.getElementById('next-day-section').classList.add('hidden');
+            document.getElementById('phase-text').textContent = '🌅 早晨 - 选择通勤路线';
+            gameState.phase = 'commute';
+        }
+
+        function selectRoute(routeId) {
+            gameState.selectedRoute = routes.find(r => r.id === routeId);
+            document.querySelectorAll('.route-option').forEach(el => {
+                el.classList.remove('selected');
+                if (parseInt(el.dataset.route) === routeId) {
+                    el.classList.add('selected');
+                }
+            });
+            document.getElementById('start-commute-btn').disabled = false;
+        }
+
+        function startCommute() {
+            if (!gameState.selectedRoute) return;
+            
+            const route = gameState.selectedRoute;
+            
+            gameState.money -= route.cost;
+            gameState.stamina -= route.staminaCost;
+            
+            addLog(`🚶 选择了${route.name}，花费${route.cost}元，消耗体力${route.staminaCost}`, 'success');
+            
+            const events = eventScheduler.triggerEvents(route);
+            for (const event of events) {
+                applyEventEffect(event.effect);
+                addLog(event.message, 'event');
+            }
+            
+            if (events.length === 0) {
+                addLog('✨ 一路顺风，顺利到达公司！', 'success');
+            }
+            
+            if (checkStamina()) return;
+            
+            updateUI();
+            showWorkChoices();
+        }
+
+        function applyEventEffect(effect) {
+            if (effect.money) gameState.money += effect.money;
+            if (effect.happiness) gameState.happiness += effect.happiness;
+            if (effect.stamina) gameState.stamina += effect.stamina;
+            
+            gameState.money = Math.max(0, gameState.money);
+            gameState.happiness = Math.max(0, Math.min(100, gameState.happiness));
+            gameState.stamina = Math.max(0, gameState.stamina);
+        }
+
+        function checkStamina() {
+            if (gameState.stamina <= 0) {
+                addLog('😵 体力耗尽，你昏倒了！', 'warning');
+                addLog('🏥 被送往医院，强制休息一天... 幸福度-20，体力恢复至40，当天无收入', 'warning');
+                
+                gameState.happiness -= 20;
+                gameState.stamina = 40;
+                gameState.happiness = Math.max(0, gameState.happiness);
+                
+                updateUI();
+                showNextDayButton();
+                return true;
+            }
+            return false;
+        }
+
+        function showWorkChoices() {
+            document.getElementById('commute-section').classList.add('hidden');
+            document.getElementById('work-section').classList.remove('hidden');
+            document.getElementById('phase-text').textContent = '💼 工作时间 - 选择工作模式';
+            gameState.phase = 'work';
+            
+            const overtimeBonus = gameState.skillLevel >= 3 ? 10 : 0;
+            const overtimeText = overtimeBonus > 0 ? ` (技能加成+${overtimeBonus})` : '';
+            
+            document.getElementById('work-choices').innerHTML = `
+                <div class="choice-item" onclick="doWork('normal')">
+                    <h4>😐 普通工作</h4>
+                    <p>收入100元，体力-15</p>
+                </div>
+                <div class="choice-item" onclick="doWork('overtime')">
+                    <h4>💪 加班工作</h4>
+                    <p>收入${180 + overtimeBonus}元${overtimeText}，体力-35</p>
+                </div>
+            `;
+        }
+
+        function doWork(type) {
+            if (type === 'normal') {
+                gameState.money += 100;
+                gameState.stamina -= 15;
+                addLog('💼 完成普通工作，收入100元，体力-15', 'success');
+            } else {
+                const overtimeBonus = gameState.skillLevel >= 3 ? 10 : 0;
+                const totalIncome = 180 + overtimeBonus;
+                gameState.money += totalIncome;
+                gameState.stamina -= 35;
+                addLog(`💼 加班完成，收入${totalIncome}元，体力-35`, 'success');
+            }
+            
+            if (checkStamina()) return;
+            
+            updateUI();
+            showEveningChoices();
+        }
+
+        function showEveningChoices() {
+            document.getElementById('work-section').classList.add('hidden');
+            document.getElementById('evening-section').classList.remove('hidden');
+            document.getElementById('phase-text').textContent = '🌙 晚间时光 - 选择晚间活动';
+            gameState.phase = 'evening';
+            
+            document.getElementById('evening-choices').innerHTML = `
+                <div class="choice-item" onclick="doEvening('fitness')">
+                    <h4>🏋️ 健身</h4>
+                    <p>体力+20，花费30元</p>
+                </div>
+                <div class="choice-item" onclick="doEvening('dinner')">
+                    <h4>🍻 朋友聚餐</h4>
+                    <p>幸福度+15，体力+5，花费50元</p>
+                </div>
+                <div class="choice-item" onclick="doEvening('study')">
+                    <h4>📚 学习网课</h4>
+                    <p>技能经验+1，体力-5，幸福度-5，免费</p>
+                </div>
+                <div class="choice-item" onclick="doEvening('rest')">
+                    <h4>😴 直接休息</h4>
+                    <p>体力+30，无花费，幸福度不变</p>
+                </div>
+            `;
+        }
+
+        function doEvening(type) {
+            switch(type) {
+                case 'fitness':
+                    if (gameState.money < 30) {
+                        addLog('❌ 金钱不足，无法健身！', 'warning');
+                        return;
+                    }
+                    gameState.money -= 30;
+                    gameState.stamina += 20;
+                    addLog('🏋️ 健身结束，体力+20，花费30元', 'success');
+                    break;
+                    
+                case 'dinner':
+                    if (gameState.money < 50) {
+                        addLog('❌ 金钱不足，无法聚餐！', 'warning');
+                        return;
+                    }
+                    gameState.money -= 50;
+                    gameState.happiness += 15;
+                    gameState.stamina += 5;
+                    addLog('🍻 和朋友聚餐很开心！幸福度+15，体力+5，花费50元', 'success');
+                    break;
+                    
+                case 'study':
+                    gameState.skillExp += 1;
+                    gameState.stamina -= 5;
+                    gameState.happiness -= 5;
+                    addLog('📚 认真学习网课，技能经验+1', 'success');
+                    checkSkillLevelUp();
+                    break;
+                    
+                case 'rest':
+                    gameState.stamina += 30;
+                    addLog('😴 美美地睡了一觉，体力+30', 'success');
+                    break;
+            }
+            
+            gameState.happiness = Math.max(0, Math.min(100, gameState.happiness));
+            gameState.stamina = Math.min(100, gameState.stamina);
+            
+            updateUI();
+            showNextDayButton();
+        }
+
+        function checkSkillLevelUp() {
+            while (gameState.skillExp >= 3) {
+                gameState.skillExp -= 3;
+                gameState.skillLevel += 1;
+                addLog(`🎉 恭喜！技能等级提升到 ${gameState.skillLevel} 级！`, 'success');
+                addLog(`💡 技能等级≥3时加班可获得额外10元收入！`, 'success');
+            }
+        }
+
+        function showNextDayButton() {
+            document.getElementById('evening-section').classList.add('hidden');
+            document.getElementById('next-day-section').classList.remove('hidden');
+            document.getElementById('phase-text').textContent = '🌙 今日结束';
+            gameState.phase = 'next';
+        }
+
+        function nextDay() {
+            gameState.day += 1;
+            gameState.selectedRoute = null;
+            
+            if (gameState.day > 30) {
+                endGame();
+                return;
+            }
+            
+            addLog(`📅 ========== 第 ${gameState.day} 天开始 ==========`, 'success');
+            updateUI();
+            renderRouteOptions();
+            document.getElementById('start-commute-btn').disabled = true;
+        }
+
+        function endGame() {
+            const money = gameState.money;
+            const happiness = gameState.happiness;
+            const skill = gameState.skillLevel;
+            
+            let title, desc;
+            
+            if (money >= 5000 && happiness >= 80) {
+                title = '🏆 财务自由赢家';
+                desc = '恭喜你！在30天内不仅赚到了足够的钱，还保持了超高的幸福度！你是真正的人生赢家！';
+            } else if (money >= 3000 && happiness >= 50) {
+                title = '✨ 小有成就';
+                desc = '不错！你在大城市站稳了脚跟，虽然还有提升空间，但已经战胜了很多人！继续加油！';
+            } else {
+                title = '😢 身心俱疲返乡';
+                desc = '很遗憾，30天的奋斗没有达到预期目标。或许大城市并不适合你，返乡休整也是一种选择...';
+            }
+            
+            let highScore = 0;
+            try {
+                highScore = parseInt(localStorage.getItem('commuteGameHighScore') || '0');
+                if (money > highScore) {
+                    localStorage.setItem('commuteGameHighScore', money.toString());
+                    highScore = money;
+                    desc += ' 🎉 刷新历史最高存款记录！';
+                }
+            } catch (e) {}
+            
+            document.getElementById('endgame-title').textContent = title;
+            document.getElementById('endgame-desc').textContent = desc;
+            document.getElementById('final-money').textContent = money;
+            document.getElementById('final-happiness').textContent = happiness;
+            document.getElementById('final-skill').textContent = skill;
+            document.getElementById('high-score').textContent = highScore;
+            document.getElementById('endgame-modal').classList.remove('hidden');
+        }
+
+        function resetGame() {
+            initGame();
+        }
+
+        function addLog(message, type = 'normal') {
+            gameState.logs.unshift({ message, type, time: new Date().toLocaleTimeString() });
+            if (gameState.logs.length > 5) {
+                gameState.logs.pop();
+            }
+            renderLogs();
+        }
+
+        function renderLogs() {
+            const logArea = document.getElementById('log-area');
+            logArea.innerHTML = gameState.logs.map(log => `
+                <div class="log-item ${log.type}">
+                    <small style="color: #888;">${log.time}</small><br>
+                    ${log.message}
+                </div>
+            `).join('');
+        }
+
+        function updateUI() {
+            document.getElementById('day').textContent = gameState.day;
+            document.getElementById('money').textContent = gameState.money;
+            document.getElementById('happiness').textContent = gameState.happiness;
+            document.getElementById('stamina').textContent = gameState.stamina;
+            document.getElementById('skill-level').textContent = gameState.skillLevel;
+            document.getElementById('skill-exp').textContent = gameState.skillExp;
+            
+            document.getElementById('happiness-bar').style.width = `${gameState.happiness}%`;
+            document.getElementById('stamina-bar').style.width = `${gameState.stamina}%`;
+            document.getElementById('exp-bar').style.width = `${(gameState.skillExp / 3) * 100}%`;
+        }
+
+        function triggerTestEvent(eventName) {
+            const event = eventScheduler.events.find(e => e.name === eventName);
+            if (event) {
+                applyEventEffect(event.effect);
+                addLog(`🧪 [测试触发] ${event.message}`, 'event');
+                updateUI();
+            } else {
+                console.log('找不到事件:', eventName);
+            }
+        }
+
+        window.triggerTestEvent = triggerTestEvent;
+        window.gameState = gameState;
+        window.eventScheduler = eventScheduler;
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>

@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>城邦执政官 - 公元前5世纪爱琴海文明</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Times New Roman', 'SimSun', serif;
+            background: linear-gradient(135deg, #1a0f0a 0%, #2d1f15 50%, #1a0f0a 100%);
+            min-height: 100vh;
+            color: #e8dcc8;
+            padding: 20px;
+        }
+
+        .game-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: linear-gradient(180deg, #3d2e1f 0%, #2a1f14 100%);
+            border: 3px solid #8b6914;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 0 50px rgba(139, 105, 20, 0.3);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #8b6914;
+            padding-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            color: #d4af37;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            margin-bottom: 10px;
+        }
+
+        .header .subtitle {
+            font-size: 1.1em;
+            color: #b8a67c;
+            font-style: italic;
+        }
+
+        .status-bar {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            border: 1px solid #5a4a2a;
+        }
+
+        .status-item {
+            text-align: center;
+        }
+
+        .status-item.year {
+            grid-column: 1 / -1;
+            font-size: 1.5em;
+            color: #d4af37;
+            font-weight: bold;
+        }
+
+        .status-label {
+            font-size: 0.9em;
+            color: #b8a67c;
+            margin-bottom: 5px;
+        }
+
+        .status-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .bar-container {
+            width: 100%;
+            height: 20px;
+            background: #1a1410;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #5a4a2a;
+        }
+
+        .bar-fill {
+            height: 100%;
+            transition: width 0.5s ease, background-color 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .economy-bar { background: linear-gradient(90deg, #8b6914, #d4af37); }
+        .military-bar { background: linear-gradient(90deg, #8b1a1a, #d43737); }
+        .diplomacy-bar { background: linear-gradient(90deg, #1a6b8b, #37b8d4); }
+
+        .event-card {
+            background: linear-gradient(180deg, #4a3a2a 0%, #3a2a1a 100%);
+            border: 2px solid #8b6914;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .event-title {
+            font-size: 1.5em;
+            color: #d4af37;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .event-description {
+            font-size: 1.1em;
+            line-height: 1.8;
+            color: #e8dcc8;
+            margin-bottom: 25px;
+            text-align: justify;
+        }
+
+        .choices-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .choice-btn {
+            padding: 15px 25px;
+            font-size: 1.05em;
+            font-family: inherit;
+            background: linear-gradient(180deg, #5a4a3a 0%, #4a3a2a 100%);
+            border: 2px solid #8b6914;
+            color: #e8dcc8;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+
+        .choice-btn:hover {
+            background: linear-gradient(180deg, #6a5a4a 0%, #5a4a3a 100%);
+            border-color: #d4af37;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(139, 105, 20, 0.4);
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .control-btn {
+            padding: 12px 30px;
+            font-size: 1em;
+            font-family: inherit;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+
+        .undo-btn {
+            background: linear-gradient(180deg, #4a4a5a 0%, #3a3a4a 100%);
+            border: 2px solid #6a6a7a;
+            color: #e8dcc8;
+        }
+
+        .undo-btn:hover:not(:disabled) {
+            background: linear-gradient(180deg, #5a5a6a 0%, #4a4a5a 100%);
+            border-color: #8a8a9a;
+        }
+
+        .undo-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .reset-btn {
+            background: linear-gradient(180deg, #8b3a1a 0%, #6b2a0a 100%);
+            border: 2px solid #ab5a3a;
+            color: #e8dcc8;
+        }
+
+        .reset-btn:hover {
+            background: linear-gradient(180deg, #9b4a2a 0%, #7b3a1a 100%);
+        }
+
+        .game-over-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: linear-gradient(180deg, #4a3a2a 0%, #2a1a0a 100%);
+            border: 3px solid #d4af37;
+            border-radius: 15px;
+            padding: 50px;
+            text-align: center;
+            max-width: 500px;
+        }
+
+        .modal-title {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+
+        .modal-title.victory { color: #d4af37; }
+        .modal-title.defeat { color: #d43737; }
+        .modal-title.history { color: #888; }
+
+        .modal-description {
+            font-size: 1.2em;
+            line-height: 1.8;
+            margin-bottom: 30px;
+            color: #e8dcc8;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .effect-tooltip {
+            font-size: 0.85em;
+            color: #a8966c;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        .streak-indicator {
+            font-size: 0.8em;
+            color: #d4af37;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <h1>城邦执政官</h1>
+            <div class="subtitle">公元前5世纪爱琴海文明 · 策略统治模拟</div>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item year">
+                <span id="year-display">公元前 490 年</span>
+                <span class="streak-indicator" id="streak-display"></span>
+            </div>
+            <div class="status-item">
+                <div class="status-label">💰 经济繁荣</div>
+                <div class="status-value" id="economy-value">50</div>
+                <div class="bar-container">
+                    <div class="bar-fill economy-bar" id="economy-bar" style="width: 50%"></div>
+                </div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">⚔️ 军事力量</div>
+                <div class="status-value" id="military-value">50</div>
+                <div class="bar-container">
+                    <div class="bar-fill military-bar" id="military-bar" style="width: 50%"></div>
+                </div>
+            </div>
+            <div class="status-item" style="grid-column: 1 / -1;">
+                <div class="status-label">🤝 外交声望</div>
+                <div class="status-value" id="diplomacy-value">50</div>
+                <div class="bar-container">
+                    <div class="bar-fill diplomacy-bar" id="diplomacy-bar" style="width: 50%"></div>
+                </div>
+            </div>
+            <div class="status-item" style="grid-column: 1 / -1; font-size: 0.95em; color: #b8a67c;">
+                统治回合：<span id="turn-count">0</span>
+            </div>
+        </div>
+
+        <div class="event-card" id="event-card">
+            <div class="event-title" id="event-title"></div>
+            <div class="event-description" id="event-description"></div>
+            <div class="choices-container" id="choices-container"></div>
+        </div>
+
+        <div class="control-buttons">
+            <button class="control-btn undo-btn" id="undo-btn" disabled>↩️ 撤销上一回合</button>
+            <button class="control-btn reset-btn" id="reset-btn">🔄 重新开始</button>
+        </div>
+    </div>
+
+    <div class="game-over-modal hidden" id="game-over-modal">
+        <div class="modal-content">
+            <div class="modal-title" id="modal-title"></div>
+            <div class="modal-description" id="modal-description"></div>
+            <button class="control-btn reset-btn" onclick="PolisGame.UI.resetGame()">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        if (!window.PolisGame) {
+            window.PolisGame = {};
+        }
+    </script>
+
+    <script>
+        (function(PolisGame) {
+            PolisGame.Types = {
+                StatType: {
+                    ECONOMY: 'economy',
+                    MILITARY: 'military',
+                    DIPLOMACY: 'diplomacy'
+                },
+
+                EventCategory: {
+                    ECONOMIC: 'economic',
+                    MILITARY: 'military',
+                    DIPLOMATIC: 'diplomatic'
+                },
+
+                ValueRange: {
+                    LOW: 0,
+                    MEDIUM: 1,
+                    HIGH: 2
+                },
+
+                IEffect: function() {},
+                IHistoricalEvent: function() {},
+                IGameState: function() {},
+                IEventHistoryEntry: function() {}
+            };
+        })(window.PolisGame);
+    </script>
+
+    <script>
+        (function(PolisGame) {
+            const Types = PolisGame.Types;
+
+            function GameState() {
+                this.year = -490;
+                this.economy = 50;
+                this.military = 50;
+                this.diplomacy = 50;
+                this.turnCount = 0;
+                this.victoryStreak = { type: null, count: 0 };
+            }
+
+            GameState.prototype.clone = function() {
+                const cloned = new GameState();
+                cloned.year = this.year;
+                cloned.economy = this.economy;
+                cloned.military = this.military;
+                cloned.diplomacy = this.diplomacy;
+                cloned.turnCount = this.turnCount;
+                cloned.victoryStreak = { 
+                    type: this.victoryStreak.type, 
+                    count: this.victoryStreak.count 
+                };
+                return cloned;
+            };
+
+            GameState.prototype.applyEffect = function(effect) {
+                const variation = 1 + (Math.random() * 0.4 - 0.2);
+                
+                this.economy += Math.round((effect.economy || 0) * variation);
+                this.military += Math.round((effect.military || 0) * variation);
+                this.diplomacy += Math.round((effect.diplomacy || 0) * variation);
+
+                this.economy = Math.max(0, Math.min(100, this.economy));
+                this.military = Math.max(0, Math.min(100, this.military));
+                this.diplomacy = Math.max(0, Math.min(100, this.diplomacy));
+
+                this.year += 1;
+                this.turnCount += 1;
+            };
+
+            GameState.prototype.getValueRange = function(statType) {
+                const value = this[statType];
+                if (value <= 25) return Types.ValueRange.LOW;
+                if (value >= 75) return Types.ValueRange.HIGH;
+                return Types.ValueRange.MEDIUM;
+            };
+
+            GameState.prototype.checkGameEnd = function() {
+                if (this.economy <= 0 || this.military <= 0 || this.diplomacy <= 0) {
+                    return {
+                        ended: true,
+                        type: 'defeat',
+                        reason: this.economy <= 0 ? '经济崩溃' : 
+                                this.military <= 0 ? '军事覆灭' : '外交孤立'
+                    };
+                }
+
+                const checkStreak = (statType, statName) => {
+                    if (this[statType] >= 100) {
+                        if (this.victoryStreak.type === statType) {
+                            this.victoryStreak.count++;
+                        } else {
+                            this.victoryStreak.type = statType;
+                            this.victoryStreak.count = 1;
+                        }
+                        if (this.victoryStreak.count >= 3) {
+                            return { ended: true, type: 'victory', reason: statName };
+                        }
+                    }
+                    return null;
+                };
+
+                const econVictory = checkStreak('economy', '经济繁荣');
+                if (econVictory) return econVictory;
+
+                const milVictory = checkStreak('military', '军事霸权');
+                if (milVictory) return milVictory;
+
+                const dipVictory = checkStreak('diplomacy', '外交领袖');
+                if (dipVictory) return dipVictory;
+
+                if (this.victoryStreak.type && this[this.victoryStreak.type] < 100) {
+                    this.victoryStreak.type = null;
+                    this.victoryStreak.count = 0;
+                }
+
+                if (this.turnCount >= 25) {
+                    return { ended: true, type: 'history', reason: '岁月流逝' };
+                }
+
+                return { ended: false };
+            };
+
+            PolisGame.State = {
+                GameState: GameState,
+                currentState: new GameState(),
+                historyStack: [],
+                undoState: null
+            };
+        })(window.PolisGame);
+    </script>
+
+    <script>
+        (function(PolisGame) {
+            const Types = PolisGame.Types;
+            const State = PolisGame.State;
+
+            const historicalEvents = [
+                {
+                    id: 'persian_invasion_warning',
+                    title: '波斯大军压境',
+                    description: '密探来报，波斯国王大流士的军队正在小亚细亚集结，准备渡海入侵希腊诸邦。各城邦人心惶惶，你必须做出决断。',
+                    category: Types.EventCategory.MILITARY,
+                    triggerCondition: { military: Types.ValueRange.LOW },
+                    choices: [
+                        {
+                            text: '加固城防，征召民兵（军事↑，经济↓）',
+                            effect: { economy: -10, military: 15, diplomacy: 0 }
+                        },
+                        {
+                            text: '遣使向雅典和斯巴达求援（外交↑，军事↓）',
+                            effect: { economy: 0, military: -5, diplomacy: 12 }
+                        },
+                        {
+                            text: '开城献降，保存实力（全属性↓）',
+                            effect: { economy: -20, military: -15, diplomacy: -25 }
+                        }
+                    ]
+                },
+                {
+                    id: 'olympic_truce',
+                    title: '奥林匹克休战请求',
+                    description: '奥林匹亚的祭司团派出使者，请求你遵守神圣休战协定，允许城邦公民前往参加第72届奥林匹克运动会。',
+                    category: Types.EventCategory.DIPLOMATIC,
+                    triggerCondition: { diplomacy: Types.ValueRange.MEDIUM },
+                    choices: [
+                        {
+                            text: '欣然应允，派遣盛大代表团（外交↑，经济↓）',
+                            effect: { economy: -8, military: 0, diplomacy: 15 }
+                        },
+                        {
+                            text: '允许民间参与，但不派官方使团（小幅外交↑）',
+                            effect: { economy: -3, military: 0, diplomacy: 5 }
+                        },
+                        {
+                            text: '以战备为由拒绝休战（外交↓↓）',
+                            effect: { economy: 0, military: 3, diplomacy: -20 }
+                        }
+                    ]
+                },
+                {
+                    id: 'lydian_counterfeit',
+                    title: '吕底亚金币伪造危机',
+                    description: '市场上出现大量仿造的吕底亚金币，严重冲击了城邦的货币体系，商人们人心惶惶。',
+                    category: Types.EventCategory.ECONOMIC,
+                    triggerCondition: { economy: Types.ValueRange.MEDIUM },
+                    choices: [
+                        {
+                            text: '重铸货币，设立防伪标记（经济↑↑）',
+                            effect: { economy: 18, military: -5, diplomacy: 5 }
+                        },
+                        {
+                            text: '严惩造假者，没收所有伪币（经济↑，风险）',
+                            effect: { economy: 10, military: 5, diplomacy: -8 }
+                        },
+                        {
+                            text: '默许现状，从中渔利（短期经济↑，长期风险）',
+                            effect: { economy: 8, military: -3, diplomacy: -12 }
+                        }
+                    ]
+                },
+                {
+                    id: 'spartan_helot_revolt',
+                    title: '斯巴达希洛人起义',
+                    description: '斯巴达的希洛人（奴隶阶层）发动大规模起义，斯巴达向周边城邦求援，请求派兵镇压。',
+                    category: Types.EventCategory.MILITARY,
+                    triggerCondition: { military: Types.ValueRange.MEDIUM },
+                    choices: [
+                        {
+                            text: '派遣精锐部队支援（军事↑，外交↑）',
+                            effect: { economy: -10, military: 12, diplomacy: 10 }
+                        },
+                        {
+                            text: '提供武器和粮食，不派士兵（经济↓）',
+                            effect: { economy: -15, military: 5, diplomacy: 8 }
+                        },
+                        {
+                            text: '拒绝卷入，保持中立（外交↓）',
+                            effect: { economy: 0, military: 0, diplomacy: -15 }
+                        }
+                    ]
+                },
+                {
+                    id: 'delian_league_tribute',
+                    title: '提洛同盟贡金争议',
+                    description: '雅典领导的提洛同盟要求你邦增加贡金份额，声称这笔钱将用于建设共同的海军抵御波斯。',
+                    category: Types.EventCategory.DIPLOMATIC,
+                    triggerCondition: { diplomacy: Types.ValueRange.HIGH },
+                    choices: [
+                        {
+                            text: '如数缴纳，争取雅典好感（外交↑，经济↓）',
+                            effect: { economy: -15, military: 5, diplomacy: 18 }
+                        },
+                        {
+                            text: '协商减少贡金额度（小幅影响）',
+                            effect: { economy: -8, military: 0, diplomacy: 5 }
+                        },
+                        {
+                            text: '断然拒绝，考虑退出同盟（外交↓，军事↓）',
+                            effect: { economy: 5, military: -8, diplomacy: -20 }
+                        }
+                    ]
+                },
+                {
+                    id: 'silver_mine_discovery',
+                    title: '银矿发现',
+                    description: '在城邦领地的山区发现了一处储量丰富的银矿，这将带来巨大的财富，但也引起了邻邦的觊觎。',
+                    category: Types.EventCategory.ECONOMIC,
+                    triggerCondition: { economy: Types.ValueRange.LOW },
+                    choices: [
+                        {
+                            text: '全力开采，充实国库（经济↑↑）',
+                            effect: { economy: 25, military: -5, diplomacy: -8 }
+                        },
+                        {
+                            text: '与邻邦共享开采权（外交↑）',
+                            effect: { economy: 12, military: 3, diplomacy: 15 }
+                        },
+                        {
+                            text: '保密并小规模开采（平稳收益）',
+                            effect: { economy: 8, military: 0, diplomacy: 0 }
+                        }
+                    ]
+                },
+                {
+                    id: 'plague_outbreak',
+                    title: '瘟疫爆发',
+                    description: '一场未知的瘟疫在城邦内蔓延，民众大量死亡，社会秩序岌岌可危。',
+                    category: Types.EventCategory.ECONOMIC,
+                    triggerCondition: { economy: Types.ValueRange.HIGH },
+                    choices: [
+                        {
+                            text: '花费巨资从埃及请来医生（经济↓）',
+                            effect: { economy: -20, military: -5, diplomacy: 10 }
+                        },
+                        {
+                            text: '严格隔离，焚烧疫区（社会动荡）',
+                            effect: { economy: -8, military: -10, diplomacy: -5 }
+                        },
+                        {
+                            text: '向神庙献祭，祈求神佑（听天由命）',
+                            effect: { economy: -5, military: -8, diplomacy: -3 }
+                        }
+                    ]
+                },
+                {
+                    id: 'corcyra_conflict',
+                    title: '科西拉争端',
+                    description: '科林斯与科西拉因殖民地问题爆发冲突，双方都派遣使者请求你邦的支持。',
+                    category: Types.EventCategory.DIPLOMATIC,
+                    triggerCondition: { diplomacy: Types.ValueRange.LOW },
+                    choices: [
+                        {
+                            text: '支持科西拉，获得海军援助（军事↑）',
+                            effect: { economy: -5, military: 15, diplomacy: -10 }
+                        },
+                        {
+                            text: '支持科林斯，加强陆地联盟（外交↑）',
+                            effect: { economy: -3, military: 8, diplomacy: 12 }
+                        },
+                        {
+                            text: '严守中立，调解冲突',
+                            effect: { economy: 0, military: -3, diplomacy: 8 }
+                        }
+                    ]
+                },
+                {
+                    id: 'hoplite_reform',
+                    title: '重装步兵改革',
+                    description: '你的将军提议进行军事改革，按照雅典模式组建职业化的重装步兵部队。',
+                    category: Types.EventCategory.MILITARY,
+                    triggerCondition: { military: Types.ValueRange.HIGH },
+                    choices: [
+                        {
+                            text: '全力支持，打造精锐之师（军事↑↑，经济↓）',
+                            effect: { economy: -18, military: 22, diplomacy: 5 }
+                        },
+                        {
+                            text: '部分改革，保留公民兵制（平衡发展）',
+                            effect: { economy: -8, military: 12, diplomacy: 0 }
+                        },
+                        {
+                            text: '拒绝改革，维持传统（无大变化）',
+                            effect: { economy: 5, military: -5, diplomacy: 0 }
+                        }
+                    ]
+                },
+                {
+                    id: 'pythian_games',
+                    title: '皮提亚竞技会',
+                    description: '德尔斐的皮提亚竞技会即将召开，祭司邀请你邦赞助这次盛会。',
+                    category: Types.EventCategory.DIPLOMATIC,
+                    triggerCondition: { economy: Types.ValueRange.MEDIUM },
+                    choices: [
+                        {
+                            text: '慷慨赞助，成为主要赞助者（外交↑↑）',
+                            effect: { economy: -18, military: 0, diplomacy: 20 }
+                        },
+                        {
+                            text: '适度赞助，参与盛典',
+                            effect: { economy: -8, military: 0, diplomacy: 10 }
+                        },
+                        {
+                            text: '派遣选手，不提供赞助',
+                            effect: { economy: -2, military: 3, diplomacy: 3 }
+                        }
+                    ]
+                },
+                {
+                    id: 'pirate_raid',
+                    title: '海盗袭击',
+                    description: '爱琴海上海盗猖獗，你的商船队遭到袭击，损失惨重。',
+                    category: Types.EventCategory.MILITARY,
+                    triggerCondition: { military: Types.ValueRange.LOW },
+                    choices: [
+                        {
+                            text: '组建海军，清剿海盗（军事↑，经济↓）',
+                            effect: { economy: -15, military: 18, diplomacy: 5 }
+                        },
+                        {
+                            text: '向雅典求援，支付保护费',
+                            effect: { economy: -12, military: 5, diplomacy: 8 }
+                        },
+                        {
+                            text: '与海盗谈判，缴纳赎金',
+                            effect: { economy: -8, military: -5, diplomacy: -8 }
+                        }
+                    ]
+                },
+                {
+                    id: 'philosopher_visit',
+                    title: '哲人来访',
+                    description: '著名哲学家阿那克萨哥拉来到你的城邦讲学，引起了民众的热烈反响。',
+                    category: Types.EventCategory.ECONOMIC,
+                    triggerCondition: { diplomacy: Types.ValueRange.MEDIUM },
+                    choices: [
+                        {
+                            text: '资助建立学园，招揽人才（经济↓，外交↑）',
+                            effect: { economy: -12, military: 0, diplomacy: 15 }
+                        },
+                        {
+                            text: '公开辩论，提升城邦声望',
+                            effect: { economy: -3, military: 0, diplomacy: 8 }
+                        },
+                        {
+                            text: '以不敬神为由驱逐哲人',
+                            effect: { economy: 0, military: 0, diplomacy: -12 }
+                        }
+                    ]
+                },
+                {
+                    id: 'grain_shortage',
+                    title: '谷物短缺',
+                    description: '持续的干旱导致粮食歉收，城邦面临严重的饥荒威胁。',
+                    category: Types.EventCategory.ECONOMIC,
+                    triggerCondition: { economy: Types.ValueRange.LOW },
+                    choices: [
+                        {
+                            text: '从埃及和黑海进口粮食（经济↓）',
+                            effect: { economy: -20, military: -3, diplomacy: 8 }
+                        },
+                        {
+                            text: '实施配给制，共渡难关',
+                            effect: { economy: -8, military: -5, diplomacy: -5 }
+                        },
+                        {
+                            text: '掠夺邻邦粮仓（军事↑，外交↓）',
+                            effect: { economy: 15, military: 10, diplomacy: -20 }
+                        }
+                    ]
+                },
+                {
+                    id: 'temple_construction',
+                    title: '神庙修建',
+                    description: '祭司团提议修建一座宏伟的阿波罗神庙，以祈求神佑并彰显城邦荣耀。',
+                    category: Types.EventCategory.DIPLOMATIC,
+                    triggerCondition: { economy: Types.ValueRange.HIGH },
+                    choices: [
+                        {
+                            text: '不惜代价修建宏伟神庙（声望↑↑）',
+                            effect: { economy: -25, military: -5, diplomacy: 18 }
+                        },
+                        {
+                            text: '适度修建，平衡开支',
+                            effect: { economy: -12, military: 0, diplomacy: 10 }
+                        },
+                        {
+                            text: '推迟修建，优先民生',
+                            effect: { economy: 5, military: 3, diplomacy: -8 }
+                        }
+                    ]
+                },
+                {
+                    id: 'megara_decree',
+                    title: '麦加拉禁令',
+                    description: '雅典颁布麦加拉禁令，禁止麦加拉商人进入提洛同盟港口。麦加拉请求你邦主持公道。',
+                    category: Types.EventCategory.DIPLOMATIC,
+                    triggerCondition: { diplomacy: Types.ValueRange.HIGH },
+                    choices: [
+                        {
+                            text: '支持麦加拉，挑战雅典权威',
+                            effect: { economy: -5, military: 8, diplomacy: -10 }
+                        },
+                        {
+                            text: '支持雅典，巩固同盟关系',
+                            effect: { economy: 8, military: -3, diplomacy: 12 }
+                        },
+                        {
+                            text: '中立调解，寻求妥协方案',
+                            effect: { economy: 0, military: 0, diplomacy: 5 }
+                        }
+                    ]
+                }
+            ];
+
+            PolisGame.Events = {
+                eventPool: historicalEvents,
+                
+                validateEvent: function(event) {
+                    return event && event.id && event.title && event.description && 
+                           event.choices && event.choices.length >= 2;
+                },
+
+                getFilteredEvents: function(gameState) {
+                    return this.eventPool.filter(event => {
+                        if (!this.validateEvent(event)) return false;
+                        
+                        if (event.triggerCondition) {
+                            for (const [stat, range] of Object.entries(event.triggerCondition)) {
+                                if (gameState.getValueRange(stat) !== range) {
+                                    return false;
+                                }
+                            }
+                        }
+                        return true;
+                    });
+                },
+
+                getFallbackEvents: function() {
+                    return this.eventPool.filter(e => this.validateEvent(e));
+                }
+            };
+        })(window.PolisGame);
+    </script>
+
+    <script>
+        (function(PolisGame) {
+            const Types = PolisGame.Types;
+            const Events = PolisGame.Events;
+            const State = PolisGame.State;
+
+            const recentCategories = [];
+            const MAX_RECENT_CATEGORIES = 3;
+
+            function selectRandomEvent(events) {
+                if (events.length === 0) return null;
+                const randomIndex = Math.floor(Math.random() * events.length);
+                return events[randomIndex];
+            }
+
+            function isCategoryBlocked(category) {
+                if (recentCategories.length < MAX_RECENT_CATEGORIES) return false;
+                return recentCategories.every(cat => cat === category);
+            }
+
+            function addToRecentCategories(category) {
+                recentCategories.push(category);
+                if (recentCategories.length > MAX_RECENT_CATEGORIES) {
+                    recentCategories.shift();
+                }
+            }
+
+            function selectEvent(gameState) {
+                let filteredEvents = Events.getFilteredEvents(gameState);
+                
+                let availableEvents = filteredEvents.filter(event => 
+                    !isCategoryBlocked(event.category)
+                );
+
+                if (availableEvents.length === 0) {
+                    availableEvents = Events.getFallbackEvents();
+                }
+
+                const selectedEvent = selectRandomEvent(availableEvents);
+                if (selectedEvent) {
+                    addToRecentCategories(selectedEvent.category);
+                }
+
+                return selectedEvent;
+            }
+
+            function clearRecentCategories() {
+                recentCategories.length = 0;
+            }
+
+            PolisGame.EventManager = {
+                selectEvent: selectEvent,
+                clearRecentCategories: clearRecentCategories
+            };
+        })(window.PolisGame);
+    </script>
+
+    <script>
+        (function(PolisGame) {
+            const State = PolisGame.State;
+            const EventManager = PolisGame.EventManager;
+            const Types = PolisGame.Types;
+
+            let currentEvent = null;
+
+            function initGame() {
+                State.currentState = new State.GameState();
+                State.historyStack = [];
+                State.undoState = null;
+                EventManager.clearRecentCategories();
+                nextTurn();
+            }
+
+            function nextTurn() {
+                currentEvent = EventManager.selectEvent(State.currentState);
+                if (!currentEvent) {
+                    currentEvent = PolisGame.Events.eventPool[0];
+                }
+                PolisGame.UI.renderEvent(currentEvent);
+                PolisGame.UI.updateStatusDisplay();
+            }
+
+            function makeChoice(choiceIndex) {
+                const choice = currentEvent.choices[choiceIndex];
+                
+                State.undoState = State.currentState.clone();
+                
+                State.historyStack.push({
+                    eventId: currentEvent.id,
+                    choiceIndex: choiceIndex,
+                    stateBefore: State.undoState.clone()
+                });
+
+                State.currentState.applyEffect(choice.effect);
+
+                const gameEnd = State.currentState.checkGameEnd();
+                if (gameEnd.ended) {
+                    PolisGame.UI.showGameEnd(gameEnd);
+                } else {
+                    nextTurn();
+                }
+            }
+
+            function undoLastTurn() {
+                if (State.undoState) {
+                    State.currentState = State.undoState;
+                    State.undoState = null;
+                    State.historyStack.pop();
+                    nextTurn();
+                }
+            }
+
+            function canUndo() {
+                return State.undoState !== null;
+            }
+
+            PolisGame.GameLoop = {
+                initGame: initGame,
+                makeChoice: makeChoice,
+                undoLastTurn: undoLastTurn,
+                canUndo: canUndo
+            };
+        })(window.PolisGame);
+    </script>
+
+    <script>
+        (function(PolisGame) {
+            const State = PolisGame.State;
+            const GameLoop = PolisGame.GameLoop;
+
+            function updateStatusDisplay() {
+                const state = State.currentState;
+                
+                const yearDisplay = document.getElementById('year-display');
+                yearDisplay.textContent = `公元前 ${Math.abs(state.year)} 年`;
+
+                updateStatDisplay('economy', state.economy);
+                updateStatDisplay('military', state.military);
+                updateStatDisplay('diplomacy', state.diplomacy);
+
+                document.getElementById('turn-count').textContent = state.turnCount;
+
+                const streakDisplay = document.getElementById('streak-display');
+                if (state.victoryStreak.count > 0) {
+                    const statNames = { economy: '经济', military: '军事', diplomacy: '外交' };
+                    streakDisplay.textContent = `🔥 ${statNames[state.victoryStreak.type]}鼎盛 ${state.victoryStreak.count}/3 回合`;
+                } else {
+                    streakDisplay.textContent = '';
+                }
+
+                document.getElementById('undo-btn').disabled = !GameLoop.canUndo();
+            }
+
+            function updateStatDisplay(statName, value) {
+                document.getElementById(`${statName}-value`).textContent = value;
+                const bar = document.getElementById(`${statName}-bar`);
+                bar.style.width = `${value}%`;
+            }
+
+            function renderEvent(event) {
+                document.getElementById('event-title').textContent = event.title;
+                document.getElementById('event-description').textContent = event.description;
+
+                const choicesContainer = document.getElementById('choices-container');
+                choicesContainer.innerHTML = '';
+
+                event.choices.forEach((choice, index) => {
+                    const button = document.createElement('button');
+                    button.className = 'choice-btn';
+                    
+                    const tooltip = generateEffectTooltip(choice.effect);
+                    button.innerHTML = `${choice.text}<div class="effect-tooltip">${tooltip}</div>`;
+                    
+                    button.onclick = () => GameLoop.makeChoice(index);
+                    choicesContainer.appendChild(button);
+                });
+            }
+
+            function generateEffectTooltip(effect) {
+                const parts = [];
+                if (effect.economy) parts.push(`经济${effect.economy > 0 ? '+' : ''}${effect.economy}`);
+                if (effect.military) parts.push(`军事${effect.military > 0 ? '+' : ''}${effect.military}`);
+                if (effect.diplomacy) parts.push(`外交${effect.diplomacy > 0 ? '+' : ''}${effect.diplomacy}`);
+                return parts.join(' · ') || '影响未知';
+            }
+
+            function showGameEnd(gameEnd) {
+                const modal = document.getElementById('game-over-modal');
+                const title = document.getElementById('modal-title');
+                const description = document.getElementById('modal-description');
+
+                modal.classList.remove('hidden');
+                
+                if (gameEnd.type === 'victory') {
+                    title.textContent = '🏆 伟大胜利';
+                    title.className = 'modal-title victory';
+                    description.innerHTML = `
+                        经过 ${State.currentState.turnCount} 回合的励精图治，<br>
+                        你的城邦凭借<strong>${gameEnd.reason}</strong>成为爱琴海最伟大的城邦！<br><br>
+                        你作为执政官将永载史册，为后世所传颂。
+                    `;
+                } else if (gameEnd.type === 'defeat') {
+                    title.textContent = '💀 城邦覆灭';
+                    title.className = 'modal-title defeat';
+                    description.innerHTML = `
+                        由于<strong>${gameEnd.reason}</strong>，你的城邦在第 ${State.currentState.turnCount} 回合走向了灭亡。<br><br>
+                        爱琴海的波涛将淹没一切痕迹，只留下史书中的一声叹息。
+                    `;
+                } else {
+                    title.textContent = '📜 历史长河';
+                    title.className = 'modal-title history';
+                    description.innerHTML = `
+                        ${State.currentState.turnCount} 回合岁月悠悠而过。<br><br>
+                        你的城邦既未走向鼎盛，也未覆灭于危难，<br>
+                        只是随着历史的长河缓缓流淌，<br>
+                        最终消逝在时间的迷雾之中...
+                    `;
+                }
+            }
+
+            function resetGame() {
+                document.getElementById('game-over-modal').classList.add('hidden');
+                GameLoop.initGame();
+            }
+
+            PolisGame.UI = {
+                updateStatusDisplay: updateStatusDisplay,
+                renderEvent: renderEvent,
+                showGameEnd: showGameEnd,
+                resetGame: resetGame
+            };
+
+            document.addEventListener('DOMContentLoaded', function() {
+                document.getElementById('undo-btn').onclick = () => GameLoop.undoLastTurn();
+                document.getElementById('reset-btn').onclick = resetGame;
+                GameLoop.initGame();
+            });
+        })(window.PolisGame);
+    </script>
+</body>
+</html>

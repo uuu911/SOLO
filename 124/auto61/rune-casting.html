@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>奇幻魔法 - 符文绘制施法系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', serif;
+            background: linear-gradient(135deg, #1a0a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 30px rgba(255, 107, 107, 0.5);
+            letter-spacing: 3px;
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            min-height: 0;
+        }
+
+        .tutorial-panel {
+            width: 250px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 200, 100, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .tutorial-panel h2 {
+            color: #feca57;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            text-align: center;
+        }
+
+        .rune-guide {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .rune-guide canvas {
+            border: 2px dashed rgba(255, 200, 100, 0.4);
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .rune-guide h3 {
+            color: #48dbfb;
+            margin: 10px 0 5px 0;
+            font-size: 1.1em;
+        }
+
+        .rune-guide p {
+            font-size: 0.9em;
+            color: #a0a0a0;
+        }
+
+        .rune-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .rune-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .rune-item:hover {
+            background: rgba(255, 200, 100, 0.2);
+            transform: translateX(5px);
+        }
+
+        .rune-item.active {
+            background: rgba(255, 200, 100, 0.3);
+            border: 1px solid #feca57;
+        }
+
+        .rune-item canvas {
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+        }
+
+        .rune-item span {
+            font-size: 0.95em;
+        }
+
+        .canvas-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #drawingCanvas {
+            background: radial-gradient(circle at center, rgba(30, 20, 50, 0.8) 0%, rgba(10, 5, 20, 0.95) 100%);
+            border: 3px solid rgba(255, 200, 100, 0.4);
+            border-radius: 20px;
+            box-shadow: 0 0 50px rgba(255, 107, 107, 0.2),
+                        inset 0 0 100px rgba(72, 219, 251, 0.1);
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            font-size: 1em;
+            font-family: 'Georgia', serif;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            letter-spacing: 1px;
+        }
+
+        .btn-clear {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+            color: white;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-clear:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+        }
+
+        .status-bar {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 200, 100, 0.3);
+        }
+
+        .status-bar span {
+            color: #feca57;
+            font-weight: bold;
+        }
+
+        .spell-effect-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .spell-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3em;
+            font-weight: bold;
+            text-shadow: 0 0 20px currentColor;
+            animation: spellAppear 1.5s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes spellAppear {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            40% { transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5) translateY(-50px); }
+        }
+
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            .tutorial-panel {
+                width: 100%;
+                order: 2;
+            }
+            .rune-list {
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .rune-item span {
+                display: none;
+            }
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✦ 符文绘制施法系统 ✦</h1>
+        </div>
+        
+        <div class="main-content">
+            <div class="tutorial-panel">
+                <h2>📜 符文图鉴</h2>
+                <div class="rune-guide">
+                    <canvas id="guideCanvas" width="180" height="180"></canvas>
+                    <h3 id="guideName">选择符文</h3>
+                    <p id="guideDesc">点击左侧符文查看绘制指南</p>
+                </div>
+                <div class="rune-list" id="runeList"></div>
+            </div>
+            
+            <div class="canvas-area">
+                <canvas id="drawingCanvas"></canvas>
+                <div class="controls">
+                    <button class="btn btn-clear" id="clearBtn">清除画布</button>
+                </div>
+                <div class="status-bar">
+                    当前状态：<span id="statusText">等待绘制...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="spell-effect-container" id="spellEffectContainer"></div>
+
+    <script>
+        // ============================================
+        // 接口定义区 - Interface Definition
+        // ============================================
+
+        /**
+         * 符文识别器接口
+         * @interface IRuneRecognizer
+         */
+        function IRuneRecognizer() {}
+        IRuneRecognizer.prototype.recognize = function(strokes) {
+            throw new Error('recognize method must be implemented');
+        };
+
+        /**
+         * 法术执行器接口
+         * @interface ISpellExecutor
+         */
+        function ISpellExecutor() {}
+        ISpellExecutor.prototype.execute = function(spellType) {
+            throw new Error('execute method must be implemented');
+        };
+
+        // ============================================
+        // 手势识别器实现区 - Rune Recognizer Implementation
+        // 基于简化版$1手势识别算法
+        // ============================================
+
+        const DIRECTIONS = {
+            RIGHT: 0,
+            DOWN_RIGHT: 1,
+            DOWN: 2,
+            DOWN_LEFT: 3,
+            LEFT: 4,
+            UP_LEFT: 5,
+            UP: 6,
+            UP_RIGHT: 7
+        };
+
+        const RUNE_TEMPLATES = {
+            FIRE: {
+                name: '火焰术',
+                color: '#ff6b6b',
+                directions: [2, 2, 2, 6, 6, 0, 2, 4, 2, 6, 6],
+                description: '三角形符文，召唤烈焰'
+            },
+            ICE: {
+                name: '冰霜术',
+                color: '#48dbfb',
+                directions: [0, 2, 4, 6, 0, 2, 4, 6, 0, 2],
+                description: '雪花形符文，召唤寒冰'
+            },
+            THUNDER: {
+                name: '雷电术',
+                color: '#feca57',
+                directions: [2, 0, 2, 0, 2, 6, 2, 6],
+                description: '闪电形符文，召唤雷电'
+            },
+            HEAL: {
+                name: '治愈术',
+                color: '#1dd1a1',
+                directions: [0, 2, 2, 4, 4, 6, 6, 0, 0],
+                description: '十字圆形符文，恢复生命'
+            },
+            SHIELD: {
+                name: '护盾术',
+                color: '#5f27cd',
+                directions: [0, 2, 2, 4, 6, 6, 0, 2],
+                description: '盾牌形符文，生成护盾'
+            }
+        };
+
+        class CanvasRuneRecognizer extends IRuneRecognizer {
+            constructor() {
+                super();
+                this.sampleCount = 32;
+                this.templates = RUNE_TEMPLATES;
+            }
+
+            recognize(strokes) {
+                if (!strokes || strokes.length < 5) return null;
+                
+                const points = this.normalizePoints(strokes);
+                const directions = this.toDirectionSequence(points);
+                const result = this.matchTemplate(directions);
+                
+                return result;
+            }
+
+            normalizePoints(strokes) {
+                const allPoints = [];
+                strokes.forEach(stroke => {
+                    allPoints.push(...stroke);
+                });
+
+                if (allPoints.length < 5) return allPoints;
+
+                const sampled = [];
+                const step = (allPoints.length - 1) / (this.sampleCount - 1);
+                
+                for (let i = 0; i < this.sampleCount; i++) {
+                    const index = Math.min(Math.round(i * step), allPoints.length - 1);
+                    sampled.push(allPoints[index]);
+                }
+
+                const minX = Math.min(...sampled.map(p => p.x));
+                const maxX = Math.max(...sampled.map(p => p.x));
+                const minY = Math.min(...sampled.map(p => p.y));
+                const maxY = Math.max(...sampled.map(p => p.y));
+                
+                const width = maxX - minX || 1;
+                const height = maxY - minY || 1;
+                const scale = Math.max(width, height);
+
+                return sampled.map(p => ({
+                    x: (p.x - minX) / scale,
+                    y: (p.y - minY) / scale
+                }));
+            }
+
+            toDirectionSequence(points) {
+                const directions = [];
+                
+                for (let i = 1; i < points.length; i++) {
+                    const dx = points[i].x - points[i - 1].x;
+                    const dy = points[i].y - points[i - 1].y;
+                    
+                    if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) continue;
+                    
+                    let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                    if (angle < 0) angle += 360;
+                    
+                    const direction = Math.round(angle / 45) % 8;
+                    directions.push(direction);
+                }
+                
+                return directions;
+            }
+
+            matchTemplate(directions) {
+                let bestMatch = null;
+                let bestScore = 0;
+
+                for (const [key, template] of Object.entries(this.templates)) {
+                    const score = this.calculateSimilarity(directions, template.directions);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMatch = key;
+                    }
+                }
+
+                const threshold = 0.3;
+                return bestScore >= threshold ? { type: bestMatch, score: bestScore, color: this.templates[bestMatch].color } : null;
+            }
+
+            calculateSimilarity(seq1, seq2) {
+                if (seq1.length === 0 || seq2.length === 0) return 0;
+
+                const len1 = seq1.length;
+                const len2 = seq2.length;
+                const maxLen = Math.max(len1, len2);
+                
+                let matches = 0;
+                for (let i = 0; i < maxLen; i++) {
+                    const d1 = seq1[Math.floor(i * len1 / maxLen)];
+                    const d2 = seq2[Math.floor(i * len2 / maxLen)];
+                    
+                    const diff = Math.abs(d1 - d2);
+                    const circularDiff = Math.min(diff, 8 - diff);
+                    
+                    if (circularDiff <= 1) {
+                        matches += 1 - circularDiff * 0.3;
+                    }
+                }
+
+                return matches / maxLen;
+            }
+
+            predictCandidate(strokes) {
+                if (!strokes || strokes.length < 3) return null;
+                const points = this.normalizePoints(strokes);
+                const directions = this.toDirectionSequence(points);
+                
+                let bestMatch = null;
+                let bestScore = 0;
+
+                for (const [key, template] of Object.entries(this.templates)) {
+                    const score = this.calculateSimilarity(directions.slice(0, Math.min(directions.length, 10)), template.directions.slice(0, 10));
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMatch = key;
+                    }
+                }
+
+                return bestScore >= 0.2 ? this.templates[bestMatch].color : null;
+            }
+        }
+
+        // ============================================
+        // 法术特效管理区 - Spell Effect Manager
+        // ============================================
+
+        class SpellEffectManager extends ISpellExecutor {
+            constructor() {
+                super();
+                this.container = document.getElementById('spellEffectContainer');
+                this.spellColors = {
+                    FIRE: '#ff6b6b',
+                    ICE: '#48dbfb',
+                    THUNDER: '#feca57',
+                    HEAL: '#1dd1a1',
+                    SHIELD: '#5f27cd'
+                };
+                this.spellNames = {
+                    FIRE: '🔥 火焰术',
+                    ICE: '❄️ 冰霜术',
+                    THUNDER: '⚡ 雷电术',
+                    HEAL: '💚 治愈术',
+                    SHIELD: '🛡️ 护盾术'
+                };
+            }
+
+            execute(spellType) {
+                const color = this.spellColors[spellType];
+                const name = this.spellNames[spellType];
+
+                if (!color) return;
+
+                this.showSpellText(name, color);
+                this.createParticleEffect(color, spellType);
+            }
+
+            showSpellText(text, color) {
+                const textEl = document.createElement('div');
+                textEl.className = 'spell-text';
+                textEl.textContent = text;
+                textEl.style.color = color;
+                this.container.appendChild(textEl);
+
+                setTimeout(() => {
+                    textEl.remove();
+                }, 1500);
+            }
+
+            createParticleEffect(color, spellType) {
+                const centerX = window.innerWidth / 2;
+                const centerY = window.innerHeight / 2;
+                const particleCount = 100;
+
+                for (let i = 0; i < particleCount; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    
+                    const size = Math.random() * 8 + 4;
+                    particle.style.width = size + 'px';
+                    particle.style.height = size + 'px';
+                    particle.style.background = color;
+                    particle.style.boxShadow = `0 0 ${size * 2}px ${color}`;
+                    
+                    const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.5;
+                    const velocity = Math.random() * 300 + 150;
+                    const vx = Math.cos(angle) * velocity;
+                    const vy = Math.sin(angle) * velocity;
+
+                    particle.style.left = centerX + 'px';
+                    particle.style.top = centerY + 'px';
+
+                    this.container.appendChild(particle);
+
+                    this.animateParticle(particle, vx, vy, size);
+                }
+
+                if (spellType === 'THUNDER') {
+                    this.createLightningEffect();
+                } else if (spellType === 'SHIELD') {
+                    this.createShieldEffect();
+                } else if (spellType === 'HEAL') {
+                    this.createHealEffect();
+                }
+            }
+
+            animateParticle(particle, vx, vy, size) {
+                let x = parseFloat(particle.style.left);
+                let y = parseFloat(particle.style.top);
+                let opacity = 1;
+                let scale = 1;
+
+                const animate = () => {
+                    x += vx * 0.016;
+                    y += vy * 0.016;
+                    opacity -= 0.02;
+                    scale -= 0.01;
+
+                    particle.style.left = x + 'px';
+                    particle.style.top = y + 'px';
+                    particle.style.opacity = opacity;
+                    particle.style.transform = `scale(${Math.max(0, scale)})`;
+
+                    if (opacity > 0) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        particle.remove();
+                    }
+                };
+
+                requestAnimationFrame(animate);
+            }
+
+            createLightningEffect() {
+                for (let i = 0; i < 5; i++) {
+                    setTimeout(() => {
+                        const flash = document.createElement('div');
+                        flash.style.cssText = `
+                            position: fixed;
+                            top: 0; left: 0;
+                            width: 100%; height: 100%;
+                            background: rgba(254, 202, 87, 0.3);
+                            pointer-events: none;
+                            z-index: 999;
+                        `;
+                        document.body.appendChild(flash);
+                        setTimeout(() => flash.remove(), 50);
+                    }, i * 100);
+                }
+            }
+
+            createShieldEffect() {
+                const shield = document.createElement('div');
+                const size = 300;
+                shield.style.cssText = `
+                    position: fixed;
+                    top: 50%; left: 50%;
+                    width: ${size}px; height: ${size}px;
+                    transform: translate(-50%, -50%);
+                    border: 4px solid #5f27cd;
+                    border-radius: 50%;
+                    box-shadow: 0 0 50px #5f27cd, inset 0 0 50px rgba(95, 39, 205, 0.3);
+                    pointer-events: none;
+                    animation: shieldPulse 1s ease-out forwards;
+                `;
+                this.container.appendChild(shield);
+
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes shieldPulse {
+                        0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+                        30% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+                        100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+
+                setTimeout(() => {
+                    shield.remove();
+                    style.remove();
+                }, 1000);
+            }
+
+            createHealEffect() {
+                for (let i = 0; i < 20; i++) {
+                    setTimeout(() => {
+                        const heart = document.createElement('div');
+                        heart.innerHTML = '✨';
+                        heart.style.cssText = `
+                            position: fixed;
+                            font-size: 24px;
+                            pointer-events: none;
+                            left: ${50 + (Math.random() - 0.5) * 30}%;
+                            top: 70%;
+                            animation: healFloat 2s ease-out forwards;
+                        `;
+                        this.container.appendChild(heart);
+                        setTimeout(() => heart.remove(), 2000);
+                    }, i * 100);
+                }
+
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes healFloat {
+                        0% { transform: translateY(0) scale(0.5); opacity: 0; }
+                        20% { opacity: 1; }
+                        100% { transform: translateY(-200px) scale(1.5); opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+                setTimeout(() => style.remove(), 2000);
+            }
+        }
+
+        // ============================================
+        // UI交互逻辑区 - UI Interaction Logic
+        // ============================================
+
+        class RuneCastingSystem {
+            constructor() {
+                this.canvas = document.getElementById('drawingCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.guideCanvas = document.getElementById('guideCanvas');
+                this.guideCtx = this.guideCanvas.getContext('2d');
+                
+                this.recognizer = new CanvasRuneRecognizer();
+                this.spellExecutor = new SpellEffectManager();
+                
+                this.strokes = [];
+                this.currentStroke = [];
+                this.isDrawing = false;
+                this.currentColor = '#feca57';
+                this.selectedRune = 'FIRE';
+                
+                this.init();
+                this.runTests();
+            }
+
+            init() {
+                this.resizeCanvas();
+                this.setupEventListeners();
+                this.renderRuneList();
+                this.selectRune('FIRE');
+                this.loop();
+            }
+
+            resizeCanvas() {
+                const container = this.canvas.parentElement;
+                const rect = container.getBoundingClientRect();
+                const maxSize = Math.min(rect.width - 40, window.innerHeight - 250);
+                
+                this.canvas.width = maxSize;
+                this.canvas.height = maxSize;
+                this.clearCanvas();
+            }
+
+            setupEventListeners() {
+                window.addEventListener('resize', () => this.resizeCanvas());
+
+                this.canvas.addEventListener('mousedown', (e) => this.startDrawing(e));
+                this.canvas.addEventListener('mousemove', (e) => this.draw(e));
+                this.canvas.addEventListener('mouseup', () => this.endDrawing());
+                this.canvas.addEventListener('mouseleave', () => this.endDrawing());
+
+                this.canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.startDrawing(e.touches[0]);
+                }, { passive: false });
+                
+                this.canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    this.draw(e.touches[0]);
+                }, { passive: false });
+                
+                this.canvas.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.endDrawing();
+                }, { passive: false });
+
+                document.getElementById('clearBtn').addEventListener('click', () => {
+                    this.clearCanvas();
+                    this.strokes = [];
+                    this.updateStatus('画布已清除');
+                });
+            }
+
+            getCanvasPoint(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                return {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                };
+            }
+
+            startDrawing(e) {
+                this.isDrawing = true;
+                this.currentStroke = [this.getCanvasPoint(e)];
+                this.updateStatus('绘制中...');
+            }
+
+            draw(e) {
+                if (!this.isDrawing) return;
+                
+                const point = this.getCanvasPoint(e);
+                this.currentStroke.push(point);
+
+                const candidateColor = this.recognizer.predictCandidate([...this.strokes, this.currentStroke]);
+                if (candidateColor) {
+                    this.currentColor = candidateColor;
+                }
+            }
+
+            endDrawing() {
+                if (!this.isDrawing) return;
+                
+                this.isDrawing = false;
+                
+                if (this.currentStroke.length >= 3) {
+                    this.strokes.push([...this.currentStroke]);
+                }
+                
+                this.currentStroke = [];
+
+                setTimeout(() => {
+                    const result = this.recognizer.recognize(this.strokes);
+                    if (result) {
+                        this.updateStatus(`识别成功: ${RUNE_TEMPLATES[result.type].name} (置信度: ${Math.round(result.score * 100)}%)`);
+                        this.spellExecutor.execute(result.type);
+                        
+                        setTimeout(() => {
+                            this.clearCanvas();
+                            this.strokes = [];
+                            this.updateStatus('等待绘制...');
+                        }, 1500);
+                    } else {
+                        this.updateStatus('未能识别符文，请重试');
+                    }
+                }, 50);
+            }
+
+            loop() {
+                this.ctx.fillStyle = 'rgba(10, 5, 20, 0.1)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                this.strokes.forEach(stroke => {
+                    this.drawStroke(stroke, this.currentColor);
+                });
+
+                if (this.currentStroke.length > 0) {
+                    this.drawStroke(this.currentStroke, this.currentColor);
+                }
+
+                requestAnimationFrame(() => this.loop());
+            }
+
+            drawStroke(stroke, color) {
+                if (stroke.length < 2) return;
+
+                this.ctx.beginPath();
+                this.ctx.moveTo(stroke[0].x, stroke[0].y);
+
+                for (let i = 1; i < stroke.length; i++) {
+                    this.ctx.lineTo(stroke[i].x, stroke[i].y);
+                }
+
+                this.ctx.strokeStyle = color;
+                this.ctx.lineWidth = 4;
+                this.ctx.lineCap = 'round';
+                this.ctx.lineJoin = 'round';
+                this.ctx.shadowColor = color;
+                this.ctx.shadowBlur = 15;
+                this.ctx.stroke();
+                this.ctx.shadowBlur = 0;
+            }
+
+            clearCanvas() {
+                this.ctx.fillStyle = 'rgba(10, 5, 20, 0.95)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                this.currentColor = '#feca57';
+            }
+
+            updateStatus(text) {
+                document.getElementById('statusText').textContent = text;
+            }
+
+            renderRuneList() {
+                const list = document.getElementById('runeList');
+                list.innerHTML = '';
+
+                for (const [key, template] of Object.entries(RUNE_TEMPLATES)) {
+                    const item = document.createElement('div');
+                    item.className = 'rune-item';
+                    item.dataset.rune = key;
+                    
+                    const miniCanvas = document.createElement('canvas');
+                    miniCanvas.width = 40;
+                    miniCanvas.height = 40;
+                    this.drawMiniRune(miniCanvas, key);
+                    
+                    const name = document.createElement('span');
+                    name.textContent = template.name;
+                    
+                    item.appendChild(miniCanvas);
+                    item.appendChild(name);
+                    
+                    item.addEventListener('click', () => this.selectRune(key));
+                    list.appendChild(item);
+                }
+            }
+
+            selectRune(runeKey) {
+                this.selectedRune = runeKey;
+                
+                document.querySelectorAll('.rune-item').forEach(item => {
+                    item.classList.toggle('active', item.dataset.rune === runeKey);
+                });
+
+                const template = RUNE_TEMPLATES[runeKey];
+                document.getElementById('guideName').textContent = template.name;
+                document.getElementById('guideDesc').textContent = template.description;
+                
+                this.drawGuideRune(runeKey);
+            }
+
+            drawMiniRune(canvas, runeKey) {
+                const ctx = canvas.getContext('2d');
+                const template = RUNE_TEMPLATES[runeKey];
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(0, 0, 40, 40);
+                
+                this.drawRuneFromDirections(ctx, template.directions, 20, 20, 15, template.color);
+            }
+
+            drawGuideRune(runeKey) {
+                const ctx = this.guideCtx;
+                const template = RUNE_TEMPLATES[runeKey];
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(0, 0, 180, 180);
+                
+                this.drawRuneFromDirections(ctx, template.directions, 90, 90, 60, template.color, true);
+            }
+
+            drawRuneFromDirections(ctx, directions, cx, cy, scale, color, withDots = false) {
+                const points = [];
+                let x = cx;
+                let y = cy;
+                points.push({ x, y });
+
+                directions.forEach(dir => {
+                    const angle = dir * Math.PI / 4;
+                    x += Math.cos(angle) * scale * 0.3;
+                    y += Math.sin(angle) * scale * 0.3;
+                    points.push({ x, y });
+                });
+
+                if (points.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(points[0].x, points[0].y);
+                    for (let i = 1; i < points.length; i++) {
+                        ctx.lineTo(points[i].x, points[i].y);
+                    }
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 3;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 10;
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+
+                if (withDots) {
+                    points.forEach(p => {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                        ctx.fillStyle = color;
+                        ctx.fill();
+                    });
+                }
+            }
+
+            runTests() {
+                console.log('========== 符文识别测试开始 ==========');
+                
+                const testCases = this.generateTestCases();
+                let passed = 0;
+                let failed = 0;
+
+                testCases.forEach((testCase, index) => {
+                    const result = this.recognizer.recognize([testCase.stroke]);
+                    const isCorrect = result && result.type === testCase.expected;
+                    
+                    if (isCorrect) {
+                        passed++;
+                        console.log(`✅ 测试 ${index + 1}: ${RUNE_TEMPLATES[testCase.expected].name} - 识别正确`);
+                    } else {
+                        failed++;
+                        console.log(`❌ 测试 ${index + 1}: 期望 ${RUNE_TEMPLATES[testCase.expected].name}, 实际 ${result ? RUNE_TEMPLATES[result.type].name : '无'}`);
+                    }
+                });
+
+                console.log(`========== 测试结果: ${passed}/${testCases.length} 通过 ==========`);
+                
+                if (failed === 0) {
+                    console.log('🎉 所有测试通过！');
+                }
+            }
+
+            generateTestCases() {
+                const testCases = [];
+                
+                Object.keys(RUNE_TEMPLATES).forEach(runeKey => {
+                    const template = RUNE_TEMPLATES[runeKey];
+                    const stroke = this.generateStrokeFromDirections(template.directions);
+                    testCases.push({
+                        stroke: stroke,
+                        expected: runeKey
+                    });
+                });
+
+                return testCases;
+            }
+
+            generateStrokeFromDirections(directions) {
+                const points = [];
+                let x = 100;
+                let y = 100;
+                const scale = 20;
+
+                points.push({ x, y });
+
+                directions.forEach(dir => {
+                    const angle = dir * Math.PI / 4;
+                    x += Math.cos(angle) * scale;
+                    y += Math.sin(angle) * scale;
+                    points.push({ x, y });
+                });
+
+                return points;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new RuneCastingSystem();
+        });
+    </script>
+</body>
+</html>

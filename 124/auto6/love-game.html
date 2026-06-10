@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>樱花飘落时 - 恋爱养成游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #ff6b9d;
+            --secondary-color: #ff8a80;
+            --accent-color: #ff4081;
+            --bg-gradient: linear-gradient(135deg, #fff5f7 0%, #ffe4e9 100%);
+            --text-color: #333;
+            --dialogue-bg: rgba(255, 255, 255, 0.95);
+            --event-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 500px;
+            height: 90vh;
+            max-height: 800px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(255, 107, 157, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .status-panel {
+            padding: 15px 20px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .status-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .status-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .status-bar-container {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .status-bar {
+            height: 100%;
+            background: white;
+            border-radius: 4px;
+            transition: width 0.5s ease-out;
+        }
+
+        .status-value {
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .change-indicator {
+            font-size: 12px;
+            animation: fadeUp 1s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeUp {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+
+        .character-area {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .character-avatar {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 40px rgba(252, 182, 159, 0.4);
+            position: relative;
+            transition: var(--transition);
+        }
+
+        .character-avatar:hover {
+            transform: scale(1.05);
+        }
+
+        .character-avatar::before {
+            content: "🌸";
+            font-size: 60px;
+        }
+
+        .character-name {
+            position: absolute;
+            bottom: -40px;
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary-color);
+            text-shadow: 0 2px 10px rgba(255, 107, 157, 0.3);
+        }
+
+        .mood-emoji {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            font-size: 30px;
+            background: white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .dialogue-area {
+            padding: 20px;
+            background: var(--dialogue-bg);
+            border-top: 3px solid var(--primary-color);
+            min-height: 150px;
+        }
+
+        .dialogue-speaker {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .dialogue-text {
+            font-size: 15px;
+            line-height: 1.8;
+            color: var(--text-color);
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .options-area {
+            padding: 15px 20px 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .option-btn {
+            padding: 12px 20px;
+            border: 2px solid var(--primary-color);
+            background: white;
+            color: var(--primary-color);
+            border-radius: 25px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: inherit;
+            animation: slideIn 0.3s ease-out backwards;
+        }
+
+        .option-btn:nth-child(1) { animation-delay: 0.1s; }
+        .option-btn:nth-child(2) { animation-delay: 0.2s; }
+        .option-btn:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .option-btn:hover:not(:disabled) {
+            background: var(--primary-color);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(255, 107, 157, 0.4);
+        }
+
+        .option-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: #ccc;
+            color: #ccc;
+        }
+
+        .option-btn.locked {
+            position: relative;
+        }
+
+        .option-btn.locked::after {
+            content: "🔒 心情不足";
+            position: absolute;
+            right: 15px;
+            font-size: 12px;
+        }
+
+        .event-mode .status-panel {
+            background: var(--event-bg);
+        }
+
+        .event-mode .dialogue-area {
+            border-top-color: #667eea;
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+        }
+
+        .event-mode .dialogue-speaker {
+            color: #667eea;
+        }
+
+        .event-mode .option-btn {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .event-mode .option-btn:hover:not(:disabled) {
+            background: #667eea;
+            color: white;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .event-badge {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--event-bg);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 12px;
+            z-index: 5;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(102, 126, 234, 0); }
+        }
+
+        .ending-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .ending-modal {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            animation: scaleIn 0.5s ease-out 0.2s backwards;
+        }
+
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .ending-title {
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .ending-title.love {
+            color: var(--primary-color);
+        }
+
+        .ending-title.stranger {
+            color: #999;
+        }
+
+        .ending-text {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .reset-btn {
+            padding: 12px 40px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: inherit;
+        }
+
+        .reset-btn:hover {
+            transform: scale(1.05);

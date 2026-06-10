@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星际采矿 - Asteroid Mining</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        #gameCanvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        .hud {
+            position: absolute;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.8), 0 0 20px rgba(0, 255, 255, 0.5);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-top-left {
+            top: 20px;
+            left: 20px;
+        }
+
+        .hud-top-right {
+            top: 20px;
+            right: 20px;
+            text-align: right;
+        }
+
+        .hud-bottom-center {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+
+        .bar-container {
+            width: 200px;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 5px 0 15px 0;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .energy-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #88ff88);
+            transition: width 0.1s ease;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        .energy-bar.low {
+            background: linear-gradient(90deg, #ff0000, #ff6666);
+            animation: blink 0.5s infinite;
+        }
+
+        .shield-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #0088ff, #66bbff);
+            transition: width 0.1s ease;
+            box-shadow: 0 0 10px #0088ff;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .pause-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            display: none;
+        }
+
+        .pause-overlay.active {
+            display: flex;
+        }
+
+        .pause-title {
+            font-size: 48px;
+            color: #00ffff;
+            text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff;
+            margin-bottom: 40px;
+            letter-spacing: 5px;
+        }
+
+        .game-over-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            display: none;
+        }
+
+        .game-over-overlay.active {
+            display: flex;
+        }
+
+        .game-over-title {
+            font-size: 56px;
+            color: #ff4444;
+            text-shadow: 0 0 20px #ff4444, 0 0 40px #ff4444;
+            margin-bottom: 20px;
+            letter-spacing: 3px;
+        }
+
+        .final-score {
+            font-size: 32px;
+            color: #ffcc00;
+            text-shadow: 0 0 15px #ffcc00;
+            margin-bottom: 40px;
+        }
+
+        .upgrade-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 20, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            display: none;
+        }
+
+        .upgrade-overlay.active {
+            display: flex;
+        }
+
+        .upgrade-title {
+            font-size: 42px;
+            color: #00ff88;
+            text-shadow: 0 0 20px #00ff88, 0 0 40px #00ff88;
+            margin-bottom: 30px;
+            letter-spacing: 2px;
+        }
+
+        .upgrade-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            max-width: 600px;
+        }
+
+        .btn {
+            padding: 20px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border: 2px solid;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            pointer-events: auto;
+        }
+
+        .btn-primary {
+            background: rgba(0, 255, 136, 0.2);
+            border-color: #00ff88;
+            color: #00ff88;
+        }
+
+        .btn-primary:hover {
+            background: rgba(0, 255, 136, 0.4);
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
+            transform: scale(1.05);
+        }
+
+        .btn-secondary {
+            background: rgba(0, 150, 255, 0.2);
+            border-color: #00aaff;
+            color: #00aaff;
+            margin: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(0, 150, 255, 0.4);
+            box-shadow: 0 0 30px rgba(0, 150, 255, 0.6);
+            transform: scale(1.05);
+        }
+
+        .upgrade-btn {
+            background: rgba(100, 100, 255, 0.2);
+            border-color: #8888ff;
+            color: #aaffff;
+            min-width: 250px;
+        }
+
+        .upgrade-btn:hover {
+            background: rgba(100, 100, 255, 0.4);
+            box-shadow: 0 0 25px rgba(100, 100, 255, 0.6);
+            transform: scale(1.03);
+        }
+
+        .warning-border {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .warning-border.active {
+            box-shadow: inset 0 0 100px rgba(255, 50, 50, 0.3);
+            animation: warningPulse 2s infinite;
+        }
+
+        @keyframes warningPulse {
+            0%, 100% { box-shadow: inset 0 0 100px rgba(255, 50, 50, 0.2); }
+            50% { box-shadow: inset 0 0 150px rgba(255, 50, 50, 0.4); }
+        }
+
+        .stat-label {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .minerals-display {
+            font-size: 28px;
+            color: #ffcc00;
+            text-shadow: 0 0 15px #ffcc00;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="warningBorder" class="warning-border"></div>
+    
+    <div class="hud hud-top-left">
+        <div class="stat-label">能量</div>
+        <div class="bar-container">
+            <div id="energyBar" class="energy-bar" style="width: 100%"></div>
+        </div>
+        <div class="stat-label">护盾</div>
+        <div class="bar-container">
+            <div id="shieldBar" class="shield-bar" style="width: 100%"></div>
+        </div>
+    </div>
+    
+    <div class="hud hud-top-right">
+        <div class="stat-label">矿物收集</div>
+        <div id="mineralsDisplay" class="minerals-display">0</div>
+    </div>
+    
+    <div class="hud hud-bottom-center">
+        <div class="stat-label">下一升级</div>
+        <div id="nextUpgradeDisplay" class="stat-value">100 分</div>
+    </div>
+    
+    <div id="pauseOverlay" class="pause-overlay">
+        <div class="pause-title">暂 停</div>
+        <div>
+            <button class="btn btn-secondary" onclick="resumeGame()">继 续</button>
+            <button class="btn btn-secondary" onclick="restartGame()">重新开始</button>
+        </div>
+    </div>
+    
+    <div id="gameOverOverlay" class="game-over-overlay">
+        <div class="game-over-title">任务终止</div>
+        <div id="finalScore" class="final-score">最终矿物: 0</div>
+        <button class="btn btn-primary" onclick="restartGame()">重新开始</button>
+    </div>
+    
+    <div id="upgradeOverlay" class="upgrade-overlay">
+        <div class="upgrade-title">⭐ 系统升级 ⭐</div>
+        <div class="upgrade-grid">
+            <button class="btn upgrade-btn" onclick="selectUpgrade(0)">
+                ⚡ 能量恢复 +20%
+            </button>
+            <button class="btn upgrade-btn" onclick="selectUpgrade(1)">
+                🔋 激光能耗 -20%
+            </button>
+            <button class="btn upgrade-btn" onclick="selectUpgrade(2)">
+                🚀 移动速度 +15%
+            </button>
+            <button class="btn upgrade-btn" onclick="selectUpgrade(3)">
+                🛡️ 护盾容量 +30%
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        let gameState = {
+            running: true,
+            paused: false,
+            gameOver: false,
+            lastTime: 0,
+            deltaTime: 0
+        };
+        
+        let player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            angle: 0,
+            targetAngle: 0,
+            baseSpeed: 200,
+            speedMultiplier: 1,
+            energy: 100,
+            energyRegen: 5,
+            energyRegenMultiplier: 1,
+            shield: 100,
+            maxShield: 100,
+            shieldRegen: 2,
+            laserCost: 10,
+            laserCostMultiplier: 1,
+            size: 25
+        };
+        
+        let score = {
+            minerals: 0,
+            nextUpgrade: 100
+        };
+        
+        let keys = {};
+        let mouse = { x: 0, y: 0, down: false };
+        
+        let asteroids = [];
+        let mineralFragments = [];
+        let drones = [];
+        let bullets = [];
+        let particles = [];
+        let stars = [];
+        let engineParticles = [];
+        
+        let timers = {
+            asteroid: 0,
+            asteroidInterval: 2000,
+            drone: 0,
+            droneInterval: 20000
+        };
+        
+        let asteroidLaserTime = new Map();
+        
+        function initStars() {
+            stars = [];
+            for (let i = 0; i < 200; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 2 + 0.5,
+                    speed: Math.random() * 20 + 10,
+                    brightness: Math.random() * 0.5 + 0.5
+                });
+            }
+        }
+        initStars();
+        
+        document.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key === 'Escape') {
+                if (!gameState.gameOver && !document.getElementById('upgradeOverlay').classList.contains('active')) {
+                    togglePause();
+                }
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+        
+        document.addEventListener('mousedown', (e) => {
+            if (e.button === 0) mouse.down = true;
+        });
+        
+        document.addEventListener('mouseup', (e) => {
+            if (e.button === 0) mouse.down = false;
+        });
+        
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && !gameState.paused && !gameState.gameOver) {
+                gameState.paused = true;
+                document.getElementById('pauseOverlay').classList.add('active');
+            }
+        });
+        
+        window.addEventListener('blur', () => {
+            if (!gameState.paused && !gameState.gameOver && !document.getElementById('upgradeOverlay').classList.contains('active')) {
+                gameState.paused = true;
+                document.getElementById('pauseOverlay').classList.add('active');
+            }
+        });
+        
+        function togglePause() {
+            gameState.paused = !gameState.paused;
+            document.getElementById('pauseOverlay').classList.toggle('active', gameState.paused);
+        }
+        
+        function resumeGame() {
+            gameState.paused = false;
+            document.getElementById('pauseOverlay').classList.remove('active');
+        }
+        
+        function restartGame() {
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+            player.angle = 0;
+            player.energy = 100;
+            player.shield = 100;
+            player.speedMultiplier = 1;
+            player.energyRegenMultiplier = 1;
+            player.laserCostMultiplier = 1;
+            player.maxShield = 100;
+            
+            score.minerals = 0;
+            score.nextUpgrade = 100;
+            
+            asteroids = [];
+            mineralFragments = [];
+            drones = [];
+            bullets = [];
+            particles = [];
+            engineParticles = [];
+            asteroidLaserTime.clear();
+            
+            timers.asteroid = 0;
+            timers.drone = 0;
+            
+            gameState.paused = false;
+            gameState.gameOver = false;
+            
+            document.getElementById('pauseOverlay').classList.remove('active');
+            document.getElementById('gameOverOverlay').classList.remove('active');
+            document.getElementById('upgradeOverlay').classList.remove('active');
+        }
+        
+        function selectUpgrade(index) {
+            switch(index) {
+                case 0:
+                    player.energyRegenMultiplier *= 1.2;
+                    break;
+                case 1:
+                    player.laserCostMultiplier *= 0.8;
+                    break;
+                case 2:
+                    player.speedMultiplier *= 1.15;
+                    break;
+                case 3:
+                    player.maxShield *= 1.3;
+                    player.shield = Math.min(player.shield + player.maxShield * 0.3, player.maxShield);
+                    break;
+            }
+            score.nextUpgrade += 100;
+            document.getElementById('upgradeOverlay').classList.remove('active');
+            gameState.paused = false;
+        }
+        
+        function spawnAsteroid() {
+            const radius = Math.random() * 25 + 15;
+            asteroids.push({
+                x: canvas.width + radius,
+                y: Math.random() * (canvas.height - radius * 2) + radius,
+                radius: radius,
+                speed: Math.random() * 70 + 80,
+                value: Math.floor(radius / 5),
+                rotation: 0,
+                rotationSpeed: (Math.random() - 0.5) * 2
+            });
+        }
+        
+        function spawnDrone() {
+            const edge = Math.floor(Math.random() * 3);
+            let x, y;
+            switch(edge) {
+                case 0:
+                    x = -30;
+                    y = Math.random() * canvas.height;
+                    break;
+                case 1:
+                    x = Math.random() * canvas.width;
+                    y = -30;
+                    break;
+                case 2:
+                    x = Math.random() * canvas.width;
+                    y = canvas.height + 30;
+                    break;
+            }
+            drones.push({
+                x: x,
+                y: y,
+                health: 1,
+                laserTime: 0,
+                shootTimer: 0,
+                shootInterval: 2000
+            });
+        }
+        
+        function spawnMineralFragments(x, y, value, count) {
+            for (let i = 0; i < count; i++) {
+                const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
+                const speed = Math.random() * 50 + 30;
+                mineralFragments.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    value: value,
+                    size: 8,
+                    blinkTimer: 0,
+                    lifetime: 10000
+                });
+            }
+        }
+        
+        function spawnExplosion(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 150 + 50;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1,
+                    decay: Math.random() * 1.5 + 1,
+                    size: Math.random() * 4 + 2,
+                    color: color
+                });
+            }
+        }
+        
+        function spawnEngineParticle() {
+            const backAngle = player.angle + Math.PI;
+            const offsetDist = player.size;
+            engineParticles.push({
+                x: player.x + Math.cos(backAngle) * offsetDist,
+                y: player.y + Math.sin(backAngle) * offsetDist,
+                vx: Math.cos(backAngle) * 80 + (Math.random() - 0.5) * 30,
+                vy: Math.sin(backAngle) * 80 + (Math.random() - 0.5) * 30,
+                life: 1,
+                size: Math.random() * 5 + 3
+            });
+        }
+        
+        function normalizeAngle(angle) {
+            while (angle > Math.PI) angle -= Math.PI * 2;
+            while (angle < -Math.PI) angle += Math.PI * 2;
+            return angle;
+        }
+        
+        function distance(x1, y1, x2, y2) {
+            return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        }
+        
+        function lineCircleIntersection(x1, y1, x2, y2, cx, cy, r) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const fx = x1 - cx;
+            const fy = y1 - cy;
+            
+            const a = dx * dx + dy * dy;
+            const b = 2 * (fx * dx + fy * dy);
+            const c = fx * fx + fy * fy - r * r;
+            
+            const discriminant = b * b - 4 * a * c;
+            if (discriminant < 0) return null;
+            
+            const t = (-b - Math.sqrt(discriminant)) / (2 * a);
+            if (t >= 0 && t <= 1) {
+                return { x: x1 + t * dx, y: y1 + t * dy };
+            }
+            return null;
+        }
+        
+        function update(dt) {
+            if (gameState.paused || gameState.gameOver) return;
+            
+            const delta = dt / 1000;
+            
+            player.targetAngle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+            let angleDiff = normalizeAngle(player.targetAngle - player.angle);
+            player.angle += angleDiff * Math.min(1, delta * 8);
+            
+            const speed = player.baseSpeed * player.speedMultiplier;
+            let moving = false;
+            if (keys['w'] || keys['arrowup']) { player.y -= speed * delta; moving = true; }
+            if (keys['s'] || keys['arrowdown']) { player.y += speed * delta; moving = true; }
+            if (keys['a'] || keys['arrowleft']) { player.x -= speed * delta; moving = true; }
+            if (keys['d'] || keys['arrowright']) { player.x += speed * delta; moving = true; }
+            
+            player.x = Math.max(player.size, Math.min(canvas.width - player.size, player.x));
+            player.y = Math.max(player.size, Math.min(canvas.height - player.size, player.y));
+            
+            if (moving || (keys['w'] || keys['s'] || keys['a'] || keys['d'] || keys['arrowup'] || keys['arrowdown'] || keys['arrowleft'] || keys['arrowright'])) {
+                if (Math.random() < 0.5) spawnEngineParticle();
+            }
+            
+            if (player.energy < 100) {
+                player.energy = Math.min(100, player.energy + player.energyRegen * player.energyRegenMultiplier * delta);
+            }
+            
+            if (player.shield < player.maxShield) {
+                player.shield = Math.min(player.maxShield, player.shield + player.shieldRegen * delta);
+            }
+            
+            let laserEndX = mouse.x;
+            let laserEndY = mouse.y;
+            let laserHitAsteroid = null;
+            
+            if (mouse.down && player.energy > 0) {
+                player.energy = Math.max(0, player.energy - player.laserCost * player.laserCostMultiplier * delta);
+                
+                for (let asteroid of asteroids) {
+                    const hit = lineCircleIntersection(
+                        player.x + Math.cos(player.angle) * player.size,
+                        player.y + Math.sin(player.angle) * player.size,
+                        mouse.x, mouse.y,
+                        asteroid.x, asteroid.y, asteroid.radius
+                    );
+                    if (hit) {
+                        laserEndX = hit.x;
+                        laserEndY = hit.y;
+                        laserHitAsteroid = asteroid;
+                        break;
+                    }
+                }
+                
+                for (let drone of drones) {
+                    const hit = lineCircleIntersection(
+                        player.x + Math.cos(player.angle) * player.size,
+                        player.y + Math.sin(player.angle) * player.size,
+                        mouse.x, mouse.y,
+                        drone.x, drone.y, 20
+                    );
+                    if (hit) {
+                        drone.laserTime += dt;
+                        if (drone.laserTime >= 1000) {
+                            spawnExplosion(drone.x, drone.y, '#ff6600', 30);
+                            drones = drones.filter(d => d !== drone);
+                        }
+                    } else {
+                        drone.laserTime = Math.max(0, drone.laserTime - dt * 0.5);
+                    }
+                }
+            }
+            
+            if (laserHitAsteroid) {
+                const id = asteroids.indexOf(laserHitAsteroid);
+                const current = asteroidLaserTime.get(id) || 0;
+                asteroidLaserTime.set(id, current + dt);
+                
+                if (asteroidLaserTime.get(id) >= 2000) {
+                    spawnMineralFragments(
+                        laserHitAsteroid.x, 
+                        laserHitAsteroid.y, 
+                        laserHitAsteroid.value,
+                        Math.floor(Math.random() * 3) + 3
+                    );
+                    spawnExplosion(laserHitAsteroid.x, laserHitAsteroid.y, '#888888', 20);
+                    asteroids = asteroids.filter(a => a !== laserHitAsteroid);
+                    asteroidLaserTime.delete(id);
+                }
+            } else {
+                asteroidLaserTime.clear();
+            }
+            
+            timers.asteroid += dt;
+            if (timers.asteroid >= timers.asteroidInterval) {
+                timers.asteroid = 0;
+                timers.asteroidInterval = Math.random() * 1500 + 1500;
+                spawnAsteroid();
+            }
+            
+            timers.drone += dt;
+            if (timers.drone >= timers.droneInterval) {
+                timers.drone = 0;
+                timers.droneInterval = Math.random() * 10000 + 15000;
+                spawnDrone();
+            }
+            
+            for (let i = asteroids.length - 1; i >= 0; i--) {
+                const asteroid = asteroids[i];
+                asteroid.x -= asteroid.speed * delta;
+                asteroid.rotation += asteroid.rotationSpeed * delta;
+                
+                if (distance(player.x, player.y, asteroid.x, asteroid.y) < player.size + asteroid.radius) {
+                    const damage = asteroid.radius / 2;
+                    player.shield -= damage;
+                    spawnExplosion(asteroid.x, asteroid.y, '#ff4444', 15);
+                    asteroids.splice(i, 1);
+                    
+                    if (player.shield <= 0) {
+                        gameState.gameOver = true;
+                        document.getElementById('finalScore').textContent = `最终矿物: ${score.minerals}`;
+                        document.getElementById('gameOverOverlay').classList.add('active');
+                    }
+                }
+                
+                if (asteroid.x < -asteroid.radius * 2) {
+                    asteroids.splice(i, 1);
+                }
+            }
+            
+            for (let i = mineralFragments.length - 1; i >= 0; i--) {
+                const frag = mineralFragments[i];
+                frag.x += frag.vx * delta;
+                frag.y += frag.vy * delta;
+                frag.vx *= 0.98;
+                frag.vy *= 0.98;
+                frag.blinkTimer += dt;
+                frag.lifetime -= dt;
+                
+                const dist = distance(player.x, player.y, frag.x, frag.y);
+                if (dist <= 42) {
+                    score.minerals += frag.value;
+                    mineralFragments.splice(i, 1);
+                    
+                    if (score.minerals >= score.nextUpgrade) {
+                        gameState.paused = true;
+                        document.getElementById('upgradeOverlay').classList.add('active');
+                    }
+                } else if (frag.lifetime <= 0) {
+                    mineralFragments.splice(i, 1);
+                }
+            }
+            
+            for (let drone of drones) {
+                const angleToPlayer = Math.atan2(player.y - drone.y, player.x - drone.x);
+                drone.x += Math.cos(angleToPlayer) * 100 * delta;
+                drone.y += Math.sin(angleToPlayer) * 100 * delta;
+                
+                drone.shootTimer += dt;
+                if (drone.shootTimer >= drone.shootInterval) {
+                    drone.shootTimer = 0;
+                    bullets.push({
+                        x: drone.x,
+                        y: drone.y,
+                        vx: Math.cos(angleToPlayer) * 300,
+                        vy: Math.sin(angleToPlayer) * 300
+                    });
+                }
+            }
+            
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                bullet.x += bullet.vx * delta;
+                bullet.y += bullet.vy * delta;
+                
+                if (distance(player.x, player.y, bullet.x, bullet.y) < player.size + 5) {
+                    player.shield -= 15;
+                    bullets.splice(i, 1);
+                    spawnExplosion(bullet.x, bullet.y, '#ff0000', 10);
+                    
+                    if (player.shield <= 0) {
+                        gameState.gameOver = true;
+                        document.getElementById('finalScore').textContent = `最终矿物: ${score.minerals}`;
+                        document.getElementById('gameOverOverlay').classList.add('active');
+                    }
+                }
+                
+                if (bullet.x < -50 || bullet.x > canvas.width + 50 || 
+                    bullet.y < -50 || bullet.y > canvas.height + 50) {
+                    bullets.splice(i, 1);
+                }
+            }
+            
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx * delta;
+                p.y += p.vy * delta;
+                p.life -= p.decay * delta;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+            
+            for (let i = engineParticles.length - 1; i >= 0; i--) {
+                const p = engineParticles[i];
+                p.x += p.vx * delta;
+                p.y += p.vy * delta;
+                p.life -= 2 * delta;
+                if (p.life <= 0) engineParticles.splice(i, 1);
+            }
+            
+            for (let star of stars) {
+                star.x -= star.speed * delta;
+                if (star.x < 0) {
+                    star.x = canvas.width;
+                    star.y = Math.random() * canvas.height;
+                }
+            }
+            
+            updateUI();
+        }
+        
+        function updateUI() {
+            const energyPercent = player.energy;
+            const shieldPercent = (player.shield / player.maxShield) * 100;
+            
+            const energyBar = document.getElementById('energyBar');
+            energyBar.style.width = energyPercent + '%';
+            energyBar.classList.toggle('low', energyPercent <= 10);
+            
+            document.getElementById('shieldBar').style.width = shieldPercent + '%';
+            document.getElementById('mineralsDisplay').textContent = score.minerals;
+            document.getElementById('nextUpgradeDisplay').textContent = score.nextUpgrade + ' 分';
+            
+            const warningBorder = document.getElementById('warningBorder');
+            warningBorder.classList.toggle('active', score.minerals >= 200);
+        }
+        
+        function draw() {
+            ctx.fillStyle = '#0a0a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            for (let star of stars) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            for (let p of engineParticles) {
+                ctx.fillStyle = `rgba(100, 180, 255, ${p.life})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            for (let p of particles) {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+            
+            for (let asteroid of asteroids) {
+                ctx.save();
+                ctx.translate(asteroid.x, asteroid.y);
+                ctx.rotate(asteroid.rotation);
+                
+                ctx.fillStyle = '#4a4a5a';
+                ctx.strokeStyle = '#6a6a7a';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const angle = (Math.PI * 2 / 8) * i;
+                    const r = asteroid.radius * (0.8 + Math.sin(i * 3) * 0.2);
+                    if (i === 0) ctx.moveTo(Math.cos(angle) * r, Math.sin(angle) * r);
+                    else ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                
+                ctx.restore();
+            }
+            
+            for (let frag of mineralFragments) {
+                const blink = Math.sin(frag.blinkTimer / 100) * 0.3 + 0.7;
+                ctx.fillStyle = `rgba(255, 200, 50, ${blink})`;
+                ctx.strokeStyle = `rgba(255, 230, 100, ${blink})`;
+                ctx.lineWidth = 2;
+                
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const angle = (Math.PI * 2 / 6) * i + frag.blinkTimer / 1000;
+                    const r = frag.size;
+                    if (i === 0) ctx.moveTo(frag.x + Math.cos(angle) * r, frag.y + Math.sin(angle) * r);
+                    else ctx.lineTo(frag.x + Math.cos(angle) * r, frag.y + Math.sin(angle) * r);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+            
+            for (let drone of drones) {
+                ctx.fillStyle = '#ff4444';
+                ctx.strokeStyle = '#ff8888';
+                ctx.lineWidth = 2;
+                
+                ctx.save();
+                ctx.translate(drone.x, drone.y);
+                
+                ctx.beginPath();
+                ctx.moveTo(20, 0);
+                ctx.lineTo(-10, 15);
+                ctx.lineTo(-5, 0);
+                ctx.lineTo(-10, -15);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                
+                if (drone.laserTime > 0) {
+                    ctx.strokeStyle = `rgba(255, 150, 0, ${drone.laserTime / 1000})`;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 25, 0, Math.PI * 2 * (drone.laserTime / 1000));
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+            }
+            
+            for (let bullet of bullets) {
+                ctx.fillStyle = '#ff2222';
+                ctx.shadowColor = '#ff0000';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+            
+            if (mouse.down && player.energy > 0 && !gameState.paused) {
+                let laserEndX = mouse.x;
+                let laserEndY = mouse.y;
+                
+                for (let asteroid of asteroids) {
+                    const hit = lineCircleIntersection(
+                        player.x + Math.cos(player.angle) * player.size,
+                        player.y + Math.sin(player.angle) * player.size,
+                        mouse.x, mouse.y,
+                        asteroid.x, asteroid.y, asteroid.radius
+                    );
+                    if (hit) {
+                        laserEndX = hit.x;
+                        laserEndY = hit.y;
+                        break;
+                    }
+                }
+                
+                ctx.strokeStyle = 'rgba(255, 150, 50, 0.7)';
+                ctx.lineWidth = 4;
+                ctx.shadowColor = '#ff8800';
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.moveTo(
+                    player.x + Math.cos(player.angle) * player.size,
+                    player.y + Math.sin(player.angle) * player.size
+                );
+                ctx.lineTo(laserEndX, laserEndY);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+            
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            ctx.rotate(player.angle);
+            
+            ctx.fillStyle = '#2a4a6a';
+            ctx.strokeStyle = '#4a8aff';
+            ctx.lineWidth = 3;
+            
+            ctx.beginPath();
+            ctx.moveTo(player.size, 0);
+            ctx.lineTo(-player.size * 0.7, player.size * 0.6);
+            ctx.lineTo(-player.size * 0.4, 0);
+            ctx.lineTo(-player.size * 0.7, -player.size * 0.6);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = '#00ddff';
+            ctx.beginPath();
+            ctx.ellipse(player.size * 0.2, 0, player.size * 0.3, player.size * 0.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+        
+        function gameLoop(timestamp) {
+            if (!gameState.lastTime) gameState.lastTime = timestamp;
+            const dt = Math.min(timestamp - gameState.lastTime, 50);
+            gameState.lastTime = timestamp;
+            
+            update(dt);
+            draw();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>

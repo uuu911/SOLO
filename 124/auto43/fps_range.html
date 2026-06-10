@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPS 训练靶场</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; font-family: 'Arial', sans-serif; }
+        #game-container { width: 100vw; height: 100vh; position: relative; }
+        canvas { display: block; }
+        
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 10;
+        }
+        .crosshair-line {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.8);
+        }
+        .crosshair-horizontal {
+            width: 20px;
+            height: 2px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .crosshair-vertical {
+            width: 2px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .crosshair-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: rgba(255, 50, 50, 0.9);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .crosshair-ads .crosshair-horizontal { width: 8px; }
+        .crosshair-ads .crosshair-vertical { height: 8px; }
+        
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        .hud-panel {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 8px;
+            padding: 10px 15px;
+            color: white;
+            font-size: 14px;
+        }
+        
+        #weapon-panel { bottom: 20px; left: 20px; }
+        #weapon-icon {
+            width: 80px;
+            height: 40px;
+            background: linear-gradient(135deg, #4a5568, #2d3748);
+            border-radius: 4px;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #a0aec0;
+        }
+        #ammo-display { font-size: 24px; font-weight: bold; }
+        #magazine-display { color: #a0aec0; font-size: 14px; }
+        
+        #status-panel { top: 20px; left: 20px; }
+        .status-bar {
+            width: 150px;
+            height: 20px;
+            background: #2d3748;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+        .status-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+        #health-fill { background: linear-gradient(90deg, #e53e3e, #fc8181); width: 100%; }
+        
+        #info-panel { top: 20px; right: 20px; text-align: right; }
+        .info-item { margin: 5px 0; }
+        #mode-indicator {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+        .mode-hip { background: #4299e1; }
+        .mode-ads { background: #f6ad55; }
+        
+        #targets-panel { bottom: 20px; right: 20px; }
+        #targets-count { font-size: 20px; font-weight: bold; color: #68d391; }
+        
+        .damage-number {
+            position: absolute;
+            font-weight: bold;
+            font-size: 20px;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 20;
+        }
+        .damage-head { color: #ffd700; font-size: 28px; }
+        .damage-torso { color: #ff6b6b; }
+        .damage-limb { color: #a0aec0; }
+        
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-80px) scale(0.5); }
+        }
+        
+        #menu-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 100;
+            display: none;
+            pointer-events: auto;
+        }
+        #menu-overlay.active { display: flex; }
+        .menu-content {
+            margin: auto;
+            background: #1a202c;
+            padding: 30px;
+            border-radius: 12px;
+            min-width: 400px;
+            color: white;
+        }
+        .menu-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #68d391;
+        }
+        .setting-item {
+            margin: 15px 0;
+        }
+        .setting-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #a0aec0;
+        }
+        .setting-slider {
+            width: 100%;
+            height: 8px;
+            -webkit-appearance: none;
+            background: #2d3748;
+            border-radius: 4px;
+            outline: none;
+        }
+        .setting-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #68d391;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .setting-value {
+            text-align: center;
+            margin-top: 5px;
+            color: #68d391;
+            font-weight: bold;
+        }
+        
+        #reload-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, 50px);
+            color: #ffd700;
+            font-size: 18px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        #reload-indicator.active { opacity: 1; }
+        
+        #death-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(220, 38, 38, 0.8);
+            z-index: 50;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: white;
+        }
+        #death-screen.active { display: flex; }
+        .death-text {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .respawn-text {
+            font-size: 24px;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="ui-layer">
+            <div id="crosshair">
+                <div class="crosshair-line crosshair-horizontal"></div>
+                <div class="crosshair-line crosshair-vertical"></div>
+                <div class="crosshair-line crosshair-dot"></div>
+            </div>
+            
+            <div id="weapon-panel" class="hud-panel">
+                <div id="weapon-icon">步枪</div>
+                <div id="ammo-display">30</div>
+                <div id="magazine-display">/ 30</div>
+            </div>
+            
+            <div id="status-panel" class="hud-panel">
+                <div>生命值</div>
+                <div class="status-bar">
+                    <div class="status-fill" id="health-fill"></div>
+                </div>
+                <div id="health-text">100 / 100</div>
+            </div>
+            
+            <div id="info-panel" class="hud-panel">
+                <div class="info-item">
+                    <span id="mode-indicator" class="mode-hip">腰射</span>
+                </div>
+                <div class="info-item">
+                    速度倍率: <span id="speed-multiplier">1.0x</span>
+                </div>
+                <div class="info-item">
+                    按 ESC 打开菜单
+                </div>
+            </div>
+            
+            <div id="targets-panel" class="hud-panel">
+                <div>剩余靶标</div>
+                <div id="targets-count">0</div>
+            </div>
+            
+            <div id="reload-indicator">换弹中...</div>
+            
+            <div id="death-screen">
+                <div class="death-text">你死了</div>
+                <div class="respawn-text">重生中...</div>
+            </div>
+        </div>
+        
+        <div id="menu-overlay">
+            <div class="menu-content">
+                <div class="menu-title">设置</div>
+                <div class="setting-item">
+                    <label class="setting-label">鼠标灵敏度</label>
+                    <input type="range" class="setting-slider" id="sensitivity-slider" min="0.1" max="5" step="0.1" value="1">
+                    <div class="setting-value" id="sensitivity-value">1.0</div>
+                </div>
+                <div class="setting-item">
+                    <label class="setting-label">视野 (FOV)</label>
+                    <input type="range" class="setting-slider" id="fov-slider" min="60" max="120" step="1" value="90">
+                    <div class="setting-value" id="fov-value">90°</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+    const CONFIG = {
+        gravity: -9.8,
+        bulletSpeed: 900,
+        baseMoveSpeed: 8,
+        jumpForce: 12,
+        mouseSensitivity: 1,
+        fov: 90,
+        fallDamageThreshold: 3,
+        fallDeathThreshold: 15,
+        landPenaltyDuration: 0.5,
+        targetRespawnTime: 2000,
+        adsSpeedMultiplier: 0.5,
+        adsSpreadMultiplier: 0.2,
+        recoilRecoverySpeed: 15
+    };
+
+    interface IWeaponProficiency {
+        modifyRecoil(recoil: number): number;
+        modifySpread(spread: number): number;
+        modifyDamage(damage: number): number;
+        modifyReloadSpeed(speed: number): number;
+    }
+
+    class DefaultProficiency implements IWeaponProficiency {
+        modifyRecoil(recoil: number): number { return recoil; }
+        modifySpread(spread: number): number { return spread; }
+        modifyDamage(damage: number): number { return damage; }
+        modifyReloadSpeed(speed: number): number { return speed; }
+    }
+
+    interface IWeapon {
+        name: string;
+        damage: number;
+        fireRate: number;
+        magazineSize: number;
+        currentAmmo: number;
+        reloadTime: number;
+        recoilPattern: number[];
+        spread: number;
+        isReloading: boolean;
+        
+        fire(): Bullet | null;
+        reload(): void;
+        updateRecoil(deltaTime: number): void;
+        setProficiency(proficiency: IWeaponProficiency): void;
+        getRecoilOffset(): { x: number; y: number };
+    }
+
+    abstract class Weapon implements IWeapon {
+        name: string;
+        damage: number;
+        fireRate: number;
+        magazineSize: number;
+        currentAmmo: number;
+        reloadTime: number;
+        recoilPattern: number[];
+        spread: number;
+        isReloading: boolean;
+        isADS: boolean;
+        
+        protected proficiency: IWeaponProficiency;
+        protected lastFireTime: number;
+        protected currentRecoilIndex: number;
+        protected recoilRecovery: THREE.Vector2;
+        protected currentRecoilOffset: THREE.Vector2;
+        
+        constructor(config: any) {
+            this.name = config.name;
+            this.damage = config.damage;
+            this.fireRate = config.fireRate;
+            this.magazineSize = config.magazineSize;
+            this.currentAmmo = config.magazineSize;
+            this.reloadTime = config.reloadTime;
+            this.recoilPattern = config.recoilPattern;
+            this.spread = config.spread;
+            this.isReloading = false;
+            this.isADS = false;
+            this.lastFireTime = 0;
+            this.currentRecoilIndex = 0;
+            this.recoilRecovery = new THREE.Vector2(0, 0);
+            this.currentRecoilOffset = new THREE.Vector2(0, 0);
+            this.proficiency = new DefaultProficiency();
+        }
+        
+        setProficiency(proficiency: IWeaponProficiency): void {
+            this.proficiency = proficiency;
+        }
+        
+        abstract fire(): Bullet | null;
+        
+        reload(): void {
+            if (this.isReloading || this.currentAmmo === this.magazineSize) return;
+            this.isReloading = true;
+            const modifiedReloadTime = this.proficiency.modifyReloadSpeed(this.reloadTime);
+            setTimeout(() => {
+                this.currentAmmo = this.magazineSize;
+                this.isReloading = false;
+            }, modifiedReloadTime * 1000);
+        }
+        
+        updateRecoil(deltaTime: number): void {
+            if (this.currentRecoilIndex > 0) {
+                const recoveryAmount = CONFIG.recoilRecoverySpeed * deltaTime;
+                this.currentRecoilOffset.y = Math.max(0, this.currentRecoilOffset.y - recoveryAmount);
+                if (this.currentRecoilOffset.y <= 0) {
+                    this.currentRecoilIndex = 0;
+                }
+            }
+        }
+        
+        getRecoilOffset(): { x: number; y: number } {
+            return { x: this.currentRecoilOffset.x, y: this.currentRecoilOffset.y };
+        }
+        
+        protected applyRecoil(): void {
+            const recoilMOA = this.recoilPattern[Math.min(this.currentRecoilIndex, this.recoilPattern.length - 1)];
+            const modifiedRecoil = this.proficiency.modifyRecoil(recoilMOA);
+            const recoilRad = (modifiedRecoil / 60) * (Math.PI / 180);
+            this.currentRecoilOffset.y += recoilRad;
+            this.currentRecoilOffset.x += (Math.random() - 0.5) * recoilRad * 0.5;
+            this.currentRecoilIndex++;
+        }
+        
+        protected getEffectiveSpread(): number {
+            const baseSpread = this.isADS ? this.spread * CONFIG.adsSpreadMultiplier : this.spread;
+            return this.proficiency.modifySpread(baseSpread);
+        }
+    }
+
+    class AssaultRifle extends Weapon {
+        constructor() {
+            super({
+                name: '突击步枪',
+                damage: 25,
+                fireRate: 600,
+                magazineSize: 30,
+                reloadTime: 2.5,
+                recoilPattern: [3, 5, 8, 12, 12, 12, 12, 12, 12, 12, 12, 12],
+                spread: 0.008
+            });
+        }
+        
+        fire(): Bullet | null {
+            const now = Date.now();
+            if (this.isReloading) return null;
+            if (this.currentAmmo <= 0) {
+                this.reload();
+                return null;
+            }
+            if (now - this.lastFireTime < 60000 / this.fireRate) return null;
+            
+            this.lastFireTime = now;
+            this.currentAmmo--;
+            this.applyRecoil();
+            
+            const spread = this.getEffectiveSpread();
+            return new Bullet({
+                damage: this.proficiency.modifyDamage(this.damage),
+                speed: CONFIG.bulletSpeed,
+                spread: spread
+            });
+        }
+    }
+
+    class Pistol extends Weapon {
+        constructor() {
+            super({
+                name: '手枪',
+                damage: 35,
+                fireRate: 300,
+                magazineSize: 15,
+                reloadTime: 1.5,
+                recoilPattern: [8, 12, 15, 15, 15],
+                spread: 0.006
+            });
+        }
+        
+        fire(): Bullet | null {
+            const now = Date.now();
+            if (this.isReloading) return null;
+            if (this.currentAmmo <= 0) {
+                this.reload();
+                return null;
+            }
+            if (now - this.lastFireTime < 60000 / this.fireRate) return null;
+            
+            this.lastFireTime = now;
+            this.currentAmmo--;
+            this.applyRecoil();
+            
+            const spread = this.getEffectiveSpread();
+            return new Bullet({
+                damage: this.proficiency.modifyDamage(this.damage),
+                speed: CONFIG.bulletSpeed,
+                spread: spread
+            });
+        }
+    }
+
+    class Bullet {
+        position: THREE.Vector3;
+        velocity: THREE.Vector3;
+        damage: number;
+        speed: number;
+        isActive: boolean;
+        mesh: THREE.Mesh;
+        trail: THREE.Line;
+        trailPoints: THREE.Vector3[];
+        
+        constructor(config: any) {
+            this.damage = config.damage;
+            this.speed = config.speed;
+            this.isActive = true;
+            this.position = new THREE.Vector3();
+            this.velocity = new THREE.Vector3();
+            this.trailPoints = [];
+        }
+        
+        init(position: THREE.Vector3, direction: THREE.Vector3, scene: THREE.Scene): void {
+            this.position.copy(position);
+            this.velocity.copy(direction).normalize().multiplyScalar(this.speed);
+            
+            const bulletGeo = new THREE.SphereGeometry(0.02, 8, 8);
+            const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+            this.mesh = new THREE.Mesh(bulletGeo, bulletMat);
+            this.mesh.position.copy(this.position);
+            scene.add(this.mesh);
+            
+            this.trailPoints.push(this.position.clone());
+        }
+        
+        update(deltaTime: number, scene: THREE.Scene): void {
+            if (!this.isActive) return;
+            
+            this.velocity.y += CONFIG.gravity * deltaTime;
+            
+            const moveVector = this.velocity.clone().multiplyScalar(deltaTime);
+            this.position.add(moveVector);
+            this.mesh.position.copy(this.position);
+            
+            this.trailPoints.push(this.position.clone());
+            if (this.trailPoints.length > 50) this.trailPoints.shift();
+            
+            if (this.trail) scene.remove(this.trail);
+            const trailGeo = new THREE.BufferGeometry().setFromPoints(this.trailPoints);
+            const trailMat = new THREE.LineBasicMaterial({ color: 0xffaa00, opacity: 0.6, transparent: true });
+            this.trail = new THREE.Line(trailGeo, trailMat);
+            scene.add(this.trail);
+            
+            if (this.position.y < -100) this.isActive = false;
+        }
+        
+        destroy(scene: THREE.Scene): void {
+            scene.remove(this.mesh);
+            if (this.trail) scene.remove(this.trail);
+            this.isActive = false;
+        }
+    }
+
+    interface ITarget {
+        position: THREE.Vector3;
+        health: number;
+        maxHealth: number;
+        isAlive: boolean;
+        
+        checkHit(bullet: Bullet): { hit: boolean; bodyPart: string; damage: number };
+        takeDamage(damage: number, bodyPart: string): boolean;
+        respawn(position: THREE.Vector3): void;
+        update(deltaTime: number): void;
+    }
+
+    class HumanoidTarget implements ITarget {
+        position: THREE.Vector3;
+        health: number;
+        maxHealth: number;
+        isAlive: boolean;
+        group: THREE.Group;
+        
+        private head: THREE.Mesh;
+        private torso: THREE.Mesh;
+        private leftArm: THREE.Mesh;
+        private rightArm: THREE.Mesh;
+        private leftLeg: THREE.Mesh;
+        private rightLeg: THREE.Mesh;
+        private velocity: THREE.Vector3;
+        
+        constructor(position: THREE.Vector3, scene: THREE.Scene) {
+            this.position = position.clone();
+            this.maxHealth = 100;
+            this.health = this.maxHealth;
+            this.isAlive = true;
+            this.velocity = new THREE.Vector3();
+            
+            this.createMesh(scene);
+        }
+        
+        private createMesh(scene: THREE.Scene): void {
+            this.group = new THREE.Group();
+            
+            const mat = new THREE.MeshStandardMaterial({ color: 0xff4444 });
+            
+            const headGeo = new THREE.SphereGeometry(0.2, 16, 16);
+            this.head = new THREE.Mesh(headGeo, mat.clone());
+            this.head.position.y = 1.7;
+            this.head.userData.bodyPart = 'head';
+            this.group.add(this.head);
+            
+            const torsoGeo = new THREE.CapsuleGeometry(0.25, 0.8, 4, 8);
+            this.torso = new THREE.Mesh(torsoGeo, mat.clone());
+            this.torso.position.y = 1.0;
+            this.torso.userData.bodyPart = 'torso';
+            this.group.add(this.torso);
+            
+            const armGeo = new THREE.CapsuleGeometry(0.08, 0.5, 4, 8);
+            this.leftArm = new THREE.Mesh(armGeo, mat.clone());
+            this.leftArm.position.set(-0.35, 1.1, 0);
+            this.leftArm.rotation.z = Math.PI / 6;
+            this.leftArm.userData.bodyPart = 'limb';
+            this.group.add(this.leftArm);
+            
+            this.rightArm = new THREE.Mesh(armGeo, mat.clone());
+            this.rightArm.position.set(0.35, 1.1, 0);
+            this.rightArm.rotation.z = -Math.PI / 6;
+            this.rightArm.userData.bodyPart = 'limb';
+            this.group.add(this.rightArm);
+            
+            const legGeo = new THREE.CapsuleGeometry(0.1, 0.7, 4, 8);
+            this.leftLeg = new THREE.Mesh(legGeo, mat.clone());
+            this.leftLeg.position.set(-0.12, 0.25, 0);
+            this.leftLeg.userData.bodyPart = 'limb';
+            this.group.add(this.leftLeg);
+            
+            this.rightLeg = new THREE.Mesh(legGeo, mat.clone());
+            this.rightLeg.position.set(0.12, 0.25, 0);
+            this.rightLeg.userData.bodyPart = 'limb';
+            this.group.add(this.rightLeg);
+            
+            this.group.position.copy(this.position);
+            scene.add(this.group);
+        }
+        
+        checkHit(bullet: Bullet): { hit: boolean; bodyPart: string; damage: number } {
+            if (!this.isAlive) return { hit: false, bodyPart: '', damage: 0 };
+            
+            const parts = [this.head, this.torso, this.leftArm, this.rightArm, this.leftLeg, this.rightLeg];
+            const bulletPos = bullet.position.clone();
+            
+            for (const part of parts) {
+                const worldPos = new THREE.Vector3();
+                part.getWorldPosition(worldPos);
+                const distance = bulletPos.distanceTo(worldPos);
+                const radius = part.geometry.boundingSphere ? part.geometry.boundingSphere.radius : 0.3;
+                
+                if (distance < radius + 0.05) {
+                    const bodyPart = part.userData.bodyPart;
+                    let damageMultiplier = 1;
+                    if (bodyPart === 'head') damageMultiplier = 3;
+                    else if (bodyPart === 'limb') damageMultiplier = 0.5;
+                    
+                    return {
+                        hit: true,
+                        bodyPart: bodyPart,
+                        damage: bullet.damage * damageMultiplier
+                    };
+                }
+            }
+            
+            return { hit: false, bodyPart: '', damage: 0 };
+        }
+        
+        takeDamage(damage: number, bodyPart: string): boolean {
+            this.health -= damage;
+            
+            if (this.health <= 0) {
+                this.isAlive = false;
+                this.group.visible = false;
+                return true;
+            }
+            
+            const color = bodyPart === 'head' ? 0xffff00 : (bodyPart === 'limb' ? 0x888888 : 0xffffff);
+            this.group.children.forEach(child => {
+                if (child instanceof THREE.Mesh) {
+                    (child.material as THREE.MeshStandardMaterial).emissive.setHex(color);
+                    (child.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.5;
+                }
+            });
+            
+            setTimeout(() => {
+                this.group.children.forEach(child => {
+                    if (child instanceof THREE.Mesh) {
+                        (child.material as THREE.MeshStandardMaterial).emissiveIntensity = 0;
+                    }
+                });
+            }, 100);
+            
+            return false;
+        }
+        
+        respawn(position: THREE.Vector3): void {
+            this.position.copy(position);
+            this.health = this.maxHealth;
+            this.isAlive = true;
+            this.group.position.copy(this.position);
+            this.group.visible = true;
+        }
+        
+        update(deltaTime: number): void {
+            if (!this.isAlive) return;
+            
+            this.velocity.y += CONFIG.gravity * 0.5 * deltaTime;
+            this.position.y += this.velocity.y * deltaTime;
+            
+            if (this.position.y < 0) {
+                this.position.y = 0;
+                this.velocity.y = 0;
+            }
+            
+            this.group.position.copy(this.position);
+        }
+    }
+
+    class TargetManager {
+        private scene: THREE.Scene;
+        private targets: HumanoidTarget[];
+        private spawnPoints: THREE.Vector3[];
+        
+        constructor(scene: THREE.Scene) {
+            this.scene = scene;
+            this.targets = [];
+            this.spawnPoints = [];
+            this.initSpawnPoints();
+        }
+        
+        private initSpawnPoints(): void {
+            const distances = [10, 15, 20, 25, 30];
+            const angles = [-0.4, -0.2, 0, 0.2, 0.4];
+            
+            distances.forEach(dist => {
+                angles.forEach(angle => {
+                    const x = Math.sin(angle) * dist;
+                    const z = -Math.cos(angle) * dist;
+                    this.spawnPoints.push(new THREE.Vector3(x, 0, z));
+                });
+            });
+        }
+        
+        spawnTargets(count: number): void {
+            const shuffled = [...this.spawnPoints].sort(() => Math.random() - 0.5);
+            const selected = shuffled.slice(0, count);
+            
+            selected.forEach(pos => {
+                const target = new HumanoidTarget(pos, this.scene);
+                this.targets.push(target);
+            });
+        }
+        
+        checkBulletHits(bullet: Bullet): { hit: boolean; target: HumanoidTarget | null; bodyPart: string; damage: number } {
+            for (const target of this.targets) {
+                const result = target.checkHit(bullet);
+                if (result.hit) {
+                    return { hit: true, target, bodyPart: result.bodyPart, damage: result.damage };
+                }
+            }
+            return { hit: false, target: null, bodyPart: '', damage: 0 };
+        }
+        
+        getAliveTargets(): HumanoidTarget[] {
+            return this.targets.filter(t => t.isAlive);
+        }
+        
+        respawnTarget(target: HumanoidTarget): void {
+            const availablePoints = this.spawnPoints.filter(sp => {
+                return !this.targets.some(t => 
+                    t.isAlive && t.position.distanceTo(sp) < 2
+                );
+            });
+            
+            if (availablePoints.length > 0) {
+                const spawnPoint = availablePoints[Math.floor(Math.random() * availablePoints.length)];
+                setTimeout(() => {
+                    target.respawn(spawnPoint);
+                }, CONFIG.targetRespawnTime);
+            }
+        }
+        
+        update(deltaTime: number): void {
+            this.targets.forEach(target => target.update(deltaTime));
+        }
+        
+        getTargetCount(): number {
+            return this.getAliveTargets().length;
+        }
+    }
+
+    class InputHandler {
+        private keys: Set<string>;
+        private mouseButtons: Set<number>;
+        private mouseX: number;
+        private mouseY: number;
+        private mouseDeltaX: number;
+        private mouseDeltaY: number;
+        
+        constructor() {
+            this.keys = new Set();
+            this.mouseButtons = new Set();
+            this.mouseX = 0;
+            this.mouseY = 0;
+            this.mouseDeltaX = 0;
+            this.mouseDeltaY = 0;
+            
+            this.bindEvents();
+        }
+        
+        private bindEvents(): void {
+            document.addEventListener('keydown', (e) => {
+                this.keys.add(e.code);
+            });
+            
+            document.addEventListener('keyup', (e) => {
+                this.keys.delete(e.code);
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                this.mouseDeltaX = e.movementX;
+                this.mouseDeltaY = e.movementY;
+                this.mouseX = e.clientX;
+                this.mouseY = e.clientY;
+            });
+            
+            document.addEventListener('mousedown', (e) => {
+                this.mouseButtons.add(e.button);
+            });
+            
+            document.addEventListener('mouseup', (e) => {
+                this.mouseButtons.delete(e.button);
+            });
+        }
+        
+        isKeyPressed(code: string): boolean {
+            return this.keys.has(code);
+        }
+        
+        isMouseButtonPressed(button: number): boolean {
+            return this.mouseButtons.has(button);
+        }
+        
+        getMouseDelta(): { x: number; y: number } {
+            const delta = { x: this.mouseDeltaX, y: this.mouseDeltaY };
+            this.mouseDeltaX = 0;
+            this.mouseDeltaY = 0;
+            return delta;
+        }
+        
+        getMousePosition(): { x: number; y: number } {
+            return { x: this.mouseX, y: this.mouseY };
+        }
+    }
+
+    class Player {
+        position: THREE.Vector3;
+        rotation: THREE.Euler;
+        velocity: THREE.Vector3;
+        health: number;
+        maxHealth: number;
+        isGrounded: boolean;
+        isDead: boolean;
+        
+        private camera: THREE.PerspectiveCamera;
+        private input: InputHandler;
+        private currentWeapon: Weapon;
+        private weapons: Weapon[];
+        private yaw: number;
+        private pitch: number;
+        private lastHeight: number;
+        private isLanding: boolean;
+        private landingPenaltyTimer: number;
+        private speedMultiplier: number;
+        private cameraShake: THREE.Vector2;
+        private shakeIntensity: number;
+        private shakeDecay: number;
+        
+        constructor(camera: THREE.PerspectiveCamera, input: InputHandler) {
+            this.camera = camera;
+            this.input = input;
+            this.position = new THREE.Vector3(0, 2, 5);
+            this.rotation = new THREE.Euler(0, 0, 0);
+            this.velocity = new THREE.Vector3();
+            this.health = 100;
+            this.maxHealth = 100;
+            this.isGrounded = true;
+            this.isDead = false;
+            
+            this.weapons = [new AssaultRifle(), new Pistol()];
+            this.currentWeapon = this.weapons[0];
+            
+            this.yaw = 0;
+            this.pitch = 0;
+            this.lastHeight = this.position.y;
+            this.isLanding = false;
+            this.landingPenaltyTimer = 0;
+            this.speedMultiplier = 1;
+            this.cameraShake = new THREE.Vector2();
+            this.shakeIntensity = 0;
+            this.shakeDecay = 10;
+        }
+        
+        update(deltaTime: number, isMenuOpen: boolean): void {
+            if (this.isDead) return;
+            
+            if (!isMenuOpen) {
+                this.handleMouseLook();
+            }
+            this.handleWeaponSwitch();
+            this.handleMovement(deltaTime);
+            this.handleGravity(deltaTime);
+            this.handleFallDamage();
+            
+            this.currentWeapon.updateRecoil(deltaTime);
+            this.applyRecoilToCamera();
+            this.applyCameraShake(deltaTime);
+            
+            this.camera.position.copy(this.position);
+            this.camera.rotation.order = 'YXZ';
+            this.camera.rotation.y = this.yaw;
+            this.camera.rotation.x = this.pitch + this.cameraShake.y;
+            this.camera.rotation.z = this.cameraShake.x;
+        }
+        
+        private handleMouseLook(): void {
+            const mouseDelta = this.input.getMouseDelta();
+            const sensitivity = CONFIG.mouseSensitivity * 0.002;
+            
+            this.yaw -= mouseDelta.x * sensitivity;
+            this.pitch -= mouseDelta.y * sensitivity;
+            
+            this.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, this.pitch));
+        }
+        
+        private handleWeaponSwitch(): void {
+            if (this.input.isKeyPressed('Digit1') && this.currentWeapon !== this.weapons[0]) {
+                this.currentWeapon = this.weapons[0];
+            }
+            if (this.input.isKeyPressed('Digit2') && this.currentWeapon !== this.weapons[1]) {
+                this.currentWeapon = this.weapons[1];
+            }
+        }
+        
+        private handleMovement(deltaTime: number): void {
+            const isADS = this.input.isMouseButtonPressed(2);
+            this.currentWeapon.isADS = isADS;
+            
+            let speed = CONFIG.baseMoveSpeed * this.speedMultiplier;
+            if (isADS) speed *= CONFIG.adsSpeedMultiplier;
+            if (this.landingPenaltyTimer > 0) speed *= 0.5;
+            
+            const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+            const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+            
+            const moveDir = new THREE.Vector3();
+            
+            if (this.input.isKeyPressed('KeyW')) moveDir.add(forward);
+            if (this.input.isKeyPressed('KeyS')) moveDir.sub(forward);
+            if (this.input.isKeyPressed('KeyD')) moveDir.add(right);
+            if (this.input.isKeyPressed('KeyA')) moveDir.sub(right);
+            
+            if (moveDir.length() > 0) {
+                moveDir.normalize().multiplyScalar(speed * deltaTime);
+                this.position.add(moveDir);
+            }
+            
+            if (this.input.isKeyPressed('Space') && this.isGrounded) {
+                this.velocity.y = CONFIG.jumpForce;
+                this.isGrounded = false;
+            }
+            
+            if (this.landingPenaltyTimer > 0) {
+                this.landingPenaltyTimer -= deltaTime;
+            }
+        }
+        
+        private handleGravity(deltaTime: number): void {
+            if (!this.isGrounded) {
+                this.velocity.y += CONFIG.gravity * deltaTime;
+            }
+            
+            this.position.y += this.velocity.y * deltaTime;
+            
+            if (this.position.y <= 2) {
+                this.position.y = 2;
+                if (!this.isGrounded && this.velocity.y < 0) {
+                    this.isGrounded = true;
+                    this.onLand();
+                }
+                this.velocity.y = 0;
+            }
+        }
+        
+        private handleFallDamage(): void {
+            if (this.position.y < this.lastHeight) {
+                const fallDistance = this.lastHeight - this.position.y;
+                
+                if (fallDistance > CONFIG.fallDeathThreshold) {
+                    this.die();
+                } else if (fallDistance > CONFIG.fallDamageThreshold && this.isGrounded) {
+                    this.takeFallDamage(fallDistance);
+                }
+            }
+            
+            this.lastHeight = this.position.y;
+        }
+        
+        private onLand(): void {
+            const fallDistance = this.lastHeight - this.position.y;
+            
+            if (fallDistance > CONFIG.fallDamageThreshold) {
+                this.landingPenaltyTimer = CONFIG.landPenaltyDuration;
+                this.shakeIntensity = 0.05;
+                
+                if (fallDistance > 8) {
+                    this.health -= Math.floor((fallDistance - 8) * 5);
+                    if (this.health <= 0) {
+                        this.die();
+                    }
+                }
+            }
+        }
+        
+        private takeFallDamage(distance: number): void {
+            const damage = Math.floor((distance - CONFIG.fallDamageThreshold) * 3);
+            this.health = Math.max(0, this.health - damage);
+            this.shakeIntensity = 0.03;
+        }
+        
+        private applyRecoilToCamera(): void {
+            const recoil = this.currentWeapon.getRecoilOffset();
+        }
+        
+        private applyCameraShake(deltaTime: number): void {
+            if (this.shakeIntensity > 0) {
+                this.cameraShake.x = (Math.random() - 0.5) * this.shakeIntensity;
+                this.cameraShake.y = (Math.random() - 0.5) * this.shakeIntensity;
+                this.shakeIntensity -= this.shakeDecay * deltaTime;
+            } else {
+                this.cameraShake.set(0, 0);
+            }
+        }
+        
+        fire(): Bullet | null {
+            if (this.isDead) return null;
+            
+            const bullet = this.currentWeapon.fire();
+            if (bullet) {
+                const direction = new THREE.Vector3(0, 0, -1);
+                direction.applyEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
+                bullet.init(this.position.clone(), direction, this.camera);
+                this.shakeIntensity = 0.01;
+            }
+            return bullet;
+        }
+        
+        reload(): void {
+            this.currentWeapon.reload();
+        }
+        
+        private die(): void {
+            this.isDead = true;
+            this.health = 0;
+            
+            setTimeout(() => {
+                this.respawn();
+            }, 2000);
+        }
+        
+        private respawn(): void {
+            this.position.set(0, 2, 5);
+            this.velocity.set(0, 0, 0);
+            this.health = this.maxHealth;
+            this.isDead = false;
+            this.isGrounded = true;
+            this.yaw = 0;
+            this.pitch = 0;
+            
+            this.weapons.forEach(w => {
+                w.currentAmmo = w.magazineSize;
+                w.isReloading = false;
+            });
+        }
+        
+        getCurrentWeapon(): Weapon {
+            return this.currentWeapon;
+        }
+        
+        getSpeedMultiplier(): number {
+            const isADS = this.currentWeapon.isADS;
+            let mult = 1;
+            if (isADS) mult *= CONFIG.adsSpeedMultiplier;
+            if (this.landingPenaltyTimer > 0) mult *= 0.5;
+            return mult;
+        }
+        
+        isADSMode(): boolean {
+            return this.currentWeapon.isADS;
+        }
+        
+        getForwardDirection(): THREE.Vector3 {
+            return new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+        }
+    }
+
+    class UIManager {
+        private elements: { [key: string]: HTMLElement };
+        
+        constructor() {
+            this.elements = {
+                ammoDisplay: document.getElementById('ammo-display')!,
+                magazineDisplay: document.getElementById('magazine-display')!,
+                weaponIcon: document.getElementById('weapon-icon')!,
+                healthFill: document.getElementById('health-fill')!,
+                healthText: document.getElementById('health-text')!,
+                modeIndicator: document.getElementById('mode-indicator')!,
+                speedMultiplier: document.getElementById('speed-multiplier')!,
+                targetsCount: document.getElementById('targets-count')!,
+                crosshair: document.getElementById('crosshair')!,
+                reloadIndicator: document.getElementById('reload-indicator')!,
+                deathScreen: document.getElementById('death-screen')!,
+                menuOverlay: document.getElementById('menu-overlay')!,
+                sensitivitySlider: document.getElementById('sensitivity-slider') as HTMLInputElement,
+                fovSlider: document.getElementById('fov-slider') as HTMLInputElement,
+                sensitivityValue: document.getElementById('sensitivity-value')!,
+                fovValue: document.getElementById('fov-value')!
+            };
+            
+            this.loadSettings();
+            this.bindSettingsEvents();
+        }
+        
+        update(player: Player, targetManager: TargetManager): void {
+            const weapon = player.getCurrentWeapon();
+            
+            this.elements.ammoDisplay.textContent = weapon.currentAmmo.toString();
+            this.elements.magazineDisplay.textContent = `/ ${weapon.magazineSize}`;
+            this.elements.weaponIcon.textContent = weapon.name;
+            
+            const healthPercent = (player.health / player.maxHealth) * 100;
+            this.elements.healthFill.style.width = `${healthPercent}%`;
+            this.elements.healthText.textContent = `${player.health} / ${player.maxHealth}`;
+            
+            const isADS = player.isADSMode();
+            this.elements.modeIndicator.textContent = isADS ? '瞄准' : '腰射';
+            this.elements.modeIndicator.className = isADS ? 'mode-ads' : 'mode-hip';
+            this.elements.crosshair.className = isADS ? 'crosshair-ads' : '';
+            
+            this.elements.speedMultiplier.textContent = `${player.getSpeedMultiplier().toFixed(1)}x`;
+            this.elements.targetsCount.textContent = targetManager.getTargetCount().toString();
+            
+            this.elements.reloadIndicator.classList.toggle('active', weapon.isReloading);
+            this.elements.deathScreen.classList.toggle('active', player.isDead);
+        }
+        
+        toggleMenu(isOpen: boolean, camera: THREE.PerspectiveCamera): void {
+            this.elements.menuOverlay.classList.toggle('active', isOpen);
+            
+            if (isOpen) {
+                document.exitPointerLock();
+            } else {
+                document.body.requestPointerLock();
+            }
+        }
+        
+        private bindSettingsEvents(): void {
+            this.elements.sensitivitySlider.addEventListener('input', (e) => {
+                const value = (e.target as HTMLInputElement).value;
+                CONFIG.mouseSensitivity = parseFloat(value);
+                this.elements.sensitivityValue.textContent = parseFloat(value).toFixed(1);
+                this.saveSettings();
+            });
+            
+            this.elements.fovSlider.addEventListener('input', (e) => {
+                const value = (e.target as HTMLInputElement).value;
+                CONFIG.fov = parseInt(value);
+                this.elements.fovValue.textContent = `${value}°`;
+                this.saveSettings();
+            });
+        }
+        
+        private saveSettings(): void {
+            localStorage.setItem('fps_sensitivity', CONFIG.mouseSensitivity.toString());
+            localStorage.setItem('fps_fov', CONFIG.fov.toString());
+        }
+        
+        private loadSettings(): void {
+            const sensitivity = localStorage.getItem('fps_sensitivity');
+            const fov = localStorage.getItem('fps_fov');
+            
+            if (sensitivity) {
+                CONFIG.mouseSensitivity = parseFloat(sensitivity);
+                this.elements.sensitivitySlider.value = sensitivity;
+                this.elements.sensitivityValue.textContent = parseFloat(sensitivity).toFixed(1);
+            }
+            
+            if (fov) {
+                CONFIG.fov = parseInt(fov);
+                this.elements.fovSlider.value = fov;
+                this.elements.fovValue.textContent = `${fov}°`;
+            }
+        }
+        
+        showDamageNumber(damage: number, bodyPart: string, position: THREE.Vector3, camera: THREE.Camera): void {
+            const screenPos = position.clone().project(camera);
+            const x = (screenPos.x + 1) / 2 * window.innerWidth;
+            const y = (-screenPos.y + 1) / 2 * window.innerHeight;
+            
+            const div = document.createElement('div');
+            div.className = `damage-number damage-${bodyPart}`;
+            div.textContent = `${Math.round(damage)}`;
+            div.style.left = `${x}px`;
+            div.style.top = `${y}px`;
+            
+            document.body.appendChild(div);
+            
+            setTimeout(() => div.remove(), 1000);
+        }
+    }
+
+    class Game {
+        private scene: THREE.Scene;
+        private camera: THREE.PerspectiveCamera;
+        private renderer: THREE.WebGLRenderer;
+        private input: InputHandler;
+        private player: Player;
+        private targetManager: TargetManager;
+        private uiManager: UIManager;
+        private bullets: Bullet[];
+        private isMenuOpen: boolean;
+        private lastTime: number;
+        
+        constructor() {
+            this.initThreeJS();
+            this.initScene();
+            this.initLighting();
+            this.initSkybox();
+            this.initGround();
+            
+            this.input = new InputHandler();
+            this.player = new Player(this.camera, this.input);
+            this.targetManager = new TargetManager(this.scene);
+            this.uiManager = new UIManager();
+            this.bullets = [];
+            this.isMenuOpen = false;
+            this.lastTime = performance.now();
+            
+            this.targetManager.spawnTargets(10);
+            this.bindEvents();
+            this.animate();
+        }
+        
+        private initThreeJS(): void {
+            this.scene = new THREE.Scene();
+            this.scene.background = new THREE.Color(0x87CEEB);
+            
+            this.camera = new THREE.PerspectiveCamera(
+                CONFIG.fov,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+            
+            this.renderer = new THREE.WebGLRenderer({ antialias: true });
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.shadowMap.enabled = true;
+            document.getElementById('game-container')!.appendChild(this.renderer.domElement);
+        }
+        
+        private initScene(): void {
+            const fog = new THREE.Fog(0x87CEEB, 50, 200);
+            this.scene.fog = fog;
+        }
+        
+        private initLighting(): void {
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            this.scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(50, 100, 50);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 500;
+            directionalLight.shadow.camera.left = -100;
+            directionalLight.shadow.camera.right = 100;
+            directionalLight.shadow.camera.top = 100;
+            directionalLight.shadow.camera.bottom = -100;
+            this.scene.add(directionalLight);
+        }
+        
+        private initSkybox(): void {
+            const skyGeo = new THREE.SphereGeometry(400, 32, 32);
+            const skyMat = new THREE.ShaderMaterial({
+                uniforms: {
+                    topColor: { value: new THREE.Color(0x0077ff) },
+                    bottomColor: { value: new THREE.Color(0xffffff) },
+                    offset: { value: 33 },
+                    exponent: { value: 0.6 }
+                },
+                vertexShader: `
+                    varying vec3 vWorldPosition;
+                    void main() {
+                        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                        vWorldPosition = worldPosition.xyz;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform vec3 topColor;
+                    uniform vec3 bottomColor;
+                    uniform float offset;
+                    uniform float exponent;
+                    varying vec3 vWorldPosition;
+                    void main() {
+                        float h = normalize(vWorldPosition + offset).y;
+                        gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+                    }
+                `,
+                side: THREE.BackSide
+            });
+            
+            const sky = new THREE.Mesh(skyGeo, skyMat);
+            this.scene.add(sky);
+        }
+        
+        private initGround(): void {
+            const groundGeo = new THREE.PlaneGeometry(200, 200);
+            const groundMat = new THREE.MeshStandardMaterial({
+                color: 0x3d5c3d,
+                roughness: 0.8
+            });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            this.scene.add(ground);
+            
+            const gridHelper = new THREE.GridHelper(200, 50, 0x444444, 0x333333);
+            this.scene.add(gridHelper);
+        }
+        
+        private bindEvents(): void {
+            window.addEventListener('resize', () => {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.fov = CONFIG.fov;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+            
+            document.addEventListener('click', () => {
+                if (!this.isMenuOpen) {
+                    document.body.requestPointerLock();
+                }
+            });
+            
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'Escape') {
+                    this.isMenuOpen = !this.isMenuOpen;
+                    this.uiManager.toggleMenu(this.isMenuOpen, this.camera);
+                }
+                if (e.code === 'KeyR') {
+                    this.player.reload();
+                }
+            });
+        }
+        
+        private animate(): void {
+            requestAnimationFrame(() => this.animate());
+            
+            const currentTime = performance.now();
+            const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.1);
+            this.lastTime = currentTime;
+            
+            this.update(deltaTime);
+            this.render();
+        }
+        
+        private update(deltaTime: number): void {
+            this.player.update(deltaTime, this.isMenuOpen);
+            
+            if (!this.isMenuOpen && document.pointerLockElement) {
+                if (this.input.isMouseButtonPressed(0)) {
+                    const bullet = this.player.fire();
+                    if (bullet) {
+                        this.bullets.push(bullet);
+                    }
+                }
+            }
+            
+            this.updateBullets(deltaTime);
+            this.targetManager.update(deltaTime);
+            this.uiManager.update(this.player, this.targetManager);
+            
+            this.camera.fov = CONFIG.fov;
+            this.camera.updateProjectionMatrix();
+        }
+        
+        private updateBullets(deltaTime: number): void {
+            for (let i = this.bullets.length - 1; i >= 0; i--) {
+                const bullet = this.bullets[i];
+                bullet.update(deltaTime, this.scene);
+                
+                const hitResult = this.targetManager.checkBulletHits(bullet);
+                if (hitResult.hit && hitResult.target) {
+                    const killed = hitResult.target.takeDamage(hitResult.damage, hitResult.bodyPart);
+                    this.uiManager.showDamageNumber(
+                        hitResult.damage,
+                        hitResult.bodyPart,
+                        bullet.position.clone(),
+                        this.camera
+                    );
+                    
+                    if (killed) {
+                        this.targetManager.respawnTarget(hitResult.target);
+                    }
+                    
+                    bullet.destroy(this.scene);
+                    this.bullets.splice(i, 1);
+                    continue;
+                }
+                
+                if (!bullet.isActive) {
+                    bullet.destroy(this.scene);
+                    this.bullets.splice(i, 1);
+                }
+            }
+        }
+        
+        private render(): void {
+            this.renderer.render(this.scene, this.camera);
+        }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        new Game();
+    });
+    </script>
+</body>
+</html>

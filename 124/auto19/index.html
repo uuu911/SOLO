@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>战术战棋 - Tactical Chess</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: #fff;
+        }
+
+        .game-container {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+
+        .game-board {
+            position: relative;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            gap: 2px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .cell {
+            width: 60px;
+            height: 60px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+
+        .cell.plain {
+            background: linear-gradient(145deg, #8b9a6b, #7a8a5c);
+        }
+
+        .cell.forest {
+            background: linear-gradient(145deg, #2d5a27, #1e4a1a);
+        }
+
+        .cell.mountain {
+            background: linear-gradient(145deg, #6b6b6b, #5a5a5a);
+        }
+
+        .cell:hover {
+            transform: scale(1.05);
+            z-index: 10;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .cell.move-range {
+            box-shadow: inset 0 0 0 3px #4ecdc4;
+            animation: pulse-blue 1.5s infinite;
+        }
+
+        .cell.attack-range {
+            box-shadow: inset 0 0 0 3px #ff6b6b;
+            animation: pulse-red 1.5s infinite;
+        }
+
+        .cell.selected {
+            box-shadow: inset 0 0 0 4px #ffd93d;
+        }
+
+        @keyframes pulse-blue {
+            0%, 100% { box-shadow: inset 0 0 0 3px #4ecdc4; }
+            50% { box-shadow: inset 0 0 0 5px #4ecdc4; }
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: inset 0 0 0 3px #ff6b6b; }
+            50% { box-shadow: inset 0 0 0 5px #ff6b6b; }
+        }
+
+        .unit {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            position: relative;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .unit.player {
+            background: linear-gradient(145deg, #4a90d9, #2563eb);
+            border: 3px solid #1d4ed8;
+        }
+
+        .unit.enemy {
+            background: linear-gradient(145deg, #ef4444, #dc2626);
+            border: 3px solid #b91c1c;
+        }
+
+        .unit.acted {
+            opacity: 0.5;
+            filter: grayscale(50%);
+        }
+
+        .unit-hp {
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .unit-hp-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            transition: width 0.3s ease;
+        }
+
+        .terrain-icon {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .turn-indicator {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            animation: turn-glow 2s infinite;
+        }
+
+        .turn-indicator.player {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        }
+
+        .turn-indicator.enemy {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+        }
+
+        @keyframes turn-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.2); }
+            50% { box-shadow: 0 0 40px rgba(255, 255, 255, 0.4); }
+        }
+
+        .unit-info {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .unit-info h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 14px;
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4ecdc4, #44a08d);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .legend {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .legend h4 {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 0;
+            font-size: 13px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            padding: 40px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+            transform: scale(0.8);
+            transition: transform 0.3s ease;
+        }
+
+        .modal.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-content h2 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #ffd93d, #ff9500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .modal-content p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            color: #aaa;
+        }
+
+        .damage-popup {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+            color: #ff6b6b;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            animation: damage-float 1s ease-out forwards;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        @keyframes damage-float {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-30px); }
+        }
+
+        .message-log {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            max-height: 120px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+
+        .message-log p {
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .message-log p:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-board">
+            <div class="grid-container" id="gameGrid"></div>
+        </div>
+        
+        <div class="sidebar">
+            <div class="turn-indicator player" id="turnIndicator">
+                ⚔️ 玩家回合
+            </div>
+            
+            <div class="unit-info" id="unitInfo">
+                <h3>单位信息</h3>
+                <div style="color: #888; font-size: 13px;">点击选择单位</div>
+            </div>
+            
+            <div class="controls">
+                <button class="btn btn-secondary" id="undoBtn" disabled>↩️ 撤销移动</button>
+                <button class="btn btn-primary" id="endTurnBtn">⏭️ 结束回合</button>
+                <button class="btn btn-danger" id="restartBtn">🔄 重新开始</button>
+            </div>
+            
+            <div class="legend">
+                <h4>📋 地形图例</h4>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #7a8a5c;"></div>
+                    <span>平原 - 移动消耗1，防御+0</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #1e4a1a;"></div>
+                    <span>森林 - 移动消耗2，防御+2</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #5a5a5a;"></div>
+                    <span>山地 - 移动消耗3，防御+4</span>
+                </div>
+            </div>
+            
+            <div class="message-log" id="messageLog"></div>
+        </div>
+    </div>
+    
+    <div class="modal" id="gameOverModal">
+        <div class="modal-content">
+            <h2 id="gameOverTitle">游戏结束</h2>
+            <p id="gameOverMessage">结果</p>
+            <button class="btn btn-primary" onclick="game.restart()">再来一局</button>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 地形模块 ====================
+        const TERRAIN = {
+            PLAIN: { name: '平原', moveCost: 1, defense: 0, icon: '' },
+            FOREST: { name: '森林', moveCost: 2, defense: 2, icon: '🌲' },
+            MOUNTAIN: { name: '山地', moveCost: 3, defense: 4, icon: '⛰️' }
+        };
+
+        // ==================== 职业模块 ====================
+        const CLASS = {
+            WARRIOR: { 
+                name: '战士', 
+                icon: '⚔️', 
+                hp: 100, 
+                attack: 25, 
+                defense: 10, 
+                moveRange: 3, 
+                attackRange: 1,
+                strong: ['ARCHER'],
+                weak: ['KNIGHT']
+            },
+            ARCHER: { 
+                name: '弓箭手', 
+                icon: '🏹', 
+                hp: 70, 
+                attack: 30, 
+                defense: 5, 
+                moveRange: 2, 
+                attackRange: 3,
+                strong: ['KNIGHT'],
+                weak: ['WARRIOR']
+            },
+            KNIGHT: { 
+                name: '骑士', 
+                icon: '🐴', 
+                hp: 120, 
+                attack: 20, 
+                defense: 15, 
+                moveRange: 4, 
+                attackRange: 1,
+                strong: ['WARRIOR'],
+                weak: ['ARCHER']
+            }
+        };
+
+        // ==================== 地图类 ====================
+        class GameMap {
+            constructor(size = 8) {
+                this.size = size;
+                this.grid = [];
+                this.generateTerrain();
+            }
+
+            generateTerrain() {
+                const totalCells = this.size * this.size;
+                const forestCount = Math.floor(totalCells * 0.2);
+                const mountainCount = Math.floor(totalCells * 0.12);
+                
+                this.grid = Array(this.size).fill(null).map(() => 
+                    Array(this.size).fill(null).map(() => ({ ...TERRAIN.PLAIN }))
+                );
+
+                let placed = 0;
+                while (placed < forestCount) {
+                    const x = Math.floor(Math.random() * this.size);
+                    const y = Math.floor(Math.random() * this.size);
+                    if (this.grid[y][x].name === '平原' && !this.isSpawnArea(x, y)) {
+                        this.grid[y][x] = { ...TERRAIN.FOREST };
+                        placed++;
+                    }
+                }
+
+                placed = 0;
+                while (placed < mountainCount) {
+                    const x = Math.floor(Math.random() * this.size);
+                    const y = Math.floor(Math.random() * this.size);
+                    if (this.grid[y][x].name === '平原' && !this.isSpawnArea(x, y)) {
+                        this.grid[y][x] = { ...TERRAIN.MOUNTAIN };
+                        placed++;
+                    }
+                }
+            }
+
+            isSpawnArea(x, y) {
+                return (y <= 1 || y >= 6);
+            }
+
+            getTerrain(x, y) {
+                if (x < 0 || x >= this.size || y < 0 || y >= this.size) return null;
+                return this.grid[y][x];
+            }
+        }
+
+        // ==================== 单位类 ====================
+        class Unit {
+            constructor(id, unitClass, x, y, team) {
+                this.id = id;
+                this.unitClass = unitClass;
+                this.classData = CLASS[unitClass];
+                this.x = x;
+                this.y = y;
+                this.team = team;
+                this.maxHp = this.classData.hp;
+                this.hp = this.maxHp;
+                this.hasActed = false;
+                this.hasMoved = false;
+                this.hasAttacked = false;
+                this.prevX = x;
+                this.prevY = y;
+                this.prevHasMoved = false;
+            }
+
+            get attack() { return this.classData.attack; }
+            get defense() { return this.classData.defense; }
+            get moveRange() { return this.classData.moveRange; }
+            get attackRange() { return this.classData.attackRange; }
+            get icon() { return this.classData.icon; }
+            get name() { return this.classData.name; }
+
+            saveState() {
+                this.prevX = this.x;
+                this.prevY = this.y;
+                this.prevHasMoved = this.hasMoved;
+            }
+
+            restoreState() {
+                this.x = this.prevX;
+                this.y = this.prevY;
+                this.hasMoved = this.prevHasMoved;
+            }
+
+            takeDamage(damage) {
+                this.hp = Math.max(0, this.hp - damage);
+                return this.hp <= 0;
+            }
+
+            isAlive() {
+                return this.hp > 0;
+            }
+
+            getAdvantageMultiplier(targetClass) {
+                if (this.classData.strong.includes(targetClass)) return 1.5;
+                if (this.classData.weak.includes(targetClass)) return 0.7;
+                return 1.0;
+            }
+        }
+
+        // ==================== AI类 ====================
+        class AI {
+            constructor(game) {
+                this.game = game;
+            }
+
+            calculateMove(unit) {
+                const startTime = performance.now();
+                const moveRange = this.game.getMoveRange(unit);
+                const attackRange = this.game.getAttackRange(unit);
+                
+                let bestMove = null;
+                let bestScore = -Infinity;
+
+                const enemies = this.game.units.filter(u => u.team !== unit.team && u.isAlive());
+                
+                for (const pos of moveRange) {
+                    let score = 0;
+                    
+                    const terrain = this.game.map.getTerrain(pos.x, pos.y);
+                    score += terrain.defense * 2;
+
+                    for (const enemy of enemies) {
+                        const dist = Math.abs(pos.x - enemy.x) + Math.abs(pos.y - enemy.y);
+                        if (dist <= unit.attackRange) {
+                            score += 50 - enemy.hp * 0.3;
+                        } else {
+                            score -= dist * 5;
+                        }
+                    }
+
+                    score += (Math.random() - 0.5) * 10;
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = pos;
+                    }
+                }
+
+                return bestMove || { x: unit.x, y: unit.y };
+            }
+
+            chooseAttack(unit) {
+                const enemies = this.game.units.filter(u => 
+                    u.team !== unit.team && 
+                    u.isAlive() &&
+                    Math.abs(unit.x - u.x) + Math.abs(unit.y - u.y) <= unit.attackRange
+                );
+
+                if (enemies.length === 0) return null;
+
+                enemies.sort((a, b) => a.hp - b.hp);
+                return enemies[0];
+            }
+
+            async executeTurn() {
+                const aiUnits = this.game.units.filter(u => u.team === 'enemy' && u.isAlive());
+                
+                for (const unit of aiUnits) {
+                    await this.delay(300);
+                    
+                    const move = this.calculateMove(unit);
+                    if (move.x !== unit.x || move.y !== unit.y) {
+                        this.game.moveUnit(unit, move.x, move.y);
+                        await this.delay(200);
+                    }
+
+                    const target = this.chooseAttack(unit);
+                    if (target) {
+                        this.game.attackUnit(unit, target);
+                    }
+
+                    unit.hasActed = true;
+                    this.game.render();
+                }
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+        }
+
+        // ==================== 游戏主类 ====================
+        class Game {
+            constructor() {
+                this.map = new GameMap(8);
+                this.units = [];
+                this.currentTeam = 'player';
+                this.selectedUnit = null;
+                this.moveRange = [];
+                this.attackRange = [];
+                this.ai = new AI(this);
+                this.gameOver = false;
+                
+                this.initUnits();
+                this.render();
+                this.bindEvents();
+                this.addMessage('游戏开始！玩家回合');
+            }
+
+            initUnits() {
+                const playerClasses = ['WARRIOR', 'ARCHER', 'KNIGHT', 'WARRIOR'];
+                const enemyClasses = ['KNIGHT', 'ARCHER', 'WARRIOR', 'KNIGHT'];
+                
+                for (let i = 0; i < 4; i++) {
+                    this.units.push(new Unit(`p${i}`, playerClasses[i], i * 2, 7, 'player'));
+                    this.units.push(new Unit(`e${i}`, enemyClasses[i], i * 2 + 1, 0, 'enemy'));
+                }
+            }
+
+            getMoveRange(unit) {
+                const range = [];
+                const visited = new Set();
+                const queue = [{ x: unit.x, y: unit.y, cost: 0 }];
+                
+                while (queue.length > 0) {
+                    const current = queue.shift();
+                    const key = `${current.x},${current.y}`;
+                    
+                    if (visited.has(key)) continue;
+                    visited.add(key);
+                    
+                    if (current.cost <= unit.moveRange) {
+                        const occupyingUnit = this.getUnitAt(current.x, current.y);
+                        if (!occupyingUnit || occupyingUnit === unit) {
+                            range.push({ x: current.x, y: current.y });
+                        }
+                    }
+
+                    if (current.cost < unit.moveRange) {
+                        const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+                        for (const [dx, dy] of directions) {
+                            const nx = current.x + dx;
+                            const ny = current.y + dy;
+                            const terrain = this.map.getTerrain(nx, ny);
+                            
+                            if (terrain && current.cost + terrain.moveCost <= unit.moveRange) {
+                                queue.push({ x: nx, y: ny, cost: current.cost + terrain.moveCost });
+                            }
+                        }
+                    }
+                }
+                
+                return range;
+            }
+
+            getAttackRange(unit) {
+                const range = [];
+                for (let dy = -unit.attackRange; dy <= unit.attackRange; dy++) {
+                    for (let dx = -unit.attackRange; dx <= unit.attackRange; dx++) {
+                        const dist = Math.abs(dx) + Math.abs(dy);
+                        if (dist > 0 && dist <= unit.attackRange) {
+                            const nx = unit.x + dx;
+                            const ny = unit.y + dy;
+                            if (this.map.getTerrain(nx, ny)) {
+                                range.push({ x: nx, y: ny });
+                            }
+                        }
+                    }
+                }
+                return range;
+            }
+
+            getUnitAt(x, y) {
+                return this.units.find(u => u.x === x && u.y === y && u.isAlive());
+            }
+
+            selectUnit(unit) {
+                if (this.currentTeam !== 'player' || this.gameOver) return;
+                if (unit.team !== 'player' || unit.hasActed) return;
+                
+                this.selectedUnit = unit;
+                this.moveRange = unit.hasMoved ? [] : this.getMoveRange(unit);
+                this.attackRange = unit.hasAttacked ? [] : this.getAttackRange(unit);
+                this.render();
+                this.updateUnitInfo(unit);
+            }
+
+            moveUnit(unit, x, y) {
+                unit.saveState();
+                unit.x = x;
+                unit.y = y;
+                unit.hasMoved = true;
+                this.addMessage(`${unit.team === 'player' ? '我方' : '敌方'}${unit.name}移动到(${x}, ${y})`);
+            }
+
+            attackUnit(attacker, target) {
+                const terrain = this.map.getTerrain(target.x, target.y);
+                const advantage = attacker.getAdvantageMultiplier(target.unitClass);
+                
+                const baseDamage = attacker.attack * advantage;
+                const defense = target.defense + terrain.defense;
+                const damage = Math.max(5, Math.floor(baseDamage - defense * 0.5 + (Math.random() - 0.5) * 10));
+                
+                const killed = target.takeDamage(damage);
+                attacker.hasAttacked = true;
+                
+                this.showDamagePopup(target, damage);
+                this.addMessage(`${attacker.team === 'player' ? '我方' : '敌方'}${attacker.name}攻击${target.team === 'player' ? '我方' : '敌方'}${target.name}，造成${damage}点伤害${killed ? '，击杀！' : ''}`);
+                
+                if (killed) {
+                    this.checkGameOver();
+                }
+            }
+
+            showDamagePopup(unit, damage) {
+                const cellIndex = unit.y * 8 + unit.x;
+                const cell = document.querySelectorAll('.cell')[cellIndex];
+                if (cell) {
+                    const popup = document.createElement('div');
+                    popup.className = 'damage-popup';
+                    popup.textContent = `-${damage}`;
+                    popup.style.left = '50%';
+                    popup.style.top = '50%';
+                    popup.style.transform = 'translate(-50%, -50%)';
+                    cell.appendChild(popup);
+                    setTimeout(() => popup.remove(), 1000);
+                }
+            }
+
+            handleCellClick(x, y) {
+                if (this.currentTeam !== 'player' || this.gameOver) return;
+                
+                const unitAtPos = this.getUnitAt(x, y);
+                
+                if (unitAtPos) {
+                    if (unitAtPos.team === 'player' && !unitAtPos.hasActed) {
+                        this.selectUnit(unitAtPos);
+                    } else if (this.selectedUnit && unitAtPos.team === 'enemy') {
+                        const inRange = this.attackRange.some(r => r.x === x && r.y === y);
+                        if (inRange && !this.selectedUnit.hasAttacked) {
+                            this.attackUnit(this.selectedUnit, unitAtPos);
+                            this.selectedUnit.hasActed = true;
+                            this.clearSelection();
+                            this.render();
+                        }
+                    }
+                } else if (this.selectedUnit && !this.selectedUnit.hasMoved) {
+                    const inRange = this.moveRange.some(r => r.x === x && r.y === y);
+                    if (inRange) {
+                        this.moveUnit(this.selectedUnit, x, y);
+                        this.moveRange = [];
+                        this.attackRange = this.getAttackRange(this.selectedUnit);
+                        
+                        const hasTargetInRange = this.attackRange.some(r => {
+                            const u = this.getUnitAt(r.x, r.y);
+                            return u && u.team === 'enemy';
+                        });
+                        
+                        if (!hasTargetInRange) {
+                            this.selectedUnit.hasActed = true;
+                            this.addMessage('范围内无敌人，行动结束');
+                            this.clearSelection();
+                        }
+                        
+                        this.render();
+                        this.updateUnitInfo(this.selectedUnit);
+                    }
+                }
+            }
+
+            undoMove() {
+                if (!this.selectedUnit || !this.selectedUnit.hasMoved || this.selectedUnit.hasAttacked) return;
+                
+                this.selectedUnit.restoreState();
+                this.moveRange = this.getMoveRange(this.selectedUnit);
+                this.attackRange = this.getAttackRange(this.selectedUnit);
+                this.addMessage('撤销移动');
+                this.render();
+                this.updateUnitInfo(this.selectedUnit);
+            }
+
+            clearSelection() {
+                this.selectedUnit = null;
+                this.moveRange = [];
+                this.attackRange = [];
+                document.getElementById('unitInfo').innerHTML = '<h3>单位信息</h3><div style="color: #888; font-size: 13px;">点击选择单位</div>';
+            }
+
+            endTurn() {
+                if (this.currentTeam !== 'player' || this.gameOver) return;
+                
+                this.units.filter(u => u.team === 'player').forEach(u => u.hasActed = true);
+                this.clearSelection();
+                this.currentTeam = 'enemy';
+                this.updateTurnIndicator();
+                this.addMessage('敌方回合');
+                this.render();
+                
+                setTimeout(() => this.runAITurn(), 500);
+            }
+
+            async runAITurn() {
+                this.units.filter(u => u.team === 'enemy').forEach(u => {
+                    u.hasActed = false;
+                    u.hasMoved = false;
+                    u.hasAttacked = false;
+                });
+                
+                await this.ai.executeTurn();
+                
+                this.units.filter(u => u.team === 'enemy').forEach(u => u.hasActed = true);
+                
+                if (!this.gameOver) {
+                    this.currentTeam = 'player';
+                    this.units.filter(u => u.team === 'player').forEach(u => {
+                        u.hasActed = false;
+                        u.hasMoved = false;
+                        u.hasAttacked = false;
+                    });
+                    this.updateTurnIndicator();
+                    this.addMessage('玩家回合');
+                    this.render();
+                }
+            }
+
+            checkGameOver() {
+                const playerAlive = this.units.filter(u => u.team === 'player' && u.isAlive()).length;
+                const enemyAlive = this.units.filter(u => u.team === 'enemy' && u.isAlive()).length;
+                
+                if (playerAlive === 0) {
+                    this.gameOver = true;
+                    this.showGameOver(false);
+                } else if (enemyAlive === 0) {
+                    this.gameOver = true;
+                    this.showGameOver(true);
+                }
+            }
+
+            showGameOver(playerWon) {
+                const modal = document.getElementById('gameOverModal');
+                const title = document.getElementById('gameOverTitle');
+                const message = document.getElementById('gameOverMessage');
+                
+                title.textContent = playerWon ? '🎉 胜利！' : '💀 失败';
+                message.textContent = playerWon ? '恭喜你击败了所有敌人！' : '你的部队全军覆没...';
+                modal.classList.add('active');
+            }
+
+            restart() {
+                document.getElementById('gameOverModal').classList.remove('active');
+                this.map = new GameMap(8);
+                this.units = [];
+                this.currentTeam = 'player';
+                this.selectedUnit = null;
+                this.moveRange = [];
+                this.attackRange = [];
+                this.gameOver = false;
+                this.initUnits();
+                this.render();
+                this.updateTurnIndicator();
+                document.getElementById('messageLog').innerHTML = '';
+                this.addMessage('游戏重新开始！');
+            }
+
+            updateTurnIndicator() {
+                const indicator = document.getElementById('turnIndicator');
+                indicator.className = `turn-indicator ${this.currentTeam}`;
+                indicator.textContent = this.currentTeam === 'player' ? '⚔️ 玩家回合' : '🔴 敌方回合';
+            }
+
+            updateUnitInfo(unit) {
+                const info = document.getElementById('unitInfo');
+                const terrain = this.map.getTerrain(unit.x, unit.y);
+                info.innerHTML = `
+                    <h3>${unit.team === 'player' ? '我方' : '敌方'} ${unit.name}</h3>
+                    <div class="stat-row">
+                        <span>❤️ 生命值</span>
+                        <span>${unit.hp}/${unit.maxHp}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>⚔️ 攻击力</span>
+                        <span>${unit.attack}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>🛡️ 防御力</span>
+                        <span>${unit.defense}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>👟 移动力</span>
+                        <span>${unit.moveRange}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>🎯 攻击距离</span>
+                        <span>${unit.attackRange}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>📍 当前地形</span>
+                        <span>${terrain.name} (+${terrain.defense}防)</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>状态</span>
+                        <span>${unit.hasActed ? '已行动' : unit.hasMoved ? '已移动' : '可行动'}</span>
+                    </div>
+                `;
+                
+                document.getElementById('undoBtn').disabled = !unit.hasMoved || unit.hasAttacked;
+            }
+
+            addMessage(msg) {
+                const log = document.getElementById('messageLog');
+                const p = document.createElement('p');
+                p.textContent = `> ${msg}`;
+                log.insertBefore(p, log.firstChild);
+                if (log.children.length > 20) {
+                    log.removeChild(log.lastChild);
+                }
+            }
+
+            render() {
+                const grid = document.getElementById('gameGrid');
+                grid.innerHTML = '';
+                
+                for (let y = 0; y < 8; y++) {
+                    for (let x = 0; x < 8; x++) {
+                        const cell = document.createElement('div');
+                        const terrain = this.map.getTerrain(x, y);
+                        
+                        cell.className = `cell ${terrain.name === '平原' ? 'plain' : terrain.name === '森林' ? 'forest' : 'mountain'}`;
+                        
+                        if (terrain.icon) {
+                            const icon = document.createElement('span');
+                            icon.className = 'terrain-icon';
+                            icon.textContent = terrain.icon;
+                            cell.appendChild(icon);
+                        }
+                        
+                        const isMoveRange = this.moveRange.some(r => r.x === x && r.y === y);
+                        const isAttackRange = this.attackRange.some(r => r.x === x && r.y === y);
+                        const isSelected = this.selectedUnit && this.selectedUnit.x === x && this.selectedUnit.y === y;
+                        
+                        if (isSelected) cell.classList.add('selected');
+                        if (isMoveRange && !isSelected) cell.classList.add('move-range');
+                        if (isAttackRange && !isSelected) {
+                            const targetUnit = this.getUnitAt(x, y);
+                            if (targetUnit && targetUnit.team !== this.selectedUnit?.team) {
+                                cell.classList.add('attack-range');
+                            }
+                        }
+                        
+                        const unit = this.getUnitAt(x, y);
+                        if (unit) {
+                            const unitEl = document.createElement('div');
+                            unitEl.className = `unit ${unit.team} ${unit.hasActed ? 'acted' : ''}`;
+                            unitEl.textContent = unit.icon;
+                            
+                            const hpBar = document.createElement('div');
+                            hpBar.className = 'unit-hp';
+                            const hpFill = document.createElement('div');
+                            hpFill.className = 'unit-hp-bar';
+                            hpFill.style.width = `${(unit.hp / unit.maxHp) * 100}%`;
+                            hpBar.appendChild(hpFill);
+                            unitEl.appendChild(hpBar);
+                            
+                            cell.appendChild(unitEl);
+                        }
+                        
+                        cell.addEventListener('click', () => this.handleCellClick(x, y));
+                        grid.appendChild(cell);
+                    }
+                }
+                
+                document.getElementById('undoBtn').disabled = !this.selectedUnit?.hasMoved || this.selectedUnit?.hasAttacked;
+            }
+
+            bindEvents() {
+                document.getElementById('undoBtn').addEventListener('click', () => this.undoMove());
+                document.getElementById('endTurnBtn').addEventListener('click', () => this.endTurn());
+                document.getElementById('restartBtn').addEventListener('click', () => this.restart());
+            }
+        }
+
+        const game = new Game();
+    </script>
+</body>
+</html>

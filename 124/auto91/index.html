@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPG角色成长系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e4e4e4;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #f4d03f;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(244, 208, 63, 0.5);
+            font-size: 2.5em;
+        }
+
+        .panels {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .panel h2 {
+            color: #f4d03f;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(244, 208, 63, 0.3);
+            font-size: 1.3em;
+        }
+
+        .level-section {
+            text-align: center;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: rgba(244, 208, 63, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(244, 208, 63, 0.3);
+        }
+
+        .level-display {
+            font-size: 2em;
+            color: #f4d03f;
+            font-weight: bold;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn-upgrade {
+            background: linear-gradient(135deg, #f4d03f, #e67e22);
+            color: #1a1a2e;
+        }
+
+        .btn-upgrade:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(244, 208, 63, 0.5);
+        }
+
+        .btn-upgrade:disabled {
+            background: #555;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .attribute-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+
+        .attr-name {
+            font-weight: bold;
+            width: 60px;
+        }
+
+        .attr-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #3498db;
+            width: 40px;
+            text-align: center;
+        }
+
+        .attr-base {
+            font-size: 0.9em;
+            color: #888;
+        }
+
+        .attr-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .btn-attr {
+            width: 30px;
+            height: 30px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-plus {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-minus {
+            background: #c0392b;
+            color: white;
+        }
+
+        .btn-attr:hover:not(:disabled) {
+            transform: scale(1.1);
+        }
+
+        .btn-attr:disabled {
+            background: #444;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .free-points {
+            text-align: center;
+            padding: 15px;
+            background: rgba(46, 204, 113, 0.2);
+            border-radius: 8px;
+            margin-top: 20px;
+            border: 2px solid #2ecc71;
+            animation: pulse 2s infinite;
+        }
+
+        .free-points-value {
+            font-size: 1.8em;
+            color: #2ecc71;
+            font-weight: bold;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 5px rgba(46, 204, 113, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(46, 204, 113, 0.8); }
+        }
+
+        .skill-branch {
+            margin-bottom: 25px;
+        }
+
+        .skill-branch-title {
+            color: #e74c3c;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding: 8px 12px;
+            background: rgba(231, 76, 60, 0.2);
+            border-radius: 6px;
+            border-left: 4px solid #e74c3c;
+        }
+
+        .skill-branch.agility .skill-branch-title {
+            color: #2ecc71;
+            border-left-color: #2ecc71;
+            background: rgba(46, 204, 113, 0.2);
+        }
+
+        .skill-branch.intelligence .skill-branch-title {
+            color: #3498db;
+            border-left-color: #3498db;
+            background: rgba(52, 152, 219, 0.2);
+        }
+
+        .skill-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border: 1px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .skill-item.learned {
+            border-color: #2ecc71;
+            background: rgba(46, 204, 113, 0.15);
+        }
+
+        .skill-item.available {
+            border-color: #f4d03f;
+        }
+
+        .skill-item.locked {
+            opacity: 0.6;
+        }
+
+        .skill-name {
+            font-weight: bold;
+            color: #f4d03f;
+            margin-bottom: 5px;
+        }
+
+        .skill-learned .skill-name {
+            color: #2ecc71;
+        }
+
+        .skill-desc {
+            font-size: 0.85em;
+            color: #aaa;
+            margin-bottom: 8px;
+        }
+
+        .skill-req {
+            font-size: 0.8em;
+            color: #e74c3c;
+            margin-bottom: 8px;
+        }
+
+        .skill-req.satisfied {
+            color: #2ecc71;
+        }
+
+        .btn-learn {
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+            color: white;
+            padding: 6px 15px;
+            font-size: 12px;
+        }
+
+        .btn-learn:hover:not(:disabled) {
+            box-shadow: 0 0 10px rgba(155, 89, 182, 0.5);
+        }
+
+        .btn-learn:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        .skill-depth-1 { margin-left: 0; }
+        .skill-depth-2 { margin-left: 25px; }
+        .skill-depth-3 { margin-left: 50px; }
+
+        .skill-points-display {
+            text-align: center;
+            padding: 10px;
+            background: rgba(155, 89, 182, 0.2);
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid #9b59b6;
+        }
+
+        .skill-points-value {
+            color: #9b59b6;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .equipment-slot {
+            margin-bottom: 20px;
+        }
+
+        .slot-title {
+            font-weight: bold;
+            color: #f4d03f;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: rgba(244, 208, 63, 0.1);
+            border-radius: 6px;
+        }
+
+        .equipped-item {
+            padding: 12px;
+            background: rgba(46, 204, 113, 0.15);
+            border: 1px solid #2ecc71;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .equipped-name {
+            font-weight: bold;
+            color: #2ecc71;
+        }
+
+        .equipment-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .equipment-item {
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .equipment-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #f4d03f;
+        }
+
+        .equipment-item.equipped {
+            border-color: #2ecc71;
+            background: rgba(46, 204, 113, 0.1);
+        }
+
+        .equip-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .equip-stats {
+            font-size: 0.85em;
+            color: #3498db;
+        }
+
+        .btn-unequip {
+            background: #c0392b;
+            color: white;
+            padding: 5px 12px;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+
+        .btn-unequip:hover {
+            background: #a93226;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s;
+            max-width: 300px;
+        }
+
+        .notification.success {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+        }
+
+        .notification.info {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+        }
+
+        .notification.warning {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+        }
+
+        .notification.error {
+            background: linear-gradient(135deg, #c0392b, #e74c3c);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            z-index: 100;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .attr-breakdown {
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 3px;
+        }
+
+        @media (max-width: 1200px) {
+            .panels {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚔️ RPG角色成长系统 ⚔️</h1>
+        
+        <div class="panels">
+            <div class="panel" id="attr-panel">
+                <h2>📊 角色属性</h2>
+                <div class="level-section">
+                    <div>当前等级</div>
+                    <div class="level-display" id="level-display">1</div>
+                    <button class="btn btn-upgrade" id="btn-upgrade">升级 (+2属性点)</button>
+                </div>
+                <div id="attributes-list"></div>
+                <div class="free-points" id="free-points-section">
+                    <div>可用自由属性点</div>
+                    <div class="free-points-value" id="free-points-value">5</div>
+                </div>
+            </div>
+
+            <div class="panel" id="skill-panel">
+                <h2>🌲 技能树</h2>
+                <div class="skill-points-display">
+                    <div>可用技能点</div>
+                    <div class="skill-points-value" id="skill-points-value">3</div>
+                </div>
+                <div id="skill-tree"></div>
+            </div>
+
+            <div class="panel" id="equip-panel">
+                <h2>🛡️ 装备</h2>
+                <div id="equipment-slots"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="attribute.js"></script>
+    <script src="skill.js"></script>
+    <script src="equipment.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

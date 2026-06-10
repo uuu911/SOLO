@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>战争兵棋推演模拟器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: #1a1a2e;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #header {
+            background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+            color: #e94560;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+        #header h1 {
+            font-size: 20px;
+            text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+        }
+        .stats {
+            display: flex;
+            gap: 30px;
+            font-size: 14px;
+        }
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .stat-label {
+            color: #888;
+        }
+        .stat-value {
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .blue { color: #4da6ff; }
+        .red { color: #ff6b6b; }
+        #main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            cursor: grab;
+        }
+        #canvas-container:active {
+            cursor: grabbing;
+        }
+        canvas {
+            display: block;
+        }
+        #info-panel {
+            width: 280px;
+            background: linear-gradient(180deg, #16213e 0%, #0f0f23 100%);
+            color: #fff;
+            padding: 20px;
+            border-left: 2px solid #e94560;
+            overflow-y: auto;
+        }
+        #info-panel h2 {
+            color: #e94560;
+            margin-bottom: 20px;
+            font-size: 18px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+        .unit-info {
+            display: none;
+        }
+        .unit-info.active {
+            display: block;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+        }
+        .info-label {
+            color: #888;
+        }
+        .info-value {
+            font-weight: bold;
+        }
+        .hp-bar-container {
+            width: 100%;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        .hp-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4cd964, #00b894);
+            transition: width 0.3s ease;
+        }
+        .hp-bar.low {
+            background: linear-gradient(90deg, #ff6b6b, #e94560);
+        }
+        .no-selection {
+            color: #666;
+            text-align: center;
+            padding: 40px 0;
+            font-style: italic;
+        }
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        #result-box {
+            background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+            padding: 40px 60px;
+            border-radius: 15px;
+            text-align: center;
+            border: 2px solid #e94560;
+            box-shadow: 0 0 50px rgba(233, 69, 96, 0.3);
+        }
+        #result-text {
+            font-size: 36px;
+            color: #fff;
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+        }
+        #restart-btn {
+            background: linear-gradient(135deg, #e94560 0%, #c73e54 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+        #restart-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(233, 69, 96, 0.4);
+        }
+        #turn-indicator {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            z-index: 10;
+            border: 1px solid #e94560;
+        }
+        .legend {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #333;
+        }
+        .legend h3 {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>⚔️ 战争兵棋推演模拟器</h1>
+        <div class="stats">
+            <div class="stat-item">
+                <span class="stat-label">回合</span>
+                <span class="stat-value" id="turn-count">1</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">蓝方</span>
+                <span class="stat-value blue" id="blue-count">6</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">红方</span>
+                <span class="stat-value red" id="red-count">6</span>
+            </div>
+        </div>
+    </div>
+    <div id="main-container">
+        <div id="canvas-container">
+            <canvas id="gameCanvas"></canvas>
+            <div id="turn-indicator">蓝方回合</div>
+        </div>
+        <div id="info-panel">
+            <h2>📋 单位信息</h2>
+            <div id="no-selection" class="no-selection">请点击选择一个单位</div>
+            <div id="unit-details" class="unit-info">
+                <div class="info-row">
+                    <span class="info-label">类型</span>
+                    <span class="info-value" id="unit-type">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">所属</span>
+                    <span class="info-value" id="unit-team">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">生命值</span>
+                    <span class="info-value" id="unit-hp">-</span>
+                </div>
+                <div class="hp-bar-container">
+                    <div class="hp-bar" id="hp-bar"></div>
+                </div>
+                <div class="info-row" style="margin-top: 15px;">
+                    <span class="info-label">攻击力</span>
+                    <span class="info-value" id="unit-atk">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">移动力</span>
+                    <span class="info-value" id="unit-mov">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">攻击范围</span>
+                    <span class="info-value" id="unit-range">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">剩余行动力</span>
+                    <span class="info-value" id="unit-ap">-</span>
+                </div>
+            </div>
+            <div class="legend">
+                <h3>地形图例</h3>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #90EE90;"></div>
+                    <span>平原 (移动:1, 防御:0)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #228B22;"></div>
+                    <span>森林 (移动:2, 防御:+1)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #808080;"></div>
+                    <span>山地 (移动:3, 防御:+2)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4169E1;"></div>
+                    <span>河流 (不可通行)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #8B4513;"></div>
+                    <span>桥梁 (移动:1, 防御:+1)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="overlay">
+        <div id="result-box">
+            <div id="result-text">游戏结束</div>
+            <button id="restart-btn">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+    var MapModule = (function() {
+        var COLS = 14;
+        var ROWS = 11;
+        var HEX_SIZE = 40;
+        var TERRAIN = {
+            PLAIN: { name: '平原', cost: 1, defense: 0, passable: true, color: '#90EE90' },
+            FOREST: { name: '森林', cost: 2, defense: 1, passable: true, color: '#228B22' },
+            MOUNTAIN: { name: '山地', cost: 3, defense: 2, passable: true, color: '#808080' },
+            RIVER: { name: '河流', cost: Infinity, defense: 0, passable: false, color: '#4169E1' },
+            BRIDGE: { name: '桥梁', cost: 1, defense: 1, passable: true, color: '#8B4513' }
+        };
+        var grid = [];
+
+        function hexToPixel(q, r) {
+            var x = HEX_SIZE * (3/2 * q);
+            var y = HEX_SIZE * (Math.sqrt(3)/2 * q + Math.sqrt(3) * r);
+            return { x: x, y: y };
+        }
+
+        function pixelToHex(x, y) {
+            var q = (2/3 * x) / HEX_SIZE;
+            var r = (-1/3 * x + Math.sqrt(3)/3 * y) / HEX_SIZE;
+            return hexRound(q, r);
+        }
+
+        function hexRound(q, r) {
+            var s = -q - r;
+            var rq = Math.round(q);
+            var rr = Math.round(r);
+            var rs = Math.round(s);
+            var qDiff = Math.abs(rq - q);
+            var rDiff = Math.abs(rr - r);
+            var sDiff = Math.abs(rs - s);
+            if (qDiff > rDiff && qDiff > sDiff) {
+                rq = -rr - rs;
+            } else if (rDiff > sDiff) {
+                rr = -rq - rs;
+            }
+            return { q: rq, r: rr };
+        }
+
+        function hexDistance(a, b) {
+            return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
+        }
+
+        function getNeighbors(q, r) {
+            var directions = [
+                { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
+                { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }
+            ];
+            return directions.map(function(d) {
+                return { q: q + d.q, r: r + d.r };
+            });
+        }
+
+        function isValidHex(q, r) {
+            return q >= 0 && q < COLS && r >= 0 && r < ROWS;
+        }
+
+        function generateMap() {
+            grid = [];
+            for (var r = 0; r < ROWS; r++) {
+                grid[r] = [];
+                for (var q = 0; q < COLS; q++) {
+                    grid[r][q] = { ...TERRAIN.PLAIN };
+                }
+            }
+            var riverRow = Math.floor(ROWS / 2);
+            for (var q = 0; q < COLS; q++) {
+                if (q !== Math.floor(COLS / 2) && q !== Math.floor(COLS / 2) + 1) {
+                    grid[riverRow][q] = { ...TERRAIN.RIVER };
+                }
+            }
+            grid[riverRow][Math.floor(COLS / 2)] = { ...TERRAIN.BRIDGE };
+            grid[riverRow][Math.floor(COLS / 2) + 1] = { ...TERRAIN.BRIDGE };
+            for (var i = 0; i < 12; i++) {
+                var q = Math.floor(Math.random() * COLS);
+                var r = Math.floor(Math.random() * ROWS);
+                if (grid[r][q].name === '平原' && 
+                    !((r < 2 || r >= ROWS - 2) && (q < 3 || q >= COLS - 3))) {
+                    grid[r][q] = Math.random() > 0.5 ? { ...TERRAIN.FOREST } : { ...TERRAIN.MOUNTAIN };
+                }
+            }
+            for (var r2 = 0; r2 < ROWS; r2++) {
+                for (var q2 = 0; q2 < 3; q2++) {
+                    if (grid[r2][q2].name !== '河流') grid[r2][q2] = { ...TERRAIN.PLAIN };
+                }
+                for (var q3 = COLS - 3; q3 < COLS; q3++) {
+                    if (grid[r2][q3].name !== '河流') grid[r2][q3] = { ...TERRAIN.PLAIN };
+                }
+            }
+        }
+
+        function getTerrain(q, r) {
+            if (!isValidHex(q, r)) return null;
+            return grid[r][q];
+        }
+
+        function canPass(unitType, q, r) {
+            var terrain = getTerrain(q, r);
+            if (!terrain || !terrain.passable) return false;
+            if (unitType === 'TANK' && (terrain.name === '森林' || terrain.name === '山地')) return false;
+            if (unitType === 'ARTILLERY' && terrain.name === '山地') return false;
+            return true;
+        }
+
+        function getMoveCost(unitType, q, r) {
+            var terrain = getTerrain(q, r);
+            if (!terrain) return Infinity;
+            if (!canPass(unitType, q, r)) return Infinity;
+            return terrain.cost;
+        }
+
+        return {
+            COLS: COLS,
+            ROWS: ROWS,
+            HEX_SIZE: HEX_SIZE,
+            TERRAIN: TERRAIN,
+            hexToPixel: hexToPixel,
+            pixelToHex: pixelToHex,
+            hexDistance: hexDistance,
+            getNeighbors: getNeighbors,
+            isValidHex: isValidHex,
+            generateMap: generateMap,
+            getTerrain: getTerrain,
+            canPass: canPass,
+            getMoveCost: getMoveCost
+        };
+    })();
+
+    var UnitModule = (function() {
+        var UNIT_TYPES = {
+            INFANTRY: { name: '步兵', hp: 8, atk: 3, mov: 4, range: 1, color: '#FFD700' },
+            TANK: { name: '装甲车', hp: 10, atk: 4, mov: 6, range: 1, color: '#FFA500' },
+            ARTILLERY: { name: '火炮', hp: 6, atk: 5, mov: 2, range: 2, color: '#FF69B4' }
+        };
+        var units = [];
+        var selectedUnit = null;
+
+        function createUnit(type, team, q, r) {
+            var typeData = UNIT_TYPES[type];
+            return {
+                id: units.length,
+                type: type,
+                typeName: typeData.name,
+                team: team,
+                hp: typeData.hp,
+                maxHp: typeData.hp,
+                atk: typeData.atk,
+                mov: typeData.mov,
+                range: typeData.range,
+                ap: typeData.mov,
+                q: q,
+                r: r,
+                hasActed: false,
+                color: typeData.color
+            };
+        }
+
+        function initUnits() {
+            units = [];
+            var bluePositions = [
+                { q: 1, r: 1, type: 'INFANTRY' },
+                { q: 2, r: 2, type: 'INFANTRY' },
+                { q: 1, r: 3, type: 'TANK' },
+                { q: 2, r: 4, type: 'TANK' },
+                { q: 1, r: 5, type: 'ARTILLERY' },
+                { q: 2, r: 6, type: 'ARTILLERY' }
+            ];
+            bluePositions.forEach(function(pos) {
+                units.push(createUnit(pos.type, 'BLUE', pos.q, pos.r));
+            });
+            var redPositions = [
+                { q: MapModule.COLS - 2, r: 4, type: 'INFANTRY' },
+                { q: MapModule.COLS - 3, r: 5, type: 'INFANTRY' },
+                { q: MapModule.COLS - 2, r: 6, type: 'TANK' },
+                { q: MapModule.COLS - 3, r: 7, type: 'TANK' },
+                { q: MapModule.COLS - 2, r: 2, type: 'ARTILLERY' },
+                { q: MapModule.COLS - 3, r: 3, type: 'ARTILLERY' }
+            ];
+            redPositions.forEach(function(pos) {
+                units.push(createUnit(pos.type, 'RED', pos.q, pos.r));
+            });
+        }
+
+        function getUnitAt(q, r) {
+            return units.find(function(u) {
+                return u.q === q && u.r === r && u.hp > 0;
+            });
+        }
+
+        function getUnitsByTeam(team) {
+            return units.filter(function(u) {
+                return u.team === team && u.hp > 0;
+            });
+        }
+
+        function calculateReachable(unit) {
+            if (unit.hasActed || unit.ap <= 0) return [];
+            var reachable = [];
+            var visited = {};
+            var queue = [{ q: unit.q, r: unit.r, cost: 0 }];
+            visited[unit.q + ',' + unit.r] = true;
+            while (queue.length > 0) {
+                var current = queue.shift();
+                if (current.cost > 0) {
+                    reachable.push({ q: current.q, r: current.r, cost: current.cost });
+                }
+                var neighbors = MapModule.getNeighbors(current.q, current.r);
+                for (var i = 0; i < neighbors.length; i++) {
+                    var n = neighbors[i];
+                    var key = n.q + ',' + n.r;
+                    if (!visited[key] && MapModule.isValidHex(n.q, n.r)) {
+                        var moveCost = MapModule.getMoveCost(unit.type, n.q, n.r);
+                        var totalCost = current.cost + moveCost;
+                        if (totalCost <= unit.ap && !getUnitAt(n.q, n.r)) {
+                            visited[key] = true;
+                            queue.push({ q: n.q, r: n.r, cost: totalCost });
+                        }
+                    }
+                }
+            }
+            return reachable;
+        }
+
+        function calculateAttackable(unit) {
+            if (unit.hasActed) return [];
+            var attackable = [];
+            for (var i = 0; i < units.length; i++) {
+                var enemy = units[i];
+                if (enemy.team !== unit.team && enemy.hp > 0) {
+                    var dist = MapModule.hexDistance(
+                        { q: unit.q, r: unit.r },
+                        { q: enemy.q, r: enemy.r }
+                    );
+                    if (dist <= unit.range) {
+                        attackable.push(enemy);
+                    }
+                }
+            }
+            return attackable;
+        }
+
+        function calculateDamage(attacker, defender) {
+            var terrain = MapModule.getTerrain(defender.q, defender.r);
+            var defense = terrain ? terrain.defense : 0;
+            var damage = Math.max(1, attacker.atk - defense);
+            return damage;
+        }
+
+        function moveUnit(unit, q, r) {
+            var cost = MapModule.getMoveCost(unit.type, q, r);
+            unit.q = q;
+            unit.r = r;
+            unit.ap -= cost;
+        }
+
+        function attackUnit(attacker, defender) {
+            var damage = calculateDamage(attacker, defender);
+            defender.hp -= damage;
+            attacker.ap = 0;
+            attacker.hasActed = true;
+            return damage;
+        }
+
+        function endUnitTurn(unit) {
+            unit.ap = 0;
+            unit.hasActed = true;
+        }
+
+        function resetTeamAP(team) {
+            var teamUnits = getUnitsByTeam(team);
+            teamUnits.forEach(function(u) {
+                u.ap = u.mov;
+                u.hasActed = false;
+            });
+        }
+
+        return {
+            UNIT_TYPES: UNIT_TYPES,
+            units: units,
+            selectedUnit: selectedUnit,
+            initUnits: initUnits,
+            getUnitAt: getUnitAt,
+            getUnitsByTeam: getUnitsByTeam,
+            calculateReachable: calculateReachable,
+            calculateAttackable: calculateAttackable,
+            calculateDamage: calculateDamage,
+            moveUnit: moveUnit,
+            attackUnit: attackUnit,
+            endUnitTurn: endUnitTurn,
+            resetTeamAP: resetTeamAP
+        };
+    })();
+
+    var RenderModule = (function() {
+        var canvas = document.getElementById('gameCanvas');
+        var ctx = canvas.getContext('2d');
+        var offsetX = 100;
+        var offsetY = 50;
+        var scale = 1;
+        var MIN_SCALE = 0.5;
+        var MAX_SCALE = 2.0;
+        var isDragging = false;
+        var lastMouseX = 0;
+        var lastMouseY = 0;
+        var reachableHexes = [];
+        var attackableUnits = [];
+
+        function resizeCanvas() {
+            var container = document.getElementById('canvas-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            render();
+        }
+
+        function drawHex(cx, cy, size, fillColor, strokeColor) {
+            ctx.beginPath();
+            for (var i = 0; i < 6; i++) {
+                var angle = Math.PI / 3 * i - Math.PI / 6;
+                var x = cx + size * Math.cos(angle);
+                var y = cy + size * Math.sin(angle);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.fillStyle = fillColor;
+            ctx.fill();
+            ctx.strokeStyle = strokeColor || '#333';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function drawUnit(unit, cx, cy) {
+            var size = MapModule.HEX_SIZE * 0.6;
+            ctx.beginPath();
+            ctx.arc(cx, cy, size, 0, Math.PI * 2);
+            ctx.fillStyle = unit.team === 'BLUE' ? '#4da6ff' : '#ff6b6b';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = unit.color;
+            ctx.font = 'bold ' + (size * 0.8) + 'px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            var icon = unit.type === 'INFANTRY' ? '步' : (unit.type === 'TANK' ? '甲' : '炮');
+            ctx.fillText(icon, cx, cy);
+            var hpPercent = unit.hp / unit.maxHp;
+            var barWidth = size * 1.5;
+            var barHeight = 6;
+            ctx.fillStyle = '#333';
+            ctx.fillRect(cx - barWidth / 2, cy + size + 5, barWidth, barHeight);
+            ctx.fillStyle = hpPercent > 0.3 ? '#4cd964' : '#ff6b6b';
+            ctx.fillRect(cx - barWidth / 2, cy + size + 5, barWidth * hpPercent, barHeight);
+        }
+
+        function render() {
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+            ctx.scale(scale, scale);
+            for (var r = 0; r < MapModule.ROWS; r++) {
+                for (var q = 0; q < MapModule.COLS; q++) {
+                    var terrain = MapModule.getTerrain(q, r);
+                    var pos = MapModule.hexToPixel(q, r);
+                    drawHex(pos.x, pos.y, MapModule.HEX_SIZE, terrain.color);
+                }
+            }
+            for (var i = 0; i < reachableHexes.length; i++) {
+                var hex = reachableHexes[i];
+                var pos = MapModule.hexToPixel(hex.q, hex.r);
+                ctx.globalAlpha = 0.5;
+                drawHex(pos.x, pos.y, MapModule.HEX_SIZE, '#00ff00');
+                ctx.globalAlpha = 1;
+            }
+            for (var j = 0; j < attackableUnits.length; j++) {
+                var enemy = attackableUnits[j];
+                var pos = MapModule.hexToPixel(enemy.q, enemy.r);
+                ctx.globalAlpha = 0.5;
+                drawHex(pos.x, pos.y, MapModule.HEX_SIZE, '#ff0000');
+                ctx.globalAlpha = 1;
+            }
+            if (UnitModule.selectedUnit) {
+                var pos = MapModule.hexToPixel(UnitModule.selectedUnit.q, UnitModule.selectedUnit.r);
+                ctx.globalAlpha = 0.5;
+                drawHex(pos.x, pos.y, MapModule.HEX_SIZE, '#ffff00');
+                ctx.globalAlpha = 1;
+            }
+            for (var k = 0; k < UnitModule.units.length; k++) {
+                var unit = UnitModule.units[k];
+                if (unit.hp > 0) {
+                    var pos = MapModule.hexToPixel(unit.q, unit.r);
+                    drawUnit(unit, pos.x, pos.y);
+                }
+            }
+            ctx.restore();
+        }
+
+        function screenToWorld(screenX, screenY) {
+            var rect = canvas.getBoundingClientRect();
+            var x = (screenX - rect.left - offsetX) / scale;
+            var y = (screenY - rect.top - offsetY) / scale;
+            return MapModule.pixelToHex(x, y);
+        }
+
+        function initEvents() {
+            window.addEventListener('resize', resizeCanvas);
+            canvas.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                var delta = e.deltaY > 0 ? 0.9 : 1.1;
+                var newScale = scale * delta;
+                scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+                render();
+            });
+            canvas.addEventListener('mousedown', function(e) {
+                if (e.button === 0) {
+                    isDragging = true;
+                    lastMouseX = e.clientX;
+                    lastMouseY = e.clientY;
+                    canvas.style.cursor = 'grabbing';
+                }
+            });
+            canvas.addEventListener('mousemove', function(e) {
+                if (isDragging) {
+                    offsetX += e.clientX - lastMouseX;
+                    offsetY += e.clientY - lastMouseY;
+                    lastMouseX = e.clientX;
+                    lastMouseY = e.clientY;
+                    render();
+                }
+            });
+            canvas.addEventListener('mouseup', function(e) {
+                if (e.button === 0) {
+                    isDragging = false;
+                    canvas.style.cursor = 'grab';
+                }
+            });
+            canvas.addEventListener('mouseleave', function() {
+                isDragging = false;
+                canvas.style.cursor = 'grab';
+            });
+        }
+
+        function setReachableHexes(hexes) {
+            reachableHexes = hexes;
+        }
+
+        function setAttackableUnits(units) {
+            attackableUnits = units;
+        }
+
+        function getCanvas() {
+            return canvas;
+        }
+
+        return {
+            resizeCanvas: resizeCanvas,
+            render: render,
+            screenToWorld: screenToWorld,
+            initEvents: initEvents,
+            setReachableHexes: setReachableHexes,
+            setAttackableUnits: setAttackableUnits,
+            getCanvas: getCanvas
+        };
+    })();
+
+    var AIModule = (function() {
+        function executeTurn() {
+            var redUnits = UnitModule.getUnitsByTeam('RED');
+            var blueUnits = UnitModule.getUnitsByTeam('BLUE');
+            var actions = [];
+            redUnits.forEach(function(unit) {
+                var action = planAction(unit, blueUnits);
+                if (action) {
+                    actions.push({ unit: unit, action: action });
+                }
+            });
+            actions.sort(function(a, b) {
+                return b.action.priority - a.action.priority;
+            });
+            var delay = 0;
+            actions.forEach(function(item) {
+                setTimeout(function() {
+                    executeAction(item.unit, item.action);
+                    GameModule.checkVictory();
+                    RenderModule.render();
+                }, delay);
+                delay += 600;
+            });
+            setTimeout(function() {
+                GameModule.endAITurn();
+            }, delay + 300);
+        }
+
+        function planAction(unit, enemies) {
+            var attackable = UnitModule.calculateAttackable(unit);
+            if (attackable.length > 0) {
+                attackable.sort(function(a, b) {
+                    return a.hp - b.hp;
+                });
+                return {
+                    type: 'attack',
+                    target: attackable[0],
+                    priority: 100
+                };
+            }
+            var nearestEnemy = null;
+            var minDist = Infinity;
+            enemies.forEach(function(enemy) {
+                var dist = MapModule.hexDistance(
+                    { q: unit.q, r: unit.r },
+                    { q: enemy.q, r: enemy.r }
+                );
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestEnemy = enemy;
+                }
+            });
+            if (!nearestEnemy) return null;
+            var reachable = UnitModule.calculateReachable(unit);
+            if (reachable.length === 0) {
+                return { type: 'wait', priority: 0 };
+            }
+            var bestHex = null;
+            var bestScore = -Infinity;
+            reachable.forEach(function(hex) {
+                var distToEnemy = MapModule.hexDistance(
+                    { q: hex.q, r: hex.r },
+                    { q: nearestEnemy.q, r: nearestEnemy.r }
+                );
+                var score = -distToEnemy * 10;
+                var terrain = MapModule.getTerrain(hex.q, hex.r);
+                if (terrain) score += terrain.defense * 2;
+                if (distToEnemy <= unit.range) score += 50;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestHex = hex;
+                }
+            });
+            if (bestHex) {
+                return {
+                    type: 'move',
+                    target: bestHex,
+                    priority: 50 - minDist
+                };
+            }
+            return { type: 'wait', priority: 0 };
+        }
+
+        function executeAction(unit, action) {
+            if (action.type === 'attack') {
+                UnitModule.attackUnit(unit, action.target);
+            } else if (action.type === 'move') {
+                UnitModule.moveUnit(unit, action.target.q, action.target.r);
+                var attackableAfterMove = UnitModule.calculateAttackable(unit);
+                if (attackableAfterMove.length > 0) {
+                    attackableAfterMove.sort(function(a, b) {
+                        return a.hp - b.hp;
+                    });
+                    UnitModule.attackUnit(unit, attackableAfterMove[0]);
+                }
+            }
+        }
+
+        return {
+            executeTurn: executeTurn
+        };
+    })();
+
+    var GameModule = (function() {
+        var currentTurn = 1;
+        var currentTeam = 'BLUE';
+        var isGameOver = false;
+
+        function init() {
+            MapModule.generateMap();
+            UnitModule.initUnits();
+            RenderModule.initEvents();
+            RenderModule.resizeCanvas();
+            setupClickHandler();
+            setupRestartButton();
+            updateUI();
+        }
+
+        function setupClickHandler() {
+            RenderModule.getCanvas().addEventListener('click', function(e) {
+                if (currentTeam !== 'BLUE' || isGameOver) return;
+                var hex = RenderModule.screenToWorld(e.clientX, e.clientY);
+                if (!MapModule.isValidHex(hex.q, hex.r)) return;
+                var clickedUnit = UnitModule.getUnitAt(hex.q, hex.r);
+                if (UnitModule.selectedUnit) {
+                    if (clickedUnit && clickedUnit.team === 'RED') {
+                        var attackable = UnitModule.calculateAttackable(UnitModule.selectedUnit);
+                        if (attackable.some(function(u) { return u.id === clickedUnit.id; })) {
+                            var damage = UnitModule.attackUnit(UnitModule.selectedUnit, clickedUnit);
+                            updateInfoPanel(UnitModule.selectedUnit);
+                            clearSelection();
+                            checkVictory();
+                            RenderModule.render();
+                            updateUI();
+                            return;
+                        }
+                    }
+                    var reachable = UnitModule.calculateReachable(UnitModule.selectedUnit);
+                    var targetHex = reachable.find(function(h) {
+                        return h.q === hex.q && h.r === hex.r;
+                    });
+                    if (targetHex) {
+                        UnitModule.moveUnit(UnitModule.selectedUnit, hex.q, hex.r);
+                        updateInfoPanel(UnitModule.selectedUnit);
+                        var attackableAfterMove = UnitModule.calculateAttackable(UnitModule.selectedUnit);
+                        RenderModule.setReachableHexes([]);
+                        RenderModule.setAttackableUnits(attackableAfterMove);
+                        RenderModule.render();
+                        updateUI();
+                        return;
+                    }
+                }
+                if (clickedUnit && clickedUnit.team === 'BLUE') {
+                    UnitModule.selectedUnit = clickedUnit;
+                    var reachable = UnitModule.calculateReachable(clickedUnit);
+                    var attackable = UnitModule.calculateAttackable(clickedUnit);
+                    RenderModule.setReachableHexes(reachable);
+                    RenderModule.setAttackableUnits(attackable);
+                    updateInfoPanel(clickedUnit);
+                    RenderModule.render();
+                } else {
+                    clearSelection();
+                }
+            });
+        }
+
+        function clearSelection() {
+            UnitModule.selectedUnit = null;
+            RenderModule.setReachableHexes([]);
+            RenderModule.setAttackableUnits([]);
+            RenderModule.render();
+        }
+
+        function updateInfoPanel(unit) {
+            document.getElementById('no-selection').style.display = 'none';
+            document.getElementById('unit-details').classList.add('active');
+            document.getElementById('unit-type').textContent = unit.typeName;
+            document.getElementById('unit-team').textContent = unit.team === 'BLUE' ? '蓝方' : '红方';
+            document.getElementById('unit-team').className = 'info-value ' + (unit.team === 'BLUE' ? 'blue' : 'red');
+            document.getElementById('unit-hp').textContent = unit.hp + '/' + unit.maxHp;
+            document.getElementById('unit-atk').textContent = unit.atk;
+            document.getElementById('unit-mov').textContent = unit.mov;
+            document.getElementById('unit-range').textContent = unit.range;
+            document.getElementById('unit-ap').textContent = unit.ap;
+            var hpPercent = (unit.hp / unit.maxHp) * 100;
+            var hpBar = document.getElementById('hp-bar');
+            hpBar.style.width = hpPercent + '%';
+            hpBar.className = 'hp-bar' + (hpPercent <= 30 ? ' low' : '');
+        }
+
+        function updateUI() {
+            document.getElementById('turn-count').textContent = currentTurn;
+            document.getElementById('blue-count').textContent = UnitModule.getUnitsByTeam('BLUE').length;
+            document.getElementById('red-count').textContent = UnitModule.getUnitsByTeam('RED').length;
+            document.getElementById('turn-indicator').textContent = currentTeam === 'BLUE' ? '蓝方回合' : '红方回合';
+            document.getElementById('turn-indicator').style.borderColor = currentTeam === 'BLUE' ? '#4da6ff' : '#ff6b6b';
+        }
+
+        function endPlayerTurn() {
+            clearSelection();
+            currentTeam = 'RED';
+            document.getElementById('turn-indicator').textContent = '红方回合 (AI思考中...)';
+            UnitModule.resetTeamAP('RED');
+            updateUI();
+            RenderModule.render();
+            setTimeout(function() {
+                AIModule.executeTurn();
+            }, 500);
+        }
+
+        function endAITurn() {
+            currentTurn++;
+            currentTeam = 'BLUE';
+            UnitModule.resetTeamAP('BLUE');
+            updateUI();
+            RenderModule.render();
+        }
+
+        function checkVictory() {
+            var blueAlive = UnitModule.getUnitsByTeam('BLUE').length;
+            var redAlive = UnitModule.getUnitsByTeam('RED').length;
+            if (blueAlive === 0) {
+                showVictory('RED');
+            } else if (redAlive === 0) {
+                showVictory('BLUE');
+            }
+        }
+
+        function showVictory(winner) {
+            isGameOver = true;
+            var overlay = document.getElementById('overlay');
+            var resultText = document.getElementById('result-text');
+            resultText.textContent = winner === 'BLUE' ? '🎉 蓝方获胜！' : '💀 红方获胜！';
+            resultText.style.color = winner === 'BLUE' ? '#4da6ff' : '#ff6b6b';
+            overlay.style.display = 'flex';
+        }
+
+        function setupRestartButton() {
+            document.getElementById('restart-btn').addEventListener('click', restart);
+        }
+
+        function restart() {
+            document.getElementById('overlay').style.display = 'none';
+            currentTurn = 1;
+            currentTeam = 'BLUE';
+            isGameOver = false;
+            document.getElementById('no-selection').style.display = 'block';
+            document.getElementById('unit-details').classList.remove('active');
+            MapModule.generateMap();
+            UnitModule.initUnits();
+            UnitModule.selectedUnit = null;
+            RenderModule.setReachableHexes([]);
+            RenderModule.setAttackableUnits([]);
+            updateUI();
+            RenderModule.render();
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && currentTeam === 'BLUE' && !isGameOver) {
+                endPlayerTurn();
+            }
+            if (e.key === 'Escape') {
+                clearSelection();
+            }
+        });
+
+        var turnBtn = document.createElement('button');
+        turnBtn.textContent = '结束回合 (Enter)';
+        turnBtn.style.cssText = 'position:absolute;bottom:20px;left:20px;padding:10px 20px;background:#e94560;color:white;border:none;border-radius:5px;cursor:pointer;z-index:10;';
+        turnBtn.onclick = function() {
+            if (currentTeam === 'BLUE' && !isGameOver) {
+                endPlayerTurn();
+            }
+        };
+        document.getElementById('canvas-container').appendChild(turnBtn);
+
+        return {
+            init: init,
+            endAITurn: endAITurn,
+            checkVictory: checkVictory
+        };
+    })();
+
+    window.onload = function() {
+        GameModule.init();
+    };
+    </script>
+</body>
+</html>

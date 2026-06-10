@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>沙滩排球对战游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        #gameCanvas {
+            display: block;
+        }
+        #scoreboard {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 40px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 30px;
+            border-radius: 25px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 10;
+        }
+        .score-team {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .player-label {
+            color: #4ecdc4;
+        }
+        .ai-label {
+            color: #ff6b6b;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            padding: 8px 20px;
+            border-radius: 15px;
+            color: white;
+            font-size: 12px;
+            z-index: 10;
+        }
+        #gameOver {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 100;
+        }
+        #gameOver h2 {
+            color: #ffd700;
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+        #gameOver p {
+            color: white;
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+        #restartBtn {
+            padding: 15px 40px;
+            font-size: 20px;
+            background: linear-gradient(135deg, #4ecdc4, #44a08d);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        #restartBtn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 30px rgba(78, 205, 196, 0.5);
+        }
+        #serveIndicator {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 200, 0, 0.9);
+            padding: 5px 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            display: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="scoreboard">
+            <div class="score-team">
+                <span class="player-label">玩家</span>
+                <span id="playerScore">0</span>
+            </div>
+            <span>:</span>
+            <div class="score-team">
+                <span id="aiScore">0</span>
+                <span class="ai-label">AI</span>
+            </div>
+        </div>
+        <div id="serveIndicator">按 J 发球</div>
+        <div id="controls">A/D 移动 | W 跳跃 | J 发球/垫球 | K 扣球</div>
+        <div id="gameOver">
+            <h2 id="winnerText">游戏结束</h2>
+            <p id="finalScore"></p>
+            <button id="restartBtn">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        const CANVAS_RATIO = 16 / 9;
+        const GRAVITY = 0.4;
+        const AIR_RESISTANCE = 0.995;
+        const BOUNCE_FACTOR = 0.7;
+        const WINNING_SCORE = 21;
+        const WINNING_MARGIN = 2;
+
+        class Court {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.sandColor = '#f4d03f';
+                this.lineColor = '#ffffff';
+                this.netColor = '#333333';
+                this.netHeight = 120;
+                this.netWidth = 8;
+                this.updateDimensions();
+            }
+
+            updateDimensions() {
+                this.width = this.canvas.width;
+                this.height = this.canvas.height;
+                this.courtTop = this.height * 0.25;
+                this.courtBottom = this.height * 0.85;
+                this.courtLeft = this.width * 0.1;
+                this.courtRight = this.width * 0.9;
+                this.courtWidth = this.courtRight - this.courtLeft;
+                this.courtHeight = this.courtBottom - this.courtTop;
+                this.netX = this.courtLeft + this.courtWidth / 2;
+                this.netTop = this.courtBottom - this.netHeight;
+            }
+
+            draw() {
+                this.drawSky();
+                this.drawSand();
+                this.drawCourtLines();
+                this.drawNet();
+            }
+
+            drawSky() {
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.courtTop);
+                gradient.addColorStop(0, '#87CEEB');
+                gradient.addColorStop(0.5, '#B0E0E6');
+                gradient.addColorStop(1, '#E0FFFF');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.courtTop);
+                
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                this.drawCloud(this.width * 0.15, this.height * 0.08, 40);
+                this.drawCloud(this.width * 0.4, this.height * 0.05, 50);
+                this.drawCloud(this.width * 0.75, this.height * 0.1, 35);
+            }
+
+            drawCloud(x, y, size) {
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, size * 0.5, 0, Math.PI * 2);
+                this.ctx.arc(x + size * 0.4, y - size * 0.1, size * 0.4, 0, Math.PI * 2);
+                this.ctx.arc(x + size * 0.8, y, size * 0.45, 0, Math.PI * 2);
+                this.ctx.arc(x + size * 0.4, y + size * 0.2, size * 0.35, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+
+            drawSand() {
+                const gradient = this.ctx.createLinearGradient(0, this.courtTop, 0, this.courtBottom);
+                gradient.addColorStop(0, '#f5deb3');
+                gradient.addColorStop(0.3, '#f4d03f');
+                gradient.addColorStop(1, '#daa520');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, this.courtTop, this.width, this.courtHeight);
+                
+                this.ctx.fillStyle = 'rgba(210, 180, 140, 0.3)';
+                for (let i = 0; i < 100; i++) {
+                    const x = Math.random() * this.width;
+                    const y = this.courtTop + Math.random() * this.courtHeight;
+                    const r = Math.random() * 2 + 1;
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, r, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+            }
+
+            drawCourtLines() {
+                this.ctx.strokeStyle = this.lineColor;
+                this.ctx.lineWidth = 3;
+                this.ctx.setLineDash([]);
+                
+                this.ctx.strokeRect(this.courtLeft, this.courtTop, this.courtWidth, this.courtHeight);
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.netX, this.courtTop);
+                this.ctx.lineTo(this.netX, this.courtBottom);
+                this.ctx.stroke();
+                
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(
+                    this.courtLeft + this.courtWidth * 0.1,
+                    this.courtTop + this.courtHeight * 0.1,
+                    this.courtWidth * 0.3,
+                    this.courtHeight * 0.8
+                );
+                this.ctx.strokeRect(
+                    this.courtLeft + this.courtWidth * 0.6,
+                    this.courtTop + this.courtHeight * 0.1,
+                    this.courtWidth * 0.3,
+                    this.courtHeight * 0.8
+                );
+            }
+
+            drawNet() {
+                this.ctx.fillStyle = '#8B4513';
+                this.ctx.fillRect(this.netX - 6, this.netTop - 20, 12, this.netHeight + 20);
+                
+                this.ctx.fillStyle = '#FFD700';
+                this.ctx.beginPath();
+                this.ctx.arc(this.netX, this.netTop - 20, 8, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                this.ctx.strokeStyle = this.netColor;
+                this.ctx.lineWidth = 1.5;
+                
+                for (let i = 0; i <= 20; i++) {
+                    const y = this.netTop + (this.netHeight / 20) * i;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.netX - this.netWidth / 2, y);
+                    this.ctx.lineTo(this.netX + this.netWidth / 2, y);
+                    this.ctx.stroke();
+                }
+                
+                for (let i = -2; i <= 2; i++) {
+                    const x = this.netX + i * 2;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, this.netTop);
+                    this.ctx.lineTo(x, this.courtBottom);
+                    this.ctx.stroke();
+                }
+            }
+
+            isInsideCourt(x, y) {
+                return x >= this.courtLeft && x <= this.courtRight &&
+                       y >= this.courtTop && y <= this.courtBottom;
+            }
+
+            isInsideLeftCourt(x, y) {
+                return this.isInsideCourt(x, y) && x <= this.netX;
+            }
+
+            isInsideRightCourt(x, y) {
+                return this.isInsideCourt(x, y) && x >= this.netX;
+            }
+
+            isOutOfBounds(x, y) {
+                return x < this.courtLeft || x > this.courtRight || y > this.courtBottom;
+            }
+        }
+
+        class Player {
+            constructor(x, y, isAI = false) {
+                this.x = x;
+                this.y = y;
+                this.isAI = isAI;
+                this.width = 40;
+                this.height = 60;
+                this.vx = 0;
+                this.vy = 0;
+                this.speed = 5;
+                this.jumpPower = -12;
+                this.maxVx = 8;
+                this.maxVy = -15;
+                this.isJumping = false;
+                this.groundY = y;
+                this.color = isAI ? '#ff6b6b' : '#4ecdc4';
+                this.hitCooldown = 0;
+                this.canServe = false;
+            }
+
+            update(keys, court) {
+                if (!this.isAI) {
+                    this.handleInput(keys);
+                }
+                
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += GRAVITY * 0.8;
+                
+                if (this.y >= this.groundY) {
+                    this.y = this.groundY;
+                    this.vy = 0;
+                    this.isJumping = false;
+                }
+                
+                if (this.x - this.width / 2 < court.courtLeft) {
+                    this.x = court.courtLeft + this.width / 2;
+                    this.vx = 0;
+                }
+                if (this.x + this.width / 2 > court.courtRight) {
+                    this.x = court.courtRight - this.width / 2;
+                    this.vx = 0;
+                }
+                
+                if (this.isAI) {
+                    if (this.x > court.netX) {
+                        this.x = Math.max(court.netX + this.width / 2 + 10, this.x);
+                    }
+                } else {
+                    if (this.x < court.netX) {
+                        this.x = Math.min(court.netX - this.width / 2 - 10, this.x);
+                    }
+                }
+                
+                if (this.hitCooldown > 0) {
+                    this.hitCooldown--;
+                }
+            }
+
+            handleInput(keys) {
+                if (keys['KeyA'] || keys['ArrowLeft']) {
+                    this.vx = Math.max(this.vx - 0.5, -this.maxVx);
+                } else if (keys['KeyD'] || keys['ArrowRight']) {
+                    this.vx = Math.min(this.vx + 0.5, this.maxVx);
+                } else {
+                    this.vx *= 0.85;
+                }
+                
+                if ((keys['KeyW'] || keys['ArrowUp']) && !this.isJumping) {
+                    this.vy = this.jumpPower;
+                    this.isJumping = true;
+                }
+            }
+
+            jump() {
+                if (!this.isJumping) {
+                    this.vy = this.jumpPower;
+                    this.isJumping = true;
+                }
+            }
+
+            moveLeft() {
+                this.vx = Math.max(this.vx - 0.5, -this.maxVx);
+            }
+
+            moveRight() {
+                this.vx = Math.min(this.vx + 0.5, this.maxVx);
+            }
+
+            stopMoving() {
+                this.vx *= 0.85;
+            }
+
+            draw(ctx, court) {
+                const scale = court.width / 1280;
+                const w = this.width * scale;
+                const h = this.height * scale;
+                
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.ellipse(this.x, this.y - h * 0.3, w * 0.4, h * 0.35, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y - h * 0.75, w * 0.35, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(this.x - w * 0.12, this.y - h * 0.78, w * 0.08, 0, Math.PI * 2);
+                ctx.arc(this.x + w * 0.12, this.y - h * 0.78, w * 0.08, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#333';
+                ctx.beginPath();
+                ctx.arc(this.x - w * 0.12, this.y - h * 0.78, w * 0.04, 0, Math.PI * 2);
+                ctx.arc(this.x + w * 0.12, this.y - h * 0.78, w * 0.04, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = w * 0.15;
+                ctx.lineCap = 'round';
+                
+                const armAngle = this.isJumping ? -0.8 : 0.3;
+                ctx.beginPath();
+                ctx.moveTo(this.x - w * 0.35, this.y - h * 0.4);
+                ctx.lineTo(this.x - w * 0.6, this.y - h * 0.4 + Math.sin(armAngle) * 30 * scale);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(this.x + w * 0.35, this.y - h * 0.4);
+                ctx.lineTo(this.x + w * 0.6, this.y - h * 0.4 + Math.sin(armAngle) * 30 * scale);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(this.x - w * 0.15, this.y - h * 0.05);
+                ctx.lineTo(this.x - w * 0.2, this.y);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(this.x + w * 0.15, this.y - h * 0.05);
+                ctx.lineTo(this.x + w * 0.2, this.y);
+                ctx.stroke();
+            }
+
+            getHitbox() {
+                return {
+                    x: this.x - this.width,
+                    y: this.y - this.height * 1.5,
+                    width: this.width * 2,
+                    height: this.height * 1.5
+                };
+            }
+
+            canHitBall() {
+                return this.hitCooldown <= 0;
+            }
+
+            resetCooldown() {
+                this.hitCooldown = 20;
+            }
+        }
+
+        class Ball {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 15;
+                this.vx = 0;
+                this.vy = 0;
+                this.lastHitter = null;
+            }
+
+            update(court) {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += GRAVITY;
+                this.vx *= AIR_RESISTANCE;
+                this.vy *= AIR_RESISTANCE;
+                
+                if (this.y + this.radius >= court.courtBottom) {
+                    this.y = court.courtBottom - this.radius;
+                    this.vy = -this.vy * BOUNCE_FACTOR;
+                    this.vx *= 0.9;
+                }
+                
+                if (this.y + this.radius > court.netTop && 
+                    this.y - this.radius < court.courtBottom) {
+                    if (this.x + this.radius > court.netX - court.netWidth / 2 &&
+                        this.x - this.radius < court.netX + court.netWidth / 2) {
+                        if (this.vx > 0) {
+                            this.x = court.netX - court.netWidth / 2 - this.radius;
+                        } else {
+                            this.x = court.netX + court.netWidth / 2 + this.radius;
+                        }
+                        this.vx = -this.vx * 0.6;
+                        this.vy *= 0.8;
+                    }
+                }
+            }
+
+            draw(ctx, court) {
+                const scale = court.width / 1280;
+                const r = this.radius * scale;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.beginPath();
+                ctx.ellipse(this.x + 3 * scale, this.y + 3 * scale, r, r * 0.6, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                const gradient = ctx.createRadialGradient(
+                    this.x - r * 0.3, this.y - r * 0.3, 0,
+                    this.x, this.y, r
+                );
+                gradient.addColorStop(0, '#ffffff');
+                gradient.addColorStop(0.3, '#f0f0f0');
+                gradient.addColorStop(0.7, '#d0d0d0');
+                gradient.addColorStop(1, '#a0a0a0');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 1.5 * scale;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(this.x - r, this.y);
+                ctx.lineTo(this.x + r, this.y);
+                ctx.moveTo(this.x, this.y - r);
+                ctx.lineTo(this.x, this.y + r);
+                ctx.moveTo(this.x - r * 0.7, this.y - r * 0.7);
+                ctx.lineTo(this.x + r * 0.7, this.y + r * 0.7);
+                ctx.moveTo(this.x + r * 0.7, this.y - r * 0.7);
+                ctx.lineTo(this.x - r * 0.7, this.y + r * 0.7);
+                ctx.stroke();
+            }
+
+            checkCollisionWithPlayer(player) {
+                const hitbox = player.getHitbox();
+                const dx = this.x - Math.max(hitbox.x, Math.min(this.x, hitbox.x + hitbox.width));
+                const dy = this.y - Math.max(hitbox.y, Math.min(this.y, hitbox.y + hitbox.height));
+                return (dx * dx + dy * dy) < (this.radius * this.radius);
+            }
+
+            reset(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.lastHitter = null;
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.container = document.getElementById('gameContainer');
+                this.ctx = this.canvas.getContext('2d');
+                
+                this.playerScore = 0;
+                this.aiScore = 0;
+                this.gameOver = false;
+                this.rallyActive = false;
+                this.serveTurn = 'player';
+                
+                this.keys = {};
+                this.court = new Court(this.canvas);
+                
+                this.initGame();
+                this.setupEventListeners();
+                this.resizeCanvas();
+                this.gameLoop();
+            }
+
+            initGame() {
+                const playerX = this.court.courtLeft + this.court.courtWidth * 0.25;
+                const aiX = this.court.courtLeft + this.court.courtWidth * 0.75;
+                const groundY = this.court.courtBottom;
+                
+                this.player = new Player(playerX, groundY, false);
+                this.player.groundY = groundY;
+                this.player.canServe = true;
+                
+                this.ai = new Player(aiX, groundY, true);
+                this.ai.groundY = groundY;
+                
+                this.ball = new Ball(playerX, groundY - 100);
+                
+                this.playerScore = 0;
+                this.aiScore = 0;
+                this.gameOver = false;
+                this.rallyActive = false;
+                this.serveTurn = 'player';
+                
+                this.updateScoreDisplay();
+                document.getElementById('gameOver').style.display = 'none';
+            }
+
+            setupEventListeners() {
+                window.addEventListener('resize', () => this.resizeCanvas());
+                
+                window.addEventListener('keydown', (e) => {
+                    this.keys[e.code] = true;
+                    
+                    if (e.code === 'KeyJ' && !this.gameOver) {
+                        this.handlePlayerHit('serve');
+                    }
+                    if (e.code === 'KeyK' && !this.gameOver) {
+                        this.handlePlayerHit('spike');
+                    }
+                });
+                
+                window.addEventListener('keyup', (e) => {
+                    this.keys[e.code] = false;
+                });
+                
+                document.getElementById('restartBtn').addEventListener('click', () => {
+                    this.initGame();
+                });
+            }
+
+            resizeCanvas() {
+                const windowWidth = window.innerWidth;
+                const windowHeight = window.innerHeight;
+                const windowRatio = windowWidth / windowHeight;
+                
+                let canvasWidth, canvasHeight;
+                
+                if (windowRatio > CANVAS_RATIO) {
+                    canvasHeight = windowHeight * 0.95;
+                    canvasWidth = canvasHeight * CANVAS_RATIO;
+                } else {
+                    canvasWidth = windowWidth * 0.95;
+                    canvasHeight = canvasWidth / CANVAS_RATIO;
+                }
+                
+                this.canvas.width = canvasWidth;
+                this.canvas.height = canvasHeight;
+                this.container.style.width = canvasWidth + 'px';
+                this.container.style.height = canvasHeight + 'px';
+                
+                this.court.updateDimensions();
+                
+                if (this.player) {
+                    this.player.groundY = this.court.courtBottom;
+                    if (!this.rallyActive) {
+                        this.player.x = this.court.courtLeft + this.court.courtWidth * 0.25;
+                        this.player.y = this.court.courtBottom;
+                    }
+                }
+                if (this.ai) {
+                    this.ai.groundY = this.court.courtBottom;
+                    if (!this.rallyActive) {
+                        this.ai.x = this.court.courtLeft + this.court.courtWidth * 0.75;
+                        this.ai.y = this.court.courtBottom;
+                    }
+                }
+            }
+
+            handlePlayerHit(hitType) {
+                if (!this.player.canHitBall()) return;
+                
+                const hitbox = this.player.getHitbox();
+                const inRange = this.ball.x >= hitbox.x && 
+                               this.ball.x <= hitbox.x + hitbox.width &&
+                               this.ball.y >= hitbox.y && 
+                               this.ball.y <= hitbox.y + hitbox.height;
+                
+                if (hitType === 'serve' && this.player.canServe && !this.rallyActive) {
+                    this.serve('player');
+                    this.player.canServe = false;
+                    this.rallyActive = true;
+                    document.getElementById('serveIndicator').style.display = 'none';
+                    return;
+                }
+                
+                if (inRange && this.rallyActive) {
+                    this.hitBall(this.player, hitType);
+                }
+            }
+
+            serve(server) {
+                if (server === 'player') {
+                    this.ball.vx = 8 + Math.random() * 2;
+                    this.ball.vy = -8 + Math.random() * 2;
+                } else {
+                    this.ball.vx = -8 - Math.random() * 2;
+                    this.ball.vy = -8 + Math.random() * 2;
+                }
+                this.ball.lastHitter = server;
+            }
+
+            hitBall(player, hitType) {
+                if (!player.canHitBall()) return;
+                
+                player.resetCooldown();
+                
+                const dx = this.ball.x - player.x;
+                const dy = this.ball.y - (player.y - player.height * 0.5);
+                const isJumping = player.isJumping;
+                const isSpike = hitType === 'spike' && isJumping && dy < 0;
+                
+                let power, angleOffset;
+                
+                if (isSpike) {
+                    power = 12 + Math.random() * 3;
+                    angleOffset = (Math.random() - 0.5) * 0.3;
+                } else {
+                    power = 6 + Math.random() * 2;
+                    angleOffset = (Math.random() - 0.5) * 0.8;
+                }
+                
+                let angle;
+                if (player.isAI) {
+                    angle = -Math.PI / 2.5 + angleOffset;
+                    if (Math.random() > 0.7) {
+                        angle += (Math.random() - 0.5) * 0.4;
+                    }
+                } else {
+                    angle = -Math.PI / 2.5 + angleOffset;
+                }
+                
+                const direction = player.isAI ? -1 : 1;
+                
+                this.ball.vx = Math.cos(angle) * power * direction;
+                this.ball.vy = Math.sin(angle) * power;
+                
+                if (isSpike) {
+                    this.ball.vy = Math.abs(this.ball.vy) * 0.5;
+                }
+                
+                this.ball.lastHitter = player.isAI ? 'ai' : 'player';
+            }
+
+            aiDecision() {
+                if (!this.rallyActive) {
+                    if (this.serveTurn === 'ai' && this.ai.canServe) {
+                        setTimeout(() => {
+                            if (!this.rallyActive && !this.gameOver) {
+                                this.serve('ai');
+                                this.ai.canServe = false;
+                                this.rallyActive = true;
+                            }
+                        }, 1000 + Math.random() * 1000);
+                    }
+                    return;
+                }
+                
+                const ball = this.ball;
+                const ai = this.ai;
+                
+                let targetX = ball.x;
+                
+                if (ball.vx < 0) {
+                    const timeToNet = (this.court.netX - ball.x) / ball.vx;
+                    if (timeToNet > 0) {
+                        targetX = ball.x + ball.vx * timeToNet * 2;
+                    }
+                }
+                
+                const targetDistance = Math.abs(targetX - ai.x);
+                const shouldJump = ball.y < this.court.netTop + 50 && 
+                                   ball.vy < 0 && 
+                                   targetDistance < 100;
+                
+                if (ball.x > this.court.netX) {
+                    if (ai.x < targetX - 20) {
+                        ai.moveRight();
+                    } else if (ai.x > targetX + 20) {
+                        ai.moveLeft();
+                    } else {
+                        ai.stopMoving();
+                    }
+                    
+                    if (shouldJump && Math.random() > 0.3) {
+                        ai.jump();
+                    }
+                    
+                    const hitRange = 60;
+                    const distance = Math.sqrt(
+                        Math.pow(ball.x - ai.x, 2) + 
+                        Math.pow(ball.y - (ai.y - ai.height * 0.5), 2)
+                    );
+                    
+                    if (distance < hitRange && ai.canHitBall()) {
+                        const successRate = 0.8;
+                        if (Math.random() < successRate) {
+                            const hitType = ai.isJumping && ball.y < ai.y - 30 ? 'spike' : 'bump';
+                            this.hitBall(ai, hitType);
+                        }
+                    }
+                }
+            }
+
+            checkScoring() {
+                const ball = this.ball;
+                
+                if (ball.y + ball.radius >= this.court.courtBottom) {
+                    this.rallyActive = false;
+                    
+                    if (ball.x < this.court.netX) {
+                        this.scorePoint('ai');
+                    } else {
+                        this.scorePoint('player');
+                    }
+                    return true;
+                }
+                
+                if (this.court.isOutOfBounds(ball.x, ball.y)) {
+                    this.rallyActive = false;
+                    
+                    if (ball.x < this.court.netX) {
+                        this.scorePoint('ai');
+                    } else if (ball.x > this.court.netX) {
+                        this.scorePoint('player');
+                    }
+                    return true;
+                }
+                
+                return false;
+            }
+
+            scorePoint(scorer) {
+                if (scorer === 'player') {
+                    this.playerScore++;
+                    this.serveTurn = 'player';
+                } else {
+                    this.aiScore++;
+                    this.serveTurn = 'ai';
+                }
+                
+                this.updateScoreDisplay();
+                this.checkWinCondition();
+                
+                if (!this.gameOver) {
+                    setTimeout(() => this.resetRally(), 1500);
+                }
+            }
+
+            resetRally() {
+                const playerX = this.court.courtLeft + this.court.courtWidth * 0.25;
+                const aiX = this.court.courtLeft + this.court.courtWidth * 0.75;
+                
+                this.player.x = playerX;
+                this.player.y = this.court.courtBottom;
+                this.player.vx = 0;
+                this.player.vy = 0;
+                
+                this.ai.x = aiX;
+                this.ai.y = this.court.courtBottom;
+                this.ai.vx = 0;
+                this.ai.vy = 0;
+                
+                if (this.serveTurn === 'player') {
+                    this.ball.reset(playerX, this.court.courtBottom - 100);
+                    this.player.canServe = true;
+                    document.getElementById('serveIndicator').style.display = 'block';
+                } else {
+                    this.ball.reset(aiX, this.court.courtBottom - 100);
+                    this.ai.canServe = true;
+                    document.getElementById('serveIndicator').style.display = 'none';
+                }
+                
+                this.rallyActive = false;
+            }
+
+            checkWinCondition() {
+                const pScore = this.playerScore;
+                const aScore = this.aiScore;
+                
+                if (pScore >= WINNING_SCORE && pScore - aScore >= WINNING_MARGIN) {
+                    this.endGame('player');
+                } else if (aScore >= WINNING_SCORE && aScore - pScore >= WINNING_MARGIN) {
+                    this.endGame('ai');
+                }
+            }
+
+            endGame(winner) {
+                this.gameOver = true;
+                const gameOverDiv = document.getElementById('gameOver');
+                const winnerText = document.getElementById('winnerText');
+                const finalScore = document.getElementById('finalScore');
+                
+                if (winner === 'player') {
+                    winnerText.textContent = '🎉 恭喜你获胜！ 🎉';
+                    winnerText.style.color = '#4ecdc4';
+                } else {
+                    winnerText.textContent = '😢 AI 获胜，再接再厉！';
+                    winnerText.style.color = '#ff6b6b';
+                }
+                
+                finalScore.textContent = `最终比分: ${this.playerScore} : ${this.aiScore}`;
+                gameOverDiv.style.display = 'flex';
+            }
+
+            updateScoreDisplay() {
+                document.getElementById('playerScore').textContent = this.playerScore;
+                document.getElementById('aiScore').textContent = this.aiScore;
+            }
+
+            gameLoop() {
+                if (!this.gameOver) {
+                    this.player.update(this.keys, this.court);
+                    this.ai.update(this.keys, this.court);
+                    
+                    if (this.rallyActive) {
+                        this.ball.update(this.court);
+                        this.checkScoring();
+                    }
+                    
+                    this.aiDecision();
+                }
+                
+                this.render();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+
+            render() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.court.draw();
+                this.player.draw(this.ctx, this.court);
+                this.ai.draw(this.ctx, this.court);
+                this.ball.draw(this.ctx, this.court);
+            }
+        }
+
+        window.addEventListener('load', () => {
+            new Game();
+        });
+    </script>
+</body>
+</html>

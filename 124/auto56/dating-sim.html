@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园恋爱物语 - 高中篇</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .game-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .date-display {
+            font-size: 18px;
+            font-weight: bold;
+            background: rgba(255,255,255,0.3);
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 250px 1fr 280px;
+            gap: 15px;
+            padding: 15px;
+            min-height: 500px;
+        }
+
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .character-card {
+            background: white;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .character-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+        }
+
+        .character-card.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .character-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: white;
+            font-weight: bold;
+            transition: all 0.5s ease;
+        }
+
+        .character-avatar.stage-change {
+            animation: avatarFlash 0.8s ease-in-out;
+        }
+
+        @keyframes avatarFlash {
+            0%, 100% { transform: scale(1); filter: brightness(1); }
+            50% { transform: scale(1.2); filter: brightness(1.5); }
+        }
+
+        .character-name {
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .character-tags {
+            text-align: center;
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .affection-bar {
+            height: 12px;
+            background: #e0e0e0;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 5px;
+        }
+
+        .affection-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #feca57);
+            border-radius: 6px;
+            transition: width 0.5s ease;
+        }
+
+        .affection-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .interaction-status {
+            text-align: center;
+            font-size: 11px;
+            margin-top: 8px;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .interaction-status.done {
+            background: #e0e0e0;
+            color: #999;
+        }
+
+        .interaction-status.available {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .schedule-panel .schedule-btn {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .schedule-btn.study {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .schedule-btn.sports {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            color: white;
+        }
+
+        .schedule-btn.social {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            color: white;
+        }
+
+        .schedule-btn.rest {
+            background: linear-gradient(135deg, #43e97b, #38f9d7);
+            color: white;
+        }
+
+        .schedule-btn:hover:not(:disabled) {
+            transform: scale(1.02);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .schedule-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .schedule-hint {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .dialogue-area {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .dialogue-scene {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .scene-character {
+            text-align: center;
+        }
+
+        .scene-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 50px;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .scene-name {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .dialogue-box {
+            background: rgba(0,0,0,0.8);
+            color: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            min-height: 120px;
+            position: relative;
+        }
+
+        .dialogue-speaker {
+            font-weight: bold;
+            color: #feca57;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .dialogue-text {
+            font-size: 15px;
+            line-height: 1.8;
+            min-height: 40px;
+        }
+
+        .dialogue-text.typing::after {
+            content: '|';
+            animation: blink 0.7s infinite;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .dialogue-options {
+            display: grid;
+            gap: 10px;
+        }
+
+        .option-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+
+        .option-btn:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .history-panel {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .history-item.system {
+            background: #e3f2fd;
+            color: #1565c0;
+            border-left: 4px solid #2196f3;
+        }
+
+        .history-item.stage-up {
+            background: #fff3e0;
+            color: #ef6c00;
+            border-left: 4px solid #ff9800;
+            animation: pulse 1s ease;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .history-speaker {
+            font-weight: bold;
+            color: #f5576c;
+        }
+
+        .footer {
+            background: #333;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .footer button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .save-btn {
+            background: #4caf50;
+            color: white;
+        }
+
+        .load-btn {
+            background: #2196f3;
+            color: white;
+        }
+
+        .new-game-btn {
+            background: #ff9800;
+            color: white;
+        }
+
+        .footer button:hover {
+            transform: translateY(-2px);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .save-slots {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .save-slot {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .save-slot:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .save-slot.empty {
+            color: #999;
+        }
+
+        .save-slot-date {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .save-slot-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .modal-close {
+            background: #e0e0e0;
+            border: none;
+            padding: 10px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .welcome-screen {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .welcome-title {
+            font-size: 32px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 20px;
+        }
+
+        .welcome-text {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.8;
+        }
+
+        .start-btn {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            padding: 15px 50px;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 20px rgba(240, 147, 251, 0.4);
+        }
+
+        .start-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(240, 147, 251, 0.5);
+        }
+
+        .ending-screen {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .ending-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .ending-character {
+            font-size: 24px;
+            color: #f5576c;
+            margin-bottom: 15px;
+        }
+
+        .ending-description {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.8;
+            margin-bottom: 30px;
+        }
+
+        .special-ending {
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <h1>💕 校园恋爱物语 💕</h1>
+            <div class="date-display" id="dateDisplay">第 1 天</div>
+        </div>
+
+        <div class="main-content" id="mainContent">
+            <div class="welcome-screen" id="welcomeScreen">
+                <div class="welcome-title">🎓 高中校园恋爱记 🎓</div>
+                <div class="welcome-text">
+                    你是一名刚转入樱花高中的转学生<br>
+                    在接下来的30天里，你将在这里度过难忘的一学期<br>
+                    邂逅不同的人，发展属于你的恋爱故事<br><br>
+                    你准备好了吗？
+                </div>
+                <button class="start-btn" onclick="GameAPI.startNewGame()">开始新游戏</button>
+            </div>
+
+            <div id="gameUI" style="display: none;">
+                <div class="panel">
+                    <div class="panel-title">📚 可攻略角色</div>
+                    <div id="characterList"></div>
+                </div>
+
+                <div class="dialogue-area">
+                    <div class="dialogue-scene" id="dialogueScene">
+                        <div class="scene-character">
+                            <div class="scene-avatar" id="sceneAvatar" style="background: linear-gradient(135deg, #ccc, #999);">?</div>
+                            <div class="scene-name" id="sceneName">选择角色开始互动</div>
+                        </div>
+                    </div>
+                    <div class="dialogue-box">
+                        <div class="dialogue-speaker" id="dialogueSpeaker">系统</div>
+                        <div class="dialogue-text" id="dialogueText">欢迎来到樱花高中！请先选择今日的日程安排，然后点击左侧角色头像开始互动。</div>
+                    </div>
+                    <div class="dialogue-options" id="dialogueOptions"></div>
+                </div>
+
+                <div>
+                    <div class="panel schedule-panel">
+                        <div class="panel-title">📅 今日日程</div>
+                        <button class="schedule-btn study" onclick="GameAPI.chooseSchedule('study')" id="btnStudy">📖 学习</button>
+                        <button class="schedule-btn sports" onclick="GameAPI.chooseSchedule('sports')" id="btnSports">⚽ 运动</button>
+                        <button class="schedule-btn social" onclick="GameAPI.chooseSchedule('social')" id="btnSocial">🎉 社交</button>
+                        <button class="schedule-btn rest" onclick="GameAPI.chooseSchedule('rest')" id="btnRest">😴 休息</button>
+                        <div class="schedule-hint" id="scheduleHint">选择后将影响对话选项</div>
+                    </div>
+                    <div class="panel history-panel">
+                        <div class="panel-title">📜 对话历史</div>
+                        <div id="historyList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <button class="save-btn" onclick="GameAPI.openSaveModal()">💾 保存游戏</button>
+            <button class="load-btn" onclick="GameAPI.openLoadModal()">📂 读取存档</button>
+            <button class="new-game-btn" onclick="GameAPI.startNewGame()">🔄 重新开始</button>
+        </div>
+    </div>
+
+    <div class="modal" id="saveModal">
+        <div class="modal-content">
+            <div class="modal-title">💾 保存游戏</div>
+            <div class="save-slots" id="saveSlots"></div>
+            <button class="modal-close" onclick="GameAPI.closeModal('saveModal')">关闭</button>
+        </div>
+    </div>
+
+    <div class="modal" id="loadModal">
+        <div class="modal-content">
+            <div class="modal-title">📂 读取存档</div>
+            <div class="save-slots" id="loadSlots"></div>
+            <button class="modal-close" onclick="GameAPI.closeModal('loadModal')">关闭</button>
+        </div>
+    </div>
+
+    <script>
+        const DataModel = {
+            characters: {
+                xueer: {
+                    id: 'xueer',
+                    name: '林雪儿',
+                    tags: '学霸、温柔、书虫',
+                    color: 'linear-gradient(135deg, #667eea, #764ba2)',
+                    emoji: '📚',
+                    affection: 0,
+                    stage: 0,
+                    interactedToday: false,
+                    consecutiveDays: 0,
+                    lastInteractDay: -1,
+                    conflictTriggered: false,
+                    conflictResolved: false
+                },
+                yufei: {
+                    id: 'yufei',
+                    name: '张雨菲',
+                    tags: '运动少女、开朗、直爽',
+                    color: 'linear-gradient(135deg, #f093fb, #f5576c)',
+                    emoji: '⚽',
+                    affection: 0,
+                    stage: 0,
+                    interactedToday: false,
+                    consecutiveDays: 0,
+                    lastInteractDay: -1,
+                    conflictTriggered: false,
+                    conflictResolved: false
+                },
+                xiaoyue: {
+                    id: 'xiaoyue',
+                    name: '王小月',
+                    tags: '文艺、神秘、音乐才女',
+                    color: 'linear-gradient(135deg, #4facfe, #00f2fe)',
+                    emoji: '🎵',
+                    affection: 0,
+                    stage: 0,
+                    interactedToday: false,
+                    consecutiveDays: 0,
+                    lastInteractDay: -1,
+                    conflictTriggered: false,
+                    conflictResolved: false
+                }
+            },
+
+            stages: [
+                { name: '陌生', min: 0, max: 20 },
+                { name: '相识', min: 20, max: 40 },
+                { name: '好友', min: 40, max: 60 },
+                { name: '挚友', min: 60, max: 80 },
+                { name: '恋人', min: 80, max: 100 }
+            ],
+
+            gameState: {
+                day: 1,
+                maxDays: 30,
+                currentSchedule: null,
+                currentCharacter: null,
+                currentDialogueId: null,
+                dialogueHistory: [],
+                triggeredEvents: [],
+                hiddenEventTriggered: {},
+                gameEnded: false
+            },
+
+            dialogues: {
+                xueer: {
+                    0: [
+                        {
+                            id: 'xueer_0_1',
+                            text: '（她正埋头看书，似乎没有注意到你）',
+                            speaker: '林雪儿',
+                            options: [
+                                { text: '轻轻拍她肩膀打招呼', affection: { min: 3, max: 8 }, response: '啊！吓我一跳...你是新来的转学生吧？你好，我叫林雪儿。' },
+                                { text: '安静地坐在旁边等她看完', affection: { min: 5, max: 10 }, response: '（过了一会儿她抬起头）啊，你什么时候来的？不好意思看得太入迷了，我是林雪儿。' },
+                                { text: '同学你好，请问图书馆怎么走？', affection: { min: 0, max: 5 }, response: '图书馆啊...沿着走廊走到头右转就是。我也正要去，要一起吗？' }
+                            ]
+                        }
+                    ],
+                    1: [
+                        {
+                            id: 'xueer_1_1',
+                            text: '是你啊，今天怎么有空来找我？',
+                            speaker: '林雪儿',
+                            options: [
+                                { text: '有道数学题想请教你', affection: { min: 8, max: 15 }, response: '数学题？让我看看...哦这个啊，其实很简单的，我来教你。' },
+                                { text: '刚好路过，想和你打个招呼', affection: { min: 3, max: 8 }, response: '这样啊...那要不要一起去图书馆坐会儿？' },
+                                { text: '听说你这次考试又是年级第一', affection: { min: 5, max: 10 }, response: '（脸红）也没有啦...就是平时多看书而已。你要是努力的话也可以的！' }
+                            ]
+                        }
+                    ],
+                    2: [
+                        {
+                            id: 'xueer_2_1',
+                            text: '（她看到你，露出了温柔的微笑）今天也来学习吗？',
+                            speaker: '林雪儿',
+                            options: [
+                                { text: '是啊，有你在学得比较快', affection: { min: 10, max: 18 }, response: '（脸更红了）是、是吗...那我们快开始吧，我今天准备了新的笔记。' },
+                                { text: '其实是想来看看你', affection: { min: 12, max: 20 }, response: '看、看我？你突然说这种话...我会不好意思的啦。' },
+                                { text: '想约你一起去食堂吃午饭', affection: { min: 8, max: 14 }, response: '午饭？好啊！我知道有家窗口的菜特别好吃，我带你去！' }
+                            ]
+                        },
+                        {
+                            id: 'xueer_conflict',
+                            text: '（她看起来有些不高兴）...听说你昨天和雨菲走得很近？',
+                            speaker: '林雪儿',
+                            condition: (state) => !state.conflictTriggered,
+                            options: [
+                                { text: '只是问了些运动方面的事而已', affection: { min: -10, max: -5 }, response: '（低头）是吗...算了，可能是我想多了。', triggerConflict: true },
+                                { text: '你在吃醋吗？', affection: { min: -15, max: -8 }, response: '我才没有！你、你不要乱说！', triggerConflict: true },
+                                { text: '我和她只是普通朋友', affection: { min: -5, max: 0 }, response: '...嗯，我知道了。', triggerConflict: true }
+                            ]
+                        }
+                    ],
+                    conflict: [
+                        {
+                            id: 'xueer_conflict_resolve',
+                            text: '（她故意避开你的眼神，气氛有些尴尬）',
+                            speaker: '林雪儿',
+                            options: [
+                                { text: '雪儿，对不起，我不该让你误会', affection: { min: 15, max: 25 }, response: '（抬起头）...其实我也不该生气的。只是看到你和别人那么好，心里有点不舒服...', resolveConflict: true },
+                                { text: '这是我整理的笔记，给你', affection: { min: 10, max: 18 }, response: '（接过笔记）...谢谢你。我们和好吧，我不想再这样了。', resolveConflict: true },
+                                { text: '我们能好好谈谈吗？', affection: { min: 8, max: 15 }, response: '...嗯，我也想把话说清楚。', resolveConflict: true }
+                            ]
+                        }
+                    ],
+                    3: [
+                        {
+                            id: 'xueer_3_1',
+                            text: '（她开心地向你挥手）这里这里！',
+                            speaker: '林雪儿',
+                            options: [
+                                { text: '抱歉让你久等了', affection: { min: 8, max: 15 }, response: '没关系没关系，我也刚到没多久。今天想去哪里？' },
+                                { text: '今天的你特别好看', affection: { min: 12, max: 20 }, response: '（害羞地低下头）你、你又开始了...不过...谢谢你。' },
+                                { text: '我带了你喜欢的书', affection: { min: 15, max: 22 }, response: '真的吗！太好了！我找这本书好久了，你怎么知道我想要？' }
+                            ]
+                        }
+                    ],
+                    4: [
+                        {
+                            id: 'xueer_4_1',
+                            text: '（她红着脸站在樱花树下，微风拂起她的长发）',
+                            speaker: '林雪儿',
+                            options: [
+                                { text: '雪儿，我喜欢你', affection: { min: 15, max: 20 }, response: '（泪水在眼眶里打转）...我也是，我喜欢你很久了...' },
+                                { text: '能一直这样陪在你身边真好', affection: { min: 12, max: 18 }, response: '嗯...我们要一直在一起，永远不分开。' },
+                                { text: '毕业后我们考同一所大学吧', affection: { min: 10, max: 16 }, response: '好啊！说定了，我们要一起努力，未来也要在一起！' }
+                            ]
+                        }
+                    ]
+                },
+                yufei: {
+                    0: [
+                        {
+                            id: 'yufei_0_1',
+                            text: '（她刚跑完步，正在擦汗）呼——爽！',
+                            speaker: '张雨菲',
+                            options: [
+                                { text: '你跑得好快啊！', affection: { min: 5, max: 10 }, response: '哈哈，那当然！我可是田径社的王牌！你是新来的转学生吧？我叫张雨菲！' },
+                                { text: '递上一瓶水', affection: { min: 8, max: 15 }, response: '（接过水）哇，谢啦！你人真好！以后有什么事尽管找我，我罩着你！' },
+                                { text: '同学你好，我是新来的', affection: { min: 3, max: 8 }, response: '哦！转学生啊！你好你好！我是张雨菲，叫我雨菲就行！' }
+                            ]
+                        }
+                    ],
+                    1: [
+                        {
+                            id: 'yufei_1_1',
+                            text: '哟！是你啊！今天怎么来操场找我？',
+                            speaker: '张雨菲',
+                            options: [
+                                { text: '想跟你学跑步', affection: { min: 8, max: 15 }, response: '没问题！包在我身上！以后每天早上来操场找我，我亲自教你！' },
+                                { text: '来给你加油打气', affection: { min: 5, max: 10 }, response: '哈哈，还是你够意思！下次比赛你一定要来看啊！' },
+                                { text: '刚好路过，打个招呼', affection: { min: 3, max: 7 }, response: '这样啊...要不要来跑两圈？很舒服的！' }
+                            ]
+                        }
+                    ],
+                    2: [
+                        {
+                            id: 'yufei_2_1',
+                            text: '（她跑过来一把搂住你的肩膀）嘿！等你好久了！',
+                            speaker: '张雨菲',
+                            options: [
+                                { text: '抱歉，来晚了', affection: { min: 5, max: 10 }, response: '没事没事！来了就行！今天练点轻松的！' },
+                                { text: '被你搂着有点不好意思', affection: { min: 10, max: 18 }, response: '（松开手，脸红）啊、抱歉抱歉！习惯了...我不是故意的！' },
+                                { text: '今天也一起训练吧', affection: { min: 8, max: 14 }, response: '好！就等你这句话！今天我们来挑战新纪录！' }
+                            ]
+                        },
+                        {
+                            id: 'yufei_conflict',
+                            text: '（她看起来不太高兴）...听说你最近经常和小月待在一起？',
+                            speaker: '张雨菲',
+                            condition: (state) => !state.conflictTriggered,
+                            options: [
+                                { text: '她教我一些音乐知识', affection: { min: -12, max: -6 }, response: '（别过头）...哦，这样啊。', triggerConflict: true },
+                                { text: '你在在意吗？', affection: { min: -15, max: -8 }, response: '我、我才没有！随便你和谁在一起！', triggerConflict: true },
+                                { text: '我和她只是朋友', affection: { min: -8, max: -3 }, response: '...嗯，知道了。', triggerConflict: true }
+                            ]
+                        }
+                    ],
+                    conflict: [
+                        {
+                            id: 'yufei_conflict_resolve',
+                            text: '（看到你来，她装作没看见，但眼角在偷瞄）',
+                            speaker: '张雨菲',
+                            options: [
+                                { text: '雨菲，对不起，我不该让你难过', affection: { min: 18, max: 28 }, response: '（转过身）...笨蛋！我才没有难过！...不过，你能这么说我很开心。', resolveConflict: true },
+                                { text: '这是你爱喝的运动饮料', affection: { min: 14, max: 22 }, response: '（接过饮料）...算你有良心。我们和好吧，我一个人训练好无聊。', resolveConflict: true },
+                                { text: '没有你陪我跑步，总觉得少了什么', affection: { min: 12, max: 20 }, response: '（眼眶微红）...那你还不快过来！今天要加倍训练！', resolveConflict: true }
+                            ]
+                        }
+                    ],
+                    3: [
+                        {
+                            id: 'yufei_3_1',
+                            text: '（她笑着朝你跑来，阳光下的她格外耀眼）',
+                            speaker: '张雨菲',
+                            options: [
+                                { text: '今天的你真耀眼', affection: { min: 12, max: 20 }, response: '（脸红）说、说什么呢你！...不过，谢谢。' },
+                                { text: '我想一直看着你奔跑的样子', affection: { min: 15, max: 22 }, response: '那...那你要一直看着哦！我会跑出最好的成绩给你看！' },
+                                { text: '比完赛我们去约会吧', affection: { min: 18, max: 25 }, response: '（愣住，然后脸爆红）约、约会？！...好、好啊！比完赛就去！' }
+                            ]
+                        }
+                    ],
+                    4: [
+                        {
+                            id: 'yufei_4_1',
+                            text: '（她冲过终点线，径直向你跑来扑进你怀里）',
+                            speaker: '张雨菲',
+                            options: [
+                                { text: '雨菲，你做到了！', affection: { min: 15, max: 20 }, response: '（在你怀里哽咽）嗯...我做到了...都是因为有你在...' },
+                                { text: '我喜欢你，雨菲', affection: { min: 18, max: 22 }, response: '（抱得更紧）...我也是，最喜欢你了！从第一次见到你就喜欢了！' },
+                                { text: '以后也一起跑下去吧', affection: { min: 12, max: 18 }, response: '嗯！一辈子都一起跑！只要和你在一起，去哪里都可以！' }
+                            ]
+                        }
+                    ]
+                },
+                xiaoyue: {
+                    0: [
+                        {
+                            id: 'xiaoyue_0_1',
+                            text: '（她正在窗边拉小提琴，琴声悠扬）',
+                            speaker: '王小月',
+                            options: [
+                                { text: '静静听完再打招呼', affection: { min: 8, max: 15 }, response: '（一曲终了，她转过身）啊，你什么时候来的？...谢谢你听我演奏。' },
+                                { text: '你的琴声真好听', affection: { min: 5, max: 10 }, response: '（微微颔首）谢谢。我是王小月。你是新来的转学生？' },
+                                { text: '不好意思打扰到你了', affection: { min: 3, max: 8 }, response: '没关系。很少有人会来音乐教室。你喜欢音乐吗？' }
+                            ]
+                        }
+                    ],
+                    1: [
+                        {
+                            id: 'xiaoyue_1_1',
+                            text: '（她抬起头，眼中闪过一丝惊讶）是你...',
+                            speaker: '王小月',
+                            options: [
+                                { text: '想再听你演奏', affection: { min: 8, max: 15 }, response: '...好。想听什么？虽然我可能不会。' },
+                                { text: '来看看有没有能帮忙的', affection: { min: 5, max: 10 }, response: '（嘴角微扬）那...帮我翻乐谱吧。' },
+                                { text: '只是想来看看你', affection: { min: 6, max: 12 }, response: '（别过头）...是吗。随便坐吧。' }
+                            ]
+                        }
+                    ],
+                    2: [
+                        {
+                            id: 'xiaoyue_2_1',
+                            text: '（她停下手中的琴，看向你）...来了。',
+                            speaker: '王小月',
+                            options: [
+                                { text: '嗯，来听你弹琴', affection: { min: 10, max: 18 }, response: '...今天我写了首新曲子，想让你第一个听听。' },
+                                { text: '你今天看起来特别温柔', affection: { min: 12, max: 20 }, response: '（脸红低头）...是、是吗...可能因为心情好吧。' },
+                                { text: '放学后一起去散步吧', affection: { min: 8, max: 14 }, response: '...嗯，好。刚好想去看看夕阳。' }
+                            ]
+                        },
+                        {
+                            id: 'xiaoyue_conflict',
+                            text: '（她的琴声有些凌乱，停下后沉默不语）...听说你和雪儿经常一起学习？',
+                            speaker: '王小月',
+                            condition: (state) => !state.conflictTriggered,
+                            options: [
+                                { text: '只是请教功课而已', affection: { min: -10, max: -5 }, response: '...哦。', triggerConflict: true },
+                                { text: '你也在在意这种事？', affection: { min: -15, max: -8 }, response: '（皱眉）当我没问。', triggerConflict: true },
+                                { text: '我和她只是同学', affection: { min: -6, max: -2 }, response: '...知道了。', triggerConflict: true }
+                            ]
+                        }
+                    ],
+                    conflict: [
+                        {
+                            id: 'xiaoyue_conflict_resolve',
+                            text: '（她背对着你，琴声中带着忧伤）',
+                            speaker: '王小月',
+                            options: [
+                                { text: '小月，对不起，让你难过了', affection: { min: 20, max: 30 }, response: '（琴声停下，肩膀微颤）...我以为你更喜欢和她在一起...', resolveConflict: true },
+                                { text: '我写了首诗，想读给你听', affection: { min: 15, max: 25 }, response: '（转过身，眼眶微红）...你还会写诗？念给我听听。', resolveConflict: true },
+                                { text: '只有在你身边，我的心才能平静', affection: { min: 18, max: 28 }, response: '...（轻轻握住你的手）那就...永远留在我身边吧。', resolveConflict: true }
+                            ]
+                        }
+                    ],
+                    3: [
+                        {
+                            id: 'xiaoyue_3_1',
+                            text: '（她微笑着，琴声如春风般温暖）',
+                            speaker: '王小月',
+                            options: [
+                                { text: '你的琴声越来越有感情了', affection: { min: 12, max: 20 }, response: '...因为有想倾诉的对象了。你能听懂吗？' },
+                                { text: '你的笑容真的很美', affection: { min: 15, max: 22 }, response: '（脸红）...我以前很少笑...是你改变了我。' },
+                                { text: '周末一起去听音乐会吧', affection: { min: 10, max: 18 }, response: '...好啊。那...算是约会吗？' }
+                            ]
+                        }
+                    ],
+                    4: [
+                        {
+                            id: 'xiaoyue_4_1',
+                            text: '（月光下，她为你独奏一首浪漫的曲子）',
+                            speaker: '王小月',
+                            options: [
+                                { text: '小月，我爱你', affection: { min: 15, max: 20 }, response: '（琴音落下，她泪眼婆娑）...我也爱你...这首曲子，就是为你写的。' },
+                                { text: '你的音乐，你的一切，我都喜欢', affection: { min: 12, max: 18 }, response: '...那么，以后我的每一首曲子，都只为你而演奏。' },
+                                { text: '愿我们的旋律永不停止', affection: { min: 14, max: 19 }, response: '嗯...我们的故事，才刚刚开始。' }
+                            ]
+                        }
+                    ]
+                }
+            },
+
+            hiddenEvents: {
+                xueer: {
+                    id: 'hidden_xueer',
+                    title: '图书馆的秘密约定',
+                    dialogue: {
+                        text: '（她害羞地递给你一个书签）其实...这三天你每天都来，我很开心...这个给你，是我自己做的...以后，我们就是最好的读书伙伴了，对吧？',
+                        speaker: '林雪儿',
+                        affectionBonus: 25
+                    }
+                },
+                yufei: {
+                    id: 'hidden_yufei',
+                    title: '夕阳下的奔跑',
+                    dialogue: {
+                        text: '（她喘着气，却笑得无比灿烂）哈...三天都陪我跑步...你还真是执着啊...不过我很开心！走！我请你吃刨冰！就我们两个！',
+                        speaker: '张雨菲',
+                        affectionBonus: 25
+                    }
+                },
+                xiaoyue: {
+                    id: 'hidden_xiaoyue',
+                    title: '只属于两人的旋律',
+                    dialogue: {
+                        text: '（她轻轻合上琴盖，转过身）...三天都来听我演奏...这首曲子，是我专门为你写的...只给你一个人听。',
+                        speaker: '王小月',
+                        affectionBonus: 25
+                    }
+                }
+            },
+
+            endings: {
+                normal: (name) => ({
+                    title: '🌸 青春的约定 🌸',
+                    character: name,
+                    description: `高中生活结束了，你和${name}的关系有了美好的开始。未来还有很长的路要走，但你们都相信，这份感情会一直延续下去...`
+                }),
+                trueEnding: (name) => ({
+                    title: '💖 永恒的爱恋 💖',
+                    character: name,
+                    description: `在樱花纷飞的季节，你和${name}确认了彼此的心意。你们一起经历了误会与和解，一起度过了难忘的时光。这份爱情，将成为你们一生中最珍贵的宝藏。`,
+                    special: true
+                })
+            }
+        };
+
+        const UIModule = {
+            renderCharacterList() {
+                const container = document.getElementById('characterList');
+                container.innerHTML = '';
+
+                Object.values(DataModel.characters).forEach(char => {
+                    const stageInfo = DataModel.stages[char.stage];
+                    const isDisabled = char.interactedToday;
+
+                    const card = document.createElement('div');
+                    card.className = `character-card ${isDisabled ? 'disabled' : ''}`;
+                    card.onclick = () => !isDisabled && GameAPI.selectCharacter(char.id);
+
+                    card.innerHTML = `
+                        <div class="character-avatar" style="background: ${char.color}">${char.emoji}</div>
+                        <div class="character-name">${char.name}</div>
+                        <div class="character-tags">${char.tags}</div>
+                        <div class="affection-bar">
+                            <div class="affection-fill" style="width: ${char.affection}%"></div>
+                        </div>
+                        <div class="affection-info">
+                            <span>好感度: ${char.affection}</span>
+                            <span>${stageInfo.name}</span>
+                        </div>
+                        <div class="interaction-status ${isDisabled ? 'done' : 'available'}">
+                            ${isDisabled ? '今日已交互' : '可以互动'}
+                        </div>
+                    `;
+
+                    container.appendChild(card);
+                });
+            },
+
+            updateDateDisplay() {
+                document.getElementById('dateDisplay').textContent = `第 ${DataModel.gameState.day} 天`;
+            },
+
+            updateDialogueScene(charId) {
+                const char = DataModel.characters[charId];
+                document.getElementById('sceneAvatar').style.background = char.color;
+                document.getElementById('sceneAvatar').textContent = char.emoji;
+                document.getElementById('sceneName').textContent = char.name;
+            },
+
+            async typeDialogue(text, speaker) {
+                const dialogueSpeaker = document.getElementById('dialogueSpeaker');
+                const dialogueText = document.getElementById('dialogueText');
+                
+                dialogueSpeaker.textContent = speaker;
+                dialogueText.textContent = '';
+                dialogueText.classList.add('typing');
+
+                for (let i = 0; i < text.length; i++) {
+                    dialogueText.textContent += text[i];
+                    await new Promise(resolve => setTimeout(resolve, 30));
+                }
+
+                dialogueText.classList.remove('typing');
+            },
+
+            renderOptions(options) {
+                const container = document.getElementById('dialogueOptions');
+                container.innerHTML = '';
+
+                options.forEach((opt, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'option-btn';
+                    btn.textContent = opt.text;
+                    btn.onclick = () => GameAPI.chooseOption(index);
+                    container.appendChild(btn);
+                });
+            },
+
+            clearOptions() {
+                document.getElementById('dialogueOptions').innerHTML = '';
+            },
+
+            addToHistory(speaker, text, type = 'normal') {
+                const container = document.getElementById('historyList');
+                const item = document.createElement('div');
+                item.className = `history-item ${type}`;
+                
+                if (type === 'system' || type === 'stage-up') {
+                    item.textContent = text;
+                } else {
+                    item.innerHTML = `<span class="history-speaker">${speaker}:</span> ${text}`;
+                }
+
+                container.insertBefore(item, container.firstChild);
+            },
+
+            updateScheduleButtons(enabled) {
+                ['study', 'sports', 'social', 'rest'].forEach(type => {
+                    document.getElementById(`btn${type.charAt(0).toUpperCase() + type.slice(1)}`).disabled = !enabled;
+                });
+                document.getElementById('scheduleHint').textContent = enabled ? '选择后将影响对话选项' : '已选择今日日程';
+            },
+
+            showAvatarFlash(charId) {
+                const avatars = document.querySelectorAll('.character-avatar');
+                const index = Object.keys(DataModel.characters).indexOf(charId);
+                if (avatars[index]) {
+                    avatars[index].classList.add('stage-change');
+                    setTimeout(() => avatars[index].classList.remove('stage-change'), 800);
+                }
+            },
+
+            showWelcomeScreen() {
+                document.getElementById('welcomeScreen').style.display = 'block';
+                document.getElementById('gameUI').style.display = 'none';
+            },
+
+            showGameUI() {
+                document.getElementById('welcomeScreen').style.display = 'none';
+                document.getElementById('gameUI').style.display = 'grid';
+            },
+
+            showEnding(ending) {
+                const content = document.getElementById('mainContent');
+                content.innerHTML = `
+                    <div class="ending-screen">
+                        <div class="ending-title">${ending.title}</div>
+                        <div class="ending-character ${ending.special ? 'special-ending' : ''}">${ending.character}</div>
+                        <div class="ending-description">${ending.description}</div>
+                        <button class="start-btn" onclick="GameAPI.startNewGame()">重新开始</button>
+                    </div>
+                `;
+            }
+        };
+
+        const DialogueModule = {
+            getAvailableDialogues(charId) {
+                const char = DataModel.characters[charId];
+                const state = DataModel.gameState;
+                const charDialogues = DataModel.dialogues[charId];
+
+                if (char.conflictTriggered && !char.conflictResolved) {
+                    return charDialogues.conflict || [];
+                }
+
+                const stageDialogues = charDialogues[char.stage] || [];
+                return stageDialogues.filter(d => {
+                    if (d.condition) {
+                        return d.condition(char);
+                    }
+                    return true;
+                });
+            },
+
+            calculateAffectionChange(range) {
+                return Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
+            },
+
+            checkStageUp(charId) {
+                const char = DataModel.characters[charId];
+                let newStage = char.stage;
+
+                for (let i = DataModel.stages.length - 1; i >= 0; i--) {
+                    if (char.affection >= DataModel.stages[i].min) {
+                        newStage = i;
+                        break;
+                    }
+                }
+
+                if (newStage > char.stage) {
+                    char.stage = newStage;
+                    return true;
+                }
+                return false;
+            },
+
+            checkHiddenEvent(charId) {
+                const char = DataModel.characters[charId];
+                const state = DataModel.gameState;
+
+                if (char.lastInteractDay === state.day - 1) {
+                    char.consecutiveDays++;
+                } else {
+                    char.consecutiveDays = 1;
+                }
+                char.lastInteractDay = state.day;
+
+                if (char.consecutiveDays >= 3 && char.affection >= 40 && char.affection <= 60) {
+                    if (!state.hiddenEventTriggered[charId]) {
+                        state.hiddenEventTriggered[charId] = true;
+                        return DataModel.hiddenEvents[charId];
+                    }
+                }
+                return null;
+            },
+
+            checkConflictTrigger(option, char) {
+                if (option.triggerConflict) {
+                    char.conflictTriggered = true;
+                    return true;
+                }
+                return false;
+            },
+
+            checkConflictResolve(option, char) {
+                if (option.resolveConflict) {
+                    char.conflictResolved = true;
+                    char.conflictTriggered = false;
+                    return true;
+                }
+                return false;
+            }
+        };
+
+        const SaveModule = {
+            STORAGE_KEY: 'dating_sim_saves',
+
+            getSaves() {
+                try {
+                    const data = localStorage.getItem(this.STORAGE_KEY);
+                    return data ? JSON.parse(data) : [null, null, null];
+                } catch (e) {
+                    return [null, null, null];
+                }
+            },
+
+            saveToSlot(slotIndex) {
+                const saves = this.getSaves();
+                const saveData = {
+                    timestamp: Date.now(),
+                    day: DataModel.gameState.day,
+                    characters: JSON.parse(JSON.stringify(DataModel.characters)),
+                    gameState: JSON.parse(JSON.stringify(DataModel.gameState)),
+                    dialogueHistory: DataModel.gameState.dialogueHistory.slice()
+                };
+                saves[slotIndex] = saveData;
+                localStorage.setItem(this.STORAGE_KEY, JSON.stringify(saves));
+            },
+
+            loadFromSlot(slotIndex) {
+                const saves = this.getSaves();
+                const saveData = saves[slotIndex];
+                if (!saveData) return false;
+
+                DataModel.gameState = saveData.gameState;
+                Object.assign(DataModel.characters, saveData.characters);
+                DataModel.gameState.dialogueHistory = saveData.dialogueHistory;
+
+                return true;
+            },
+
+            formatSaveInfo(saveData) {
+                if (!saveData) return { empty: true, text: '空存档' };
+                
+                const date = new Date(saveData.timestamp);
+                const dateStr = `${date.getMonth() + 1}月${date.getDate()}日 ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+                const charInfos = Object.values(saveData.characters).map(c => 
+                    `${c.name}: ${c.affection}(${DataModel.stages[c.stage].name})`
+                ).join(' | ');
+
+                return {
+                    empty: false,
+                    day: `第 ${saveData.day} 天`,
+                    info: `${dateStr} - ${charInfos.substring(0, 40)}...`,
+                    dateStr
+                };
+            }
+        };
+
+        const GameLogic = {
+            startNewGame() {
+                DataModel.gameState = {
+                    day: 1,
+                    maxDays: 30,
+                    currentSchedule: null,
+                    currentCharacter: null,
+                    currentDialogueId: null,
+                    dialogueHistory: [],
+                    triggeredEvents: [],
+                    hiddenEventTriggered: {},
+                    gameEnded: false
+                };
+
+                Object.keys(DataModel.characters).forEach(id => {
+                    DataModel.characters[id] = {
+                        ...DataModel.characters[id],
+                        affection: 0,
+                        stage: 0,
+                        interactedToday: false,
+                        consecutiveDays: 0,
+                        lastInteractDay: -1,
+                        conflictTriggered: false,
+                        conflictResolved: false
+                    };
+                });
+
+                UIModule.showGameUI();
+                UIModule.renderCharacterList();
+                UIModule.updateDateDisplay();
+                UIModule.updateScheduleButtons(true);
+                document.getElementById('historyList').innerHTML = '';
+                
+                GameAPI.showSystemMessage('新的一天开始了！请先选择今日的日程安排，然后点击角色开始互动。');
+            },
+
+            chooseSchedule(type) {
+                DataModel.gameState.currentSchedule = type;
+                UIModule.updateScheduleButtons(false);
+
+                const scheduleNames = {
+                    study: '学习',
+                    sports: '运动',
+                    social: '社交',
+                    rest: '休息'
+                };
+
+                GameAPI.showSystemMessage(`今日日程：${scheduleNames[type]}。选择左侧角色开始互动吧！`);
+            },
+
+            selectCharacter(charId) {
+                if (!DataModel.gameState.currentSchedule) {
+                    GameAPI.showSystemMessage('请先选择今日的日程安排！');
+                    return;
+                }
+
+                const char = DataModel.characters[charId];
+                if (char.interactedToday) return;
+
+                DataModel.gameState.currentCharacter = charId;
+                UIModule.updateDialogueScene(charId);
+
+                const hiddenEvent = DialogueModule.checkHiddenEvent(charId);
+                if (hiddenEvent) {
+                    this.triggerHiddenEvent(hiddenEvent, charId);
+                    return;
+                }
+
+                const dialogues = DialogueModule.getAvailableDialogues(charId);
+                if (dialogues.length > 0) {
+                    const dialogue = dialogues[Math.floor(Math.random() * dialogues.length)];
+                    DataModel.gameState.currentDialogueId = dialogue.id;
+                    this.showDialogue(dialogue);
+                }
+            },
+
+            triggerHiddenEvent(event, charId) {
+                UIModule.typeDialogue(event.dialogue.text, event.dialogue.speaker);
+                UIModule.clearOptions();
+
+                const char = DataModel.characters[charId];
+                char.affection = Math.min(100, char.affection + event.dialogue.affectionBonus);
+                
+                UIModule.addToHistory('【隐藏事件】', `${event.title} - ${event.dialogue.text}`, 'system');
+                GameAPI.showSystemMessage(`🎉 触发隐藏事件「${event.title}」！${char.name}好感度大幅提升！`);
+                
+                char.interactedToday = true;
+                UIModule.renderCharacterList();
+
+                if (DialogueModule.checkStageUp(charId)) {
+                    this.handleStageUp(charId);
+                }
+            },
+
+            showDialogue(dialogue) {
+                UIModule.typeDialogue(dialogue.text, dialogue.speaker);
+                UIModule.renderOptions(dialogue.options);
+                UIModule.addToHistory(dialogue.speaker, dialogue.text);
+            },
+
+            chooseOption(optionIndex) {
+                const charId = DataModel.gameState.currentCharacter;
+                const char = DataModel.characters[charId];
+                const dialogues = DialogueModule.getAvailableDialogues(charId);
+                const currentDialogue = dialogues.find(d => d.id === DataModel.gameState.currentDialogueId);
+                
+                if (!currentDialogue) return;
+
+                const option = currentDialogue.options[optionIndex];
+                const affectionChange = DialogueModule.calculateAffectionChange(option.affection);
+                char.affection = Math.max(0, Math.min(100, char.affection + affectionChange));
+
+                DialogueModule.checkConflictTrigger(option, char);
+                DialogueModule.checkConflictResolve(option, char);
+
+                const sign = affectionChange >= 0 ? '+' : '';
+                GameAPI.showSystemMessage(`${char.name} 好感度 ${sign}${affectionChange}`);
+
+                UIModule.typeDialogue(option.response, char.name);
+                UIModule.clearOptions();
+                UIModule.addToHistory(char.name, option.response);
+
+                char.interactedToday = true;
+                UIModule.renderCharacterList();
+
+                if (DialogueModule.checkStageUp(charId)) {
+                    this.handleStageUp(charId);
+                }
+            },
+
+            handleStageUp(charId) {
+                const char = DataModel.characters[charId];
+                const stageInfo = DataModel.stages[char.stage];
+                
+                UIModule.showAvatarFlash(charId);
+                UIModule.addToHistory('【系统】', `✨ ${char.name} 好感度阶段提升至「${stageInfo.name}」！`, 'stage-up');
+                
+                setTimeout(() => {
+                    GameAPI.showSystemMessage(`✨ ${char.name} 好感度阶段提升至「${stageInfo.name}」！`);
+                }, 500);
+            },
+
+            nextDay() {
+                DataModel.gameState.day++;
+                DataModel.gameState.currentSchedule = null;
+
+                Object.values(DataModel.characters).forEach(char => {
+                    char.interactedToday = false;
+                });
+
+                if (DataModel.gameState.day > DataModel.gameState.maxDays) {
+                    this.endGame();
+                    return;
+                }
+
+                UIModule.updateDateDisplay();
+                UIModule.renderCharacterList();
+                UIModule.updateScheduleButtons(true);
+                GameAPI.showSystemMessage(`第 ${DataModel.gameState.day} 天开始了！选择今日的日程吧！`);
+            },
+
+            endGame() {
+                DataModel.gameState.gameEnded = true;
+                
+                let maxAffection = -1;
+                let bestCharacter = null;
+
+                Object.values(DataModel.characters).forEach(char => {
+                    if (char.affection > maxAffection) {
+                        maxAffection = char.affection;
+                        bestCharacter = char;
+                    }
+                });
+
+                const hasHiddenEvent = Object.keys(DataModel.gameState.hiddenEventTriggered).length > 0;
+                const isTrueEnding = bestCharacter && 
+                    bestCharacter.stage >= 4 && 
+                    hasHiddenEvent && 
+                    DataModel.gameState.hiddenEventTriggered[bestCharacter.id];
+
+                const ending = isTrueEnding 
+                    ? DataModel.endings.trueEnding(bestCharacter.name)
+                    : DataModel.endings.normal(bestCharacter.name);
+
+                UIModule.showEnding(ending);
+            }
+        };
+
+        window.GameAPI = {
+            startNewGame() {
+                GameLogic.startNewGame();
+            },
+
+            chooseSchedule(type) {
+                GameLogic.chooseSchedule(type);
+            },
+
+            selectCharacter(charId) {
+                GameLogic.selectCharacter(charId);
+            },
+
+            chooseOption(optionIndex) {
+                GameLogic.chooseOption(optionIndex);
+            },
+
+            showSystemMessage(text) {
+                UIModule.typeDialogue(text, '系统');
+                UIModule.addToHistory('【系统】', text, 'system');
+            },
+
+            nextDay() {
+                GameLogic.nextDay();
+            },
+
+            openSaveModal() {
+                const saves = SaveModule.getSaves();
+                const container = document.getElementById('saveSlots');
+                container.innerHTML = '';
+
+                saves.forEach((save, index) => {
+                    const info = SaveModule.formatSaveInfo(save);
+                    const slot = document.createElement('div');
+                    slot.className = `save-slot ${info.empty ? 'empty' : ''}`;
+                    
+                    if (info.empty) {
+                        slot.textContent = `存档槽 ${index + 1} - 空`;
+                    } else {
+                        slot.innerHTML = `
+                            <div class="save-slot-date">存档槽 ${index + 1} - ${info.day}</div>
+                            <div class="save-slot-info">${info.info}</div>
+                        `;
+                    }
+
+                    slot.onclick = () => {
+                        SaveModule.saveToSlot(index);
+                        GameAPI.closeModal('saveModal');
+                        GameAPI.showSystemMessage(`游戏已保存到存档槽 ${index + 1}`);
+                    };
+
+                    container.appendChild(slot);
+                });
+
+                document.getElementById('saveModal').classList.add('active');
+            },
+
+            openLoadModal() {
+                const saves = SaveModule.getSaves();
+                const container = document.getElementById('loadSlots');
+                container.innerHTML = '';
+
+                saves.forEach((save, index) => {
+                    const info = SaveModule.formatSaveInfo(save);
+                    const slot = document.createElement('div');
+                    slot.className = `save-slot ${info.empty ? 'empty' : ''}`;
+                    
+                    if (info.empty) {
+                        slot.textContent = `存档槽 ${index + 1} - 空`;
+                    } else {
+                        slot.innerHTML = `
+                            <div class="save-slot-date">存档槽 ${index + 1} - ${info.day}</div>
+                            <div class="save-slot-info">${info.info}</div>
+                        `;
+                        slot.onclick = () => {
+                            if (SaveModule.loadFromSlot(index)) {
+                                GameAPI.closeModal('loadModal');
+                                UIModule.showGameUI();
+                                UIModule.renderCharacterList();
+                                UIModule.updateDateDisplay();
+                                UIModule.updateScheduleButtons(!DataModel.gameState.currentSchedule);
+                                
+                                const historyList = document.getElementById('historyList');
+                                historyList.innerHTML = '';
+                                DataModel.gameState.dialogueHistory.slice().reverse().forEach(item => {
+                                    UIModule.addToHistory(item.speaker, item.text, item.type);
+                                });
+
+                                GameAPI.showSystemMessage(`存档读取成功！当前是第 ${DataModel.gameState.day} 天`);
+                            }
+                        };
+                    }
+
+                    container.appendChild(slot);
+                });
+
+                document.getElementById('loadModal').classList.add('active');
+            },
+
+            closeModal(modalId) {
+                document.getElementById(modalId).classList.remove('active');
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const saves = SaveModule.getSaves();
+            if (saves.every(s => s === null)) {
+                UIModule.showWelcomeScreen();
+            } else {
+                UIModule.showWelcomeScreen();
+            }
+        });
+
+        const originalAddToHistory = UIModule.addToHistory.bind(UIModule);
+        UIModule.addToHistory = function(speaker, text, type = 'normal') {
+            DataModel.gameState.dialogueHistory.push({ speaker, text, type });
+            originalAddToHistory(speaker, text, type);
+        };
+
+        setInterval(() => {
+            if (!DataModel.gameState.gameEnded && 
+                DataModel.gameState.currentSchedule && 
+                Object.values(DataModel.characters).every(c => c.interactedToday)) {
+                
+                const allInteracted = Object.values(DataModel.characters).every(c => c.interactedToday);
+                if (allInteracted && !document.getElementById('nextDayBtn')) {
+                    const optionsContainer = document.getElementById('dialogueOptions');
+                    const nextDayBtn = document.createElement('button');
+                    nextDayBtn.id = 'nextDayBtn';
+                    nextDayBtn.className = 'option-btn';
+                    nextDayBtn.style.background = 'linear-gradient(135deg, #43e97b, #38f9d7)';
+                    nextDayBtn.textContent = '🌅 结束今天，进入下一天';
+                    nextDayBtn.onclick = () => GameAPI.nextDay();
+                    optionsContainer.appendChild(nextDayBtn);
+                }
+            }
+        }, 500);
+    </script>
+</body>
+</html>

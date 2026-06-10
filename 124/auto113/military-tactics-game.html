@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>军事战术推演</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #gameContainer {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        #canvasContainer {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #0f0f1a;
+        }
+        #gameCanvas {
+            border: 2px solid #4a4a6a;
+            box-shadow: 0 0 20px rgba(100, 150, 255, 0.3);
+        }
+        #sidebar {
+            width: 280px;
+            background: linear-gradient(180deg, #16213e 0%, #0f3460 100%);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            border-left: 2px solid #4a4a6a;
+        }
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .panel h3 {
+            color: #e94560;
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 13px;
+        }
+        .stat-label { color: #888; }
+        .stat-value { color: #0f0; font-weight: bold; }
+        #endTurnBtn {
+            background: linear-gradient(135deg, #e94560 0%, #c73e54 100%);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        #endTurnBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(233, 69, 96, 0.5);
+        }
+        #endTurnBtn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        #turnInfo {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        #phaseInfo {
+            text-align: center;
+            font-size: 14px;
+            color: #0ff;
+        }
+        #logPanel {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 200px;
+        }
+        #logPanel::-webkit-scrollbar { width: 6px; }
+        #logPanel::-webkit-scrollbar-thumb {
+            background: #4a4a6a;
+            border-radius: 3px;
+        }
+        .log-entry {
+            font-size: 11px;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            color: #ccc;
+        }
+        .log-damage { color: #ff6b6b; }
+        .log-move { color: #4ecdc4; }
+        .log-heal { color: #95e1a3; }
+        .unit-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            text-align: center;
+            line-height: 20px;
+            font-weight: bold;
+            border-radius: 3px;
+            margin-right: 5px;
+        }
+        #legend {
+            font-size: 11px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 3px 0;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            margin-right: 8px;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="canvasContainer">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+        <div id="sidebar">
+            <div class="panel">
+                <div id="turnInfo">第 1 回合</div>
+                <div id="phaseInfo">玩家回合</div>
+            </div>
+            
+            <div class="panel" id="unitInfo">
+                <h3>单位信息</h3>
+                <div id="noUnitSelected">点击地图上的单位选中</div>
+                <div id="selectedUnitInfo" style="display: none;">
+                    <div class="stat-row"><span class="stat-label">类型:</span><span class="stat-value" id="unitType">-</span></div>
+                    <div class="stat-row"><span class="stat-label">生命值:</span><span class="stat-value" id="unitHP">-</span></div>
+                    <div class="stat-row"><span class="stat-label">攻击力:</span><span class="stat-value" id="unitATK">-</span></div>
+                    <div class="stat-row"><span class="stat-label">防御力:</span><span class="stat-value" id="unitDEF">-</span></div>
+                    <div class="stat-row"><span class="stat-label">移动力:</span><span class="stat-value" id="unitMOV">-</span></div>
+                    <div class="stat-row"><span class="stat-label">射程:</span><span class="stat-value" id="unitRNG">-</span></div>
+                    <div class="stat-row"><span class="stat-label">视野:</span><span class="stat-value" id="unitVIS">-</span></div>
+                    <div class="stat-row"><span class="stat-label">剩余行动:</span><span class="stat-value" id="unitACT">-</span></div>
+                </div>
+            </div>
+            
+            <button id="endTurnBtn">结束回合</button>
+            
+            <div class="panel" id="legend">
+                <h3>图例</h3>
+                <div class="legend-item"><div class="legend-color" style="background: #90EE90;"></div>开阔地</div>
+                <div class="legend-item"><div class="legend-color" style="background: #228B22;"></div>树林</div>
+                <div class="legend-item"><div class="legend-color" style="background: #808080;"></div>山地</div>
+                <div class="legend-item"><div class="legend-color" style="background: #4169E1;"></div>河流</div>
+                <div class="legend-item"><div class="legend-color" style="background: #00AA00;"></div>我方单位</div>
+                <div class="legend-item"><div class="legend-color" style="background: #CC0000;"></div>敌方单位</div>
+            </div>
+            
+            <div class="panel" id="logPanel">
+                <h3>战斗日志</h3>
+                <div id="logContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // 游戏常量配置
+    const CONFIG = {
+        MAP_WIDTH: 17,
+        MAP_HEIGHT: 17,
+        CELL_SIZE: 40,
+        SEED: Date.now(),
+        VISION_SHARE_RANGE: 4,
+        WRECK_DURATION: 1
+    };
+
+    // 地形定义
+    const TERRAIN = {
+        OPEN: { id: 0, name: '开阔地', color: '#90EE90', moveCost: 1, defBonus: 0, blocksVision: false },
+        FOREST: { id: 1, name: '树林', color: '#228B22', moveCost: 2, defBonus: 2, blocksVision: true },
+        MOUNTAIN: { id: 2, name: '山地', color: '#808080', moveCost: 3, defBonus: 4, blocksVision: true },
+        RIVER: { id: 3, name: '河流', color: '#4169E1', moveCost: 4, defBonus: -1, blocksVision: false }
+    };
+
+    // 单位类型定义
+    const UNIT_TYPES = {
+        INFANTRY: {
+            name: '步兵班',
+            symbol: '步',
+            shape: 'triangle',
+            maxHP: 80,
+            attack: 25,
+            defense: 10,
+            movement: 4,
+            range: 2,
+            vision: 4
+        },
+        TANK: {
+            name: '主战坦克',
+            symbol: '坦',
+            shape: 'rect',
+            maxHP: 150,
+            attack: 50,
+            defense: 30,
+            movement: 5,
+            range: 3,
+            vision: 3
+        },
+        ARTILLERY: {
+            name: '自行火炮',
+            symbol: '炮',
+            shape: 'diamond',
+            maxHP: 60,
+            attack: 70,
+            defense: 5,
+            movement: 3,
+            range: 6,
+            vision: 2
+        }
+    };
+
+    // 种子随机数生成器
+    class SeededRandom {
+        constructor(seed) {
+            this.seed = seed;
+        }
+        next() {
+            this.seed = (this.seed * 9301 + 49297) % 233280;
+            return this.seed / 233280;
+        }
+        nextInt(min, max) {
+            return Math.floor(this.next() * (max - min + 1)) + min;
+        }
+    }
+
+    const rng = new SeededRandom(CONFIG.SEED);
+
+    // 游戏状态
+    const gameState = {
+        turn: 1,
+        phase: 'player',
+        map: [],
+        units: [],
+        wrecks: [],
+        selectedUnit: null,
+        moveRange: [],
+        attackRange: [],
+        visibleTiles: new Set(),
+        logs: []
+    };
+
+    // Canvas设置
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = CONFIG.MAP_WIDTH * CONFIG.CELL_SIZE;
+    canvas.height = CONFIG.MAP_HEIGHT * CONFIG.CELL_SIZE;
+
+    // 工具函数
+    function getDistance(x1, y1, x2, y2) {
+        return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+    }
+
+    function isValidPos(x, y) {
+        return x >= 0 && x < CONFIG.MAP_WIDTH && y >= 0 && y < CONFIG.MAP_HEIGHT;
+    }
+
+    function getUnitAt(x, y) {
+        return gameState.units.find(u => u.x === x && u.y === y && u.hp > 0);
+    }
+
+    function getTerrain(x, y) {
+        if (!isValidPos(x, y)) return TERRAIN.MOUNTAIN;
+        const t = gameState.map[y][x];
+        return Object.values(TERRAIN).find(v => v.id === t) || TERRAIN.OPEN;
+    }
+
+    function addLog(message, type = '') {
+        gameState.logs.unshift({ message, type, turn: gameState.turn });
+        if (gameState.logs.length > 50) gameState.logs.pop();
+        updateLogPanel();
+    }
+
+    function updateLogPanel() {
+        const logContent = document.getElementById('logContent');
+        logContent.innerHTML = gameState.logs.map(log => 
+            `<div class="log-entry log-${log.type}">[${log.turn}] ${log.message}</div>`
+        ).join('');
+    }
+
+    // 地图生成
+    function generateMap() {
+        gameState.map = [];
+        
+        for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
+            gameState.map[y] = [];
+            for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
+                if (y >= CONFIG.MAP_HEIGHT - 3 || y < 3) {
+                    gameState.map[y][x] = TERRAIN.OPEN.id;
+                } else {
+                    const r = rng.next();
+                    if (r < 0.55) gameState.map[y][x] = TERRAIN.OPEN.id;
+                    else if (r < 0.75) gameState.map[y][x] = TERRAIN.FOREST.id;
+                    else if (r < 0.90) gameState.map[y][x] = TERRAIN.MOUNTAIN.id;
+                    else gameState.map[y][x] = TERRAIN.RIVER.id;
+                }
+            }
+        }
+
+        for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
+            if (rng.next() < 0.3) {
+                const riverY = rng.nextInt(5, CONFIG.MAP_HEIGHT - 6);
+                gameState.map[riverY][x] = TERRAIN.RIVER.id;
+            }
+        }
+    }
+
+    // 单位创建
+    function createUnit(type, x, y, team) {
+        const template = UNIT_TYPES[type];
+        return {
+            id: Date.now() + Math.random(),
+            type,
+            ...template,
+            hp: template.maxHP,
+            x,
+            y,
+            team,
+            hasMoved: false,
+            hasAttacked: false,
+            actionsLeft: 2
+        };
+    }
+
+    function deployUnits() {
+        gameState.units = [];
+        
+        const playerPositions = [
+            { x: 5, y: CONFIG.MAP_HEIGHT - 1, type: 'TANK' },
+            { x: 8, y: CONFIG.MAP_HEIGHT - 1, type: 'TANK' },
+            { x: 3, y: CONFIG.MAP_HEIGHT - 2, type: 'INFANTRY' },
+            { x: 6, y: CONFIG.MAP_HEIGHT - 2, type: 'INFANTRY' },
+            { x: 10, y: CONFIG.MAP_HEIGHT - 2, type: 'INFANTRY' },
+            { x: 13, y: CONFIG.MAP_HEIGHT - 2, type: 'INFANTRY' },
+            { x: 8, y: CONFIG.MAP_HEIGHT - 3, type: 'ARTILLERY' }
+        ];
+
+        playerPositions.forEach(pos => {
+            gameState.units.push(createUnit(pos.type, pos.x, pos.y, 'player'));
+        });
+
+        const enemyPositions = [
+            { x: 5, y: 0, type: 'TANK' },
+            { x: 11, y: 0, type: 'TANK' },
+            { x: 3, y: 1, type: 'INFANTRY' },
+            { x: 7, y: 1, type: 'INFANTRY' },
+            { x: 10, y: 1, type: 'INFANTRY' },
+            { x: 14, y: 1, type: 'INFANTRY' },
+            { x: 8, y: 2, type: 'ARTILLERY' }
+        ];
+
+        enemyPositions.forEach(pos => {
+            gameState.units.push(createUnit(pos.type, pos.x, pos.y, 'enemy'));
+        });
+    }
+
+    // 视野系统
+    function lineOfSight(x1, y1, x2, y2) {
+        const dx = Math.abs(x2 - x1);
+        const dy = Math.abs(y2 - y1);
+        const sx = x1 < x2 ? 1 : -1;
+        const sy = y1 < y2 ? 1 : -1;
+        let err = dx - dy;
+        let x = x1, y = y1;
+
+        while (x !== x2 || y !== y2) {
+            const terrain = getTerrain(x, y);
+            if (terrain.blocksVision && (x !== x1 || y !== y1)) {
+                return false;
+            }
+
+            const e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; x += sx; }
+            if (e2 < dx) { err += dx; y += sy; }
+        }
+        return true;
+    }
+
+    function calculateVisibility() {
+        gameState.visibleTiles = new Set();
+        const playerUnits = gameState.units.filter(u => u.team === 'player' && u.hp > 0);
+
+        playerUnits.forEach(unit => {
+            for (let dy = -unit.vision; dy <= unit.vision; dy++) {
+                for (let dx = -unit.vision; dx <= unit.vision; dx++) {
+                    const nx = unit.x + dx;
+                    const ny = unit.y + dy;
+                    if (!isValidPos(nx, ny)) continue;
+                    if (getDistance(unit.x, unit.y, nx, ny) > unit.vision) continue;
+                    if (lineOfSight(unit.x, unit.y, nx, ny)) {
+                        gameState.visibleTiles.add(`${nx},${ny}`);
+                        
+                        playerUnits.forEach(nearby => {
+                            if (nearby.id !== unit.id) {
+                                const dist = getDistance(nearby.x, nearby.y, nx, ny);
+                                if (dist <= CONFIG.VISION_SHARE_RANGE) {
+                                    for (let sdy = -2; sdy <= 2; sdy++) {
+                                        for (let sdx = -2; sdx <= 2; sdx++) {
+                                            const snx = nx + sdx;
+                                            const sny = ny + sdy;
+                                            if (isValidPos(snx, sny)) {
+                                                gameState.visibleTiles.add(`${snx},${sny}`);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        });
+    }
+
+    function isVisible(x, y) {
+        return gameState.visibleTiles.has(`${x},${y}`);
+    }
+
+    // 移动范围计算
+    function calculateMoveRange(unit) {
+        const range = [];
+        const visited = new Set();
+        const queue = [{ x: unit.x, y: unit.y, cost: 0 }];
+        visited.add(`${unit.x},${unit.y}`);
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            range.push({ x: current.x, y: current.y, cost: current.cost });
+
+            const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+            for (const [dx, dy] of dirs) {
+                const nx = current.x + dx;
+                const ny = current.y + dy;
+                const key = `${nx},${ny}`;
+
+                if (!isValidPos(nx, ny) || visited.has(key)) continue;
+
+                const terrain = getTerrain(nx, ny);
+                const newCost = current.cost + terrain.moveCost;
+
+                if (newCost > unit.movement) continue;
+                if (getUnitAt(nx, ny)) continue;
+
+                visited.add(key);
+                queue.push({ x: nx, y: ny, cost: newCost });
+            }
+        }
+        return range;
+    }
+
+    // 攻击范围计算
+    function calculateAttackRange(unit) {
+        const range = [];
+        for (let dy = -unit.range; dy <= unit.range; dy++) {
+            for (let dx = -unit.range; dx <= unit.range; dx++) {
+                const nx = unit.x + dx;
+                const ny = unit.y + dy;
+                if (!isValidPos(nx, ny)) continue;
+                if (getDistance(unit.x, unit.y, nx, ny) > unit.range) continue;
+                if (getDistance(unit.x, unit.y, nx, ny) === 0) continue;
+                
+                const target = getUnitAt(nx, ny);
+                if (target && target.team !== unit.team) {
+                    if (lineOfSight(unit.x, unit.y, nx, ny)) {
+                        range.push({ x: nx, y: ny, target });
+                    }
+                }
+            }
+        }
+        return range;
+    }
+
+    // 战斗结算
+    function calculateDamage(attacker, defender) {
+        const terrain = getTerrain(defender.x, defender.y);
+        const distance = getDistance(attacker.x, attacker.y, defender.x, defender.y);
+        
+        let attack = attacker.attack;
+        let defense = defender.defense + terrain.defBonus;
+        
+        if (distance > 2) {
+            attack = Math.floor(attack * (1 - (distance - 2) * 0.1));
+        }
+
+        const baseDamage = Math.max(5, attack - defense);
+        const variance = Math.floor(rng.next() * 10) - 5;
+        const flanking = isFlanked(defender, attacker) ? 1.3 : 1;
+        
+        return Math.floor(baseDamage * flanking + variance);
+    }
+
+    function isFlanked(defender, attacker) {
+        const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+        let threats = 0;
+        
+        dirs.forEach(([dx, dy]) => {
+            const nx = defender.x + dx;
+            const ny = defender.y + dy;
+            const unit = getUnitAt(nx, ny);
+            if (unit && unit.team !== defender.team) threats++;
+        });
+        
+        return threats >= 2;
+    }
+
+    function executeAttack(attacker, defender) {
+        const damage = calculateDamage(attacker, defender);
+        defender.hp = Math.max(0, defender.hp - damage);
+        
+        addLog(`${attacker.name} 攻击 ${defender.name}，造成 ${damage} 点伤害！`, 'damage');
+        
+        if (defender.hp <= 0) {
+            addLog(`${defender.name} 被击毁！`, 'damage');
+            gameState.wrecks.push({
+                x: defender.x,
+                y: defender.y,
+                team: defender.team,
+                turnsLeft: CONFIG.WRECK_DURATION
+            });
+        }
+
+        attacker.hasAttacked = true;
+        attacker.actionsLeft = Math.max(0, attacker.actionsLeft - 1);
+        
+        gameState.selectedUnit = null;
+        gameState.moveRange = [];
+        gameState.attackRange = [];
+        
+        render();
+        updateUnitPanel();
+        checkGameEnd();
+    }
+
+    // 移动执行
+    function executeMove(unit, x, y) {
+        addLog(`${unit.name} 移动到 (${x}, ${y})`, 'move');
+        unit.x = x;
+        unit.y = y;
+        unit.hasMoved = true;
+        unit.actionsLeft = Math.max(0, unit.actionsLeft - 1);
+        
+        gameState.moveRange = [];
+        gameState.attackRange = calculateAttackRange(unit);
+        
+        calculateVisibility();
+        render();
+        updateUnitPanel();
+    }
+
+    // AI系统
+    function findDangerZone(unit) {
+        const playerUnits = gameState.units.filter(u => u.team === 'player' && u.hp > 0);
+        const dangerTiles = new Set();
+        
+        playerUnits.forEach(pu => {
+            for (let dy = -pu.range; dy <= pu.range; dy++) {
+                for (let dx = -pu.range; dx <= pu.range; dx++) {
+                    const nx = pu.x + dx;
+                    const ny = pu.y + dy;
+                    if (isValidPos(nx, ny) && getDistance(pu.x, pu.y, nx, ny) <= pu.range) {
+                        dangerTiles.add(`${nx},${ny}`);
+                    }
+                }
+            }
+        });
+        
+        return dangerTiles;
+    }
+
+    function evaluatePosition(unit, x, y, dangerZone) {
+        let score = 0;
+        const terrain = getTerrain(x, y);
+        
+        score += terrain.defBonus * 5;
+        
+        const playerUnits = gameState.units.filter(u => u.team === 'player' && u.hp > 0);
+        let minDistance = Infinity;
+        
+        playerUnits.forEach(pu => {
+            const dist = getDistance(x, y, pu.x, pu.y);
+            minDistance = Math.min(minDistance, dist);
+            
+            if (dist <= unit.range && lineOfSight(x, y, pu.x, pu.y)) {
+                score += 50;
+            }
+        });
+        
+        if (minDistance <= unit.range) {
+            score += 20;
+        }
+        
+        if (dangerZone.has(`${x},${y}`)) {
+            const terrainDef = terrain.defBonus;
+            const survival = unit.defense + terrainDef * 2;
+            if (survival < 30) {
+                score -= 100;
+            } else {
+                score -= 30;
+            }
+        }
+        
+        const exposedSides = countExposedSides(x, y, 'player');
+        score -= exposedSides * 15;
+        
+        return score;
+    }
+
+    function countExposedSides(x, y, enemyTeam) {
+        const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+        let exposed = 0;
+        
+        dirs.forEach(([dx, dy]) => {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (isValidPos(nx, ny)) {
+                const unit = getUnitAt(nx, ny);
+                if (unit && unit.team === enemyTeam) exposed++;
+            }
+        });
+        
+        return exposed;
+    }
+
+    function findBestTarget(unit) {
+        const playerUnits = gameState.units.filter(u => u.team === 'player' && u.hp > 0);
+        let bestTarget = null;
+        let bestScore = -Infinity;
+        
+        playerUnits.forEach(target => {
+            const dist = getDistance(unit.x, unit.y, target.x, target.y);
+            if (dist > unit.range) return;
+            if (!lineOfSight(unit.x, unit.y, target.x, target.y)) return;
+            
+            let score = 100 - target.hp;
+            score -= target.defense;
+            
+            const behind = target.y > unit.y ? 1 : -1;
+            score += behind * 10;
+            
+            if (score > bestScore) {
+                bestScore = score;
+                bestTarget = target;
+            }
+        });
+        
+        return bestTarget;
+    }
+
+    function executeAI() {
+        const enemyUnits = gameState.units.filter(u => u.team === 'enemy' && u.hp > 0);
+        const dangerZone = findDangerZone();
+        
+        let actionIndex = 0;
+        
+        function nextAction() {
+            if (actionIndex >= enemyUnits.length) {
+                endAITurn();
+                return;
+            }
+            
+            const unit = enemyUnits[actionIndex];
+            actionIndex++;
+            
+            const target = findBestTarget(unit);
+            
+            if (target) {
+                setTimeout(() => {
+                    const damage = calculateDamage(unit, target);
+                    target.hp = Math.max(0, target.hp - damage);
+                    addLog(`敌方${unit.name} 攻击 ${target.name}，造成 ${damage} 点伤害！`, 'damage');
+                    
+                    if (target.hp <= 0) {
+                        addLog(`${target.name} 被击毁！`, 'damage');
+                        gameState.wrecks.push({
+                            x: target.x,
+                            y: target.y,
+                            team: target.team,
+                            turnsLeft: CONFIG.WRECK_DURATION
+                        });
+                    }
+                    
+                    calculateVisibility();
+                    render();
+                    checkGameEnd();
+                    
+                    setTimeout(nextAction, 600);
+                }, 500);
+            } else {
+                const moveRange = calculateMoveRange(unit);
+                let bestMove = null;
+                let bestScore = -Infinity;
+                
+                moveRange.forEach(pos => {
+                    if (pos.x === unit.x && pos.y === unit.y) return;
+                    
+                    const score = evaluatePosition(unit, pos.x, pos.y, dangerZone);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = pos;
+                    }
+                });
+                
+                if (bestMove) {
+                    unit.x = bestMove.x;
+                    unit.y = bestMove.y;
+                    addLog(`敌方${unit.name} 移动`, 'move');
+                    calculateVisibility();
+                    render();
+                }
+                
+                setTimeout(nextAction, 400);
+            }
+        }
+        
+        setTimeout(nextAction, 500);
+    }
+
+    function endAITurn() {
+        gameState.wrecks = gameState.wrecks.filter(w => {
+            w.turnsLeft--;
+            return w.turnsLeft > 0;
+        });
+        
+        gameState.units.forEach(unit => {
+            unit.hasMoved = false;
+            unit.hasAttacked = false;
+            unit.actionsLeft = 2;
+        });
+        
+        gameState.turn++;
+        gameState.phase = 'player';
+        gameState.selectedUnit = null;
+        gameState.moveRange = [];
+        gameState.attackRange = [];
+        
+        updateTurnInfo();
+        render();
+        
+        const unmoved = gameState.units.filter(u => u.team === 'player' && u.hp > 0 && !u.hasMoved);
+        if (unmoved.length > 0) {
+            addLog(`有 ${unmoved.length} 个单位本回合未行动`, 'move');
+        }
+    }
+
+    // 回合系统
+    function endPlayerTurn() {
+        gameState.phase = 'enemy';
+        gameState.selectedUnit = null;
+        gameState.moveRange = [];
+        gameState.attackRange = [];
+        
+        updateTurnInfo();
+        render();
+        
+        setTimeout(executeAI, 500);
+    }
+
+    function updateTurnInfo() {
+        document.getElementById('turnInfo').textContent = `第 ${gameState.turn} 回合`;
+        document.getElementById('phaseInfo').textContent = 
+            gameState.phase === 'player' ? '玩家回合' : '敌方回合';
+        document.getElementById('endTurnBtn').disabled = gameState.phase !== 'player';
+    }
+
+    function updateUnitPanel() {
+        const noUnit = document.getElementById('noUnitSelected');
+        const unitInfo = document.getElementById('selectedUnitInfo');
+        
+        if (!gameState.selectedUnit) {
+            noUnit.style.display = 'block';
+            unitInfo.style.display = 'none';
+            return;
+        }
+        
+        const unit = gameState.selectedUnit;
+        const terrain = getTerrain(unit.x, unit.y);
+        
+        noUnit.style.display = 'none';
+        unitInfo.style.display = 'block';
+        
+        document.getElementById('unitType').textContent = unit.name;
+        document.getElementById('unitHP').textContent = `${unit.hp}/${unit.maxHP}`;
+        document.getElementById('unitATK').textContent = unit.attack;
+        document.getElementById('unitDEF').textContent = `${unit.defense} (+${terrain.defBonus})`;
+        document.getElementById('unitMOV').textContent = unit.movement;
+        document.getElementById('unitRNG').textContent = unit.range;
+        document.getElementById('unitVIS').textContent = unit.vision;
+        document.getElementById('unitACT').textContent = unit.actionsLeft;
+    }
+
+    function checkGameEnd() {
+        const playerAlive = gameState.units.filter(u => u.team === 'player' && u.hp > 0).length;
+        const enemyAlive = gameState.units.filter(u => u.team === 'enemy' && u.hp > 0).length;
+        
+        if (playerAlive === 0) {
+            setTimeout(() => alert('战斗失败！全军覆没。'), 100);
+        } else if (enemyAlive === 0) {
+            setTimeout(() => alert('战斗胜利！敌军已被全歼。'), 100);
+        }
+    }
+
+    // 渲染系统
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
+            for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
+                const terrain = getTerrain(x, y);
+                const visible = isVisible(x, y);
+                
+                ctx.fillStyle = visible ? terrain.color : '#1a1a2e';
+                ctx.fillRect(x * CONFIG.CELL_SIZE, y * CONFIG.CELL_SIZE, CONFIG.CELL_SIZE, CONFIG.CELL_SIZE);
+                
+                ctx.strokeStyle = visible ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.05)';
+                ctx.strokeRect(x * CONFIG.CELL_SIZE, y * CONFIG.CELL_SIZE, CONFIG.CELL_SIZE, CONFIG.CELL_SIZE);
+                
+                if (!visible) {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillRect(x * CONFIG.CELL_SIZE, y * CONFIG.CELL_SIZE, CONFIG.CELL_SIZE, CONFIG.CELL_SIZE);
+                }
+            }
+        }
+        
+        gameState.moveRange.forEach(pos => {
+            ctx.fillStyle = 'rgba(100, 200, 255, 0.4)';
+            ctx.fillRect(pos.x * CONFIG.CELL_SIZE, pos.y * CONFIG.CELL_SIZE, CONFIG.CELL_SIZE, CONFIG.CELL_SIZE);
+        });
+        
+        gameState.attackRange.forEach(pos => {
+            ctx.fillStyle = 'rgba(255, 100, 100, 0.4)';
+            ctx.fillRect(pos.x * CONFIG.CELL_SIZE, pos.y * CONFIG.CELL_SIZE, CONFIG.CELL_SIZE, CONFIG.CELL_SIZE);
+        });
+        
+        gameState.wrecks.forEach(wreck => {
+            if (isVisible(wreck.x, wreck.y)) {
+                const cx = wreck.x * CONFIG.CELL_SIZE + CONFIG.CELL_SIZE / 2;
+                const cy = wreck.y * CONFIG.CELL_SIZE + CONFIG.CELL_SIZE / 2;
+                
+                ctx.fillStyle = wreck.team === 'player' ? 'rgba(0, 150, 0, 0.5)' : 'rgba(150, 0, 0, 0.5)';
+                ctx.beginPath();
+                ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(cx - 8, cy - 8);
+                ctx.lineTo(cx + 8, cy + 8);
+                ctx.moveTo(cx + 8, cy - 8);
+                ctx.lineTo(cx - 8, cy + 8);
+                ctx.stroke();
+            }
+        });
+        
+        gameState.units.forEach(unit => {
+            if (unit.hp <= 0) return;
+            if (!isVisible(unit.x, unit.y) && unit.team === 'enemy') return;
+            
+            const cx = unit.x * CONFIG.CELL_SIZE + CONFIG.CELL_SIZE / 2;
+            const cy = unit.y * CONFIG.CELL_SIZE + CONFIG.CELL_SIZE / 2;
+            const color = unit.team === 'player' ? '#00AA00' : '#CC0000';
+            
+            ctx.fillStyle = color;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            
+            if (unit.shape === 'triangle') {
+                ctx.beginPath();
+                ctx.moveTo(cx, cy - 14);
+                ctx.lineTo(cx - 12, cy + 10);
+                ctx.lineTo(cx + 12, cy + 10);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            } else if (unit.shape === 'rect') {
+                ctx.fillRect(cx - 14, cy - 10, 28, 20);
+                ctx.strokeRect(cx - 14, cy - 10, 28, 20);
+                ctx.beginPath();
+                ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+                ctx.fillStyle = unit.team === 'player' ? '#00FF00' : '#FF0000';
+                ctx.fill();
+            } else if (unit.shape === 'diamond') {
+                ctx.beginPath();
+                ctx.moveTo(cx, cy - 14);
+                ctx.lineTo(cx + 12, cy);
+                ctx.lineTo(cx, cy + 14);
+                ctx.lineTo(cx - 12, cy);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+            
+            const hpRatio = unit.hp / unit.maxHP;
+            ctx.fillStyle = '#333';
+            ctx.fillRect(cx - 12, cy + 15, 24, 4);
+            ctx.fillStyle = hpRatio > 0.5 ? '#0f0' : hpRatio > 0.25 ? '#ff0' : '#f00';
+            ctx.fillRect(cx - 12, cy + 15, 24 * hpRatio, 4);
+            
+            if (gameState.selectedUnit && gameState.selectedUnit.id === unit.id) {
+                ctx.strokeStyle = '#FFD700';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(
+                    unit.x * CONFIG.CELL_SIZE + 2,
+                    unit.y * CONFIG.CELL_SIZE + 2,
+                    CONFIG.CELL_SIZE - 4,
+                    CONFIG.CELL_SIZE - 4
+                );
+            }
+        });
+    }
+
+    // 事件处理
+    canvas.addEventListener('click', (e) => {
+        if (gameState.phase !== 'player') return;
+        
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.floor((e.clientX - rect.left) / CONFIG.CELL_SIZE);
+        const y = Math.floor((e.clientY - rect.top) / CONFIG.CELL_SIZE);
+        
+        if (!isValidPos(x, y)) return;
+        
+        const clickedUnit = getUnitAt(x, y);
+        
+        if (clickedUnit) {
+            if (clickedUnit.team === 'player') {
+                if (gameState.selectedUnit && gameState.selectedUnit.id === clickedUnit.id) {
+                    gameState.selectedUnit = null;
+                    gameState.moveRange = [];
+                    gameState.attackRange = [];
+                } else {
+                    gameState.selectedUnit = clickedUnit;
+                    gameState.moveRange = clickedUnit.actionsLeft > 0 ? calculateMoveRange(clickedUnit) : [];
+                    gameState.attackRange = clickedUnit.actionsLeft > 0 ? calculateAttackRange(clickedUnit) : [];
+                }
+                updateUnitPanel();
+                render();
+            } else if (gameState.selectedUnit && !gameState.selectedUnit.hasAttacked) {
+                const inRange = gameState.attackRange.some(r => r.x === x && r.y === y);
+                if (inRange) {
+                    executeAttack(gameState.selectedUnit, clickedUnit);
+                }
+            }
+        } else if (gameState.selectedUnit && !gameState.selectedUnit.hasMoved) {
+            const inRange = gameState.moveRange.some(r => r.x === x && r.y === y);
+            if (inRange) {
+                executeMove(gameState.selectedUnit, x, y);
+            }
+        }
+    });
+
+    document.getElementById('endTurnBtn').addEventListener('click', () => {
+        if (gameState.phase === 'player') {
+            endPlayerTurn();
+        }
+    });
+
+    // 初始化游戏
+    function initGame() {
+        generateMap();
+        deployUnits();
+        calculateVisibility();
+        updateTurnInfo();
+        updateUnitPanel();
+        addLog('游戏开始！消灭所有敌人获得胜利。', 'move');
+        render();
+    }
+
+    initGame();
+    </script>
+</body>
+</html>

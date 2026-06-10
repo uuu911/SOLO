@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>情绪回收站 - 模拟经营游戏</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🏭 情绪回收站</h1>
+    </header>
+
+    <div class="dashboard">
+      <div class="dashboard-item">
+        <div class="label">💰 资金</div>
+        <div class="value" id="money">1000</div>
+      </div>
+      <div class="dashboard-item">
+        <div class="label">📅 第几天</div>
+        <div class="value" id="day">1</div>
+      </div>
+      <div class="dashboard-item">
+        <div class="label">⚡ 剩余能源</div>
+        <div class="value"><span id="energy">50</span>/<span id="max-energy">50</span></div>
+      </div>
+      <div class="dashboard-item">
+        <div class="label">📦 原料仓库</div>
+        <div class="value" style="font-size: 0.9rem;" id="material-storage">0/100 (0%)</div>
+      </div>
+      <div class="dashboard-item">
+        <div class="label">💎 产品仓库</div>
+        <div class="value" style="font-size: 0.9rem;" id="product-storage">0/50 (0%)</div>
+      </div>
+    </div>
+
+    <div class="main-grid">
+      <div class="phase-area">
+        <h2 class="phase-title" id="phase-title">📦 原料订单</h2>
+        <div id="phase-content"></div>
+      </div>
+
+      <div class="sidebar">
+        <div class="sidebar-panel">
+          <h4>📦 库存</h4>
+          <div id="inventory-panel"></div>
+        </div>
+
+        <div class="sidebar-panel">
+          <h4>📈 市场行情</h4>
+          <div id="market-panel"></div>
+        </div>
+
+        <div class="sidebar-panel">
+          <h4>🔧 设备升级</h4>
+          <div id="equipment-panel"></div>
+        </div>
+
+        <div class="sidebar-panel">
+          <h4>📋 事件日志</h4>
+          <div id="event-log"></div>
+          <div class="reset-section">
+            <button class="btn" id="reset-game">🔄 重置游戏</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>恋爱养成游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .game-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 800px;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 20px;
+            text-align: center;
+            color: white;
+        }
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .character-selector {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .char-btn {
+            padding: 8px 20px;
+            border: 2px solid white;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        .char-btn:hover, .char-btn.active {
+            background: white;
+            color: #f5576c;
+        }
+        .char-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .main-content {
+            padding: 30px;
+        }
+        .character-section {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        .avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            color: white;
+            font-weight: bold;
+            flex-shrink: 0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .avatar.osananajimi {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+        }
+        .avatar.senpai {
+            background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
+        }
+        .avatar.left {
+            background: linear-gradient(135deg, #bdc3c7 0%, #95a5a6 100%);
+        }
+        .status-panel {
+            flex: 1;
+        }
+        .char-name {
+            font-size: 22px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .mood-text {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 12px;
+        }
+        .affection-bar-container {
+            position: relative;
+        }
+        .affection-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        .affection-bar {
+            height: 12px;
+            background: #eee;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .affection-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #f5576c 0%, #f093fb 100%);
+            border-radius: 6px;
+            transition: width 200ms ease-out;
+            width: 0%;
+        }
+        .affection-fill.gray {
+            background: #bdc3c7;
+        }
+        .affection-fill.max {
+            background: linear-gradient(90deg, #ffd700 0%, #ffed4e 100%);
+        }
+        .heart-signal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 105, 180, 0.95);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 50px;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            box-shadow: 0 10px 30px rgba(255, 105, 180, 0.5);
+        }
+        .heart-signal.show {
+            opacity: 1;
+            animation: heartbeat 0.5s ease-in-out infinite alternate;
+        }
+        @keyframes heartbeat {
+            from { transform: translate(-50%, -50%) scale(1); }
+            to { transform: translate(-50%, -50%) scale(1.1); }
+        }
+        .dialogue-box {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            min-height: 120px;
+            border: 2px solid #e9ecef;
+        }
+        .dialogue-text {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #333;
+        }
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .option-btn {
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 15px;
+            text-align: left;
+            transition: all 0.3s;
+        }
+        .option-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .option-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .end-message {
+            text-align: center;
+            color: #95a5a6;
+            font-size: 18px;
+            padding: 20px;
+        }
+        .event-tags {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .event-tag {
+            padding: 4px 10px;
+            background: #e3f2fd;
+            color: #1976d2;
+            border-radius: 12px;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="heart-signal" id="heartSignal">💓 心跳信号触发</div>
+    <div class="game-container">
+        <div class="header">
+            <h1>💖 恋爱养成游戏</h1>
+            <div class="character-selector">
+                <button class="char-btn active" id="btnOsananajimi">青梅竹马</button>
+                <button class="char-btn" id="btnSenpai">高冷学姐</button>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="character-section">
+                <div class="avatar" id="avatar">🌸</div>
+                <div class="status-panel">
+                    <div class="char-name" id="charName">小悠</div>
+                    <div class="mood-text" id="moodText">心情：普通</div>
+                    <div class="affection-bar-container">
+                        <div class="affection-label">
+                            <span>好感度</span>
+                            <span id="affectionValue">50/100</span>
+                        </div>
+                        <div class="affection-bar">
+                            <div class="affection-fill" id="affectionFill"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="dialogue-box">
+                <div class="dialogue-text" id="dialogueText"></div>
+                <div class="event-tags" id="eventTags"></div>
+            </div>
+            <div class="options-container" id="optionsContainer"></div>
+        </div>
+    </div>
+
+    <script>
+    // ==== 全局命名空间 ====
+    var Game = Game || {};
+
+    // ==== 接口定义模块 ====
+    (function(Game) {
+        'use strict';
+
+        Game.Interfaces = {
+            ICharacter: {
+                getName: function() {},
+                getAffection: function() {},
+                modifyAffection: function(delta) {},
+                getMood: function() {}
+            },
+
+            IDialogueNode: {
+                getText: function() {},
+                getOptions: function() {},
+                getEventTags: function() {}
+            }
+        };
+
+        Game.Constants = {
+            Events: {
+                DIALOGUE_NODE_CHANGE: 'dialogue_node_change',
+                AFFECTION_UPDATE: 'affection_update',
+                HEART_SIGNAL_TRIGGERED: 'heart_signal_triggered'
+            },
+            MoodThresholds: {
+                OSANAJIMI: [
+                    { min: 0, max: 19, mood: '冷淡' },
+                    { min: 20, max: 49, mood: '普通' },
+                    { min: 50, max: 79, mood: '在意' },
+                    { min: 80, max: 100, mood: '依恋' }
+                ],
+                SENPAI: [
+                    { min: 0, max: 19, mood: '无视' },
+                    { min: 20, max: 49, mood: '冷淡' },
+                    { min: 50, max: 79, mood: '关注' },
+                    { min: 80, max: 100, mood: '娇羞' }
+                ]
+            },
+            SpecialStates: {
+                LEFT: '离开',
+                MAX: '已为你倾心'
+            }
+        };
+    })(Game);
+
+    // ==== EventBus 模块 ====
+    (function(Game) {
+        'use strict';
+
+        function EventBus() {
+            this._subscribers = {};
+        }
+
+        EventBus.prototype.subscribe = function(eventName, callback) {
+            if (typeof eventName !== 'string') {
+                throw new Error('Event name must be a string');
+            }
+            if (typeof callback !== 'function') {
+                throw new Error('Callback must be a function');
+            }
+            
+            if (!this._subscribers[eventName]) {
+                this._subscribers[eventName] = [];
+            }
+            this._subscribers[eventName].push(callback);
+
+            return function() {
+                this._subscribers[eventName] = this._subscribers[eventName].filter(
+                    function(cb) { return cb !== callback; }
+                );
+            }.bind(this);
+        };
+
+        EventBus.prototype.publish = function(eventName, data) {
+            if (typeof eventName !== 'string') {
+                throw new Error('Event name must be a string');
+            }
+            
+            if (this._subscribers[eventName]) {
+                this._subscribers[eventName].forEach(function(callback) {
+                    try {
+                        callback(data);
+                    } catch (e) {
+                        console.error('Error in event subscriber:', e);
+                    }
+                });
+            }
+        };
+
+        Game.EventBus = EventBus;
+    })(Game);
+
+    // ==== 角色基类模块 ====
+    (function(Game) {
+        'use strict';
+
+        var Constants = Game.Constants;
+
+        function BaseCharacter(name, initialAffection, moodThresholds) {
+            this._name = name;
+            this._affection = Math.max(0, Math.min(100, initialAffection));
+            this._moodThresholds = moodThresholds;
+            this._eventBus = null;
+        }
+
+        BaseCharacter.prototype.getName = function() {
+            return this._name;
+        };
+
+        BaseCharacter.prototype.getAffection = function() {
+            return this._affection;
+        };
+
+        BaseCharacter.prototype.modifyAffection = function(delta) {
+            if (typeof delta !== 'number') {
+                throw new Error('Delta must be a number');
+            }
+
+            if (this._affection <= 0 || this._affection >= 100) {
+                return this._affection;
+            }
+
+            var oldValue = this._affection;
+            this._affection = Math.max(0, Math.min(100, this._affection + delta));
+
+            if (this._eventBus && oldValue !== this._affection) {
+                this._eventBus.publish(Constants.Events.AFFECTION_UPDATE, {
+                    character: this,
+                    oldValue: oldValue,
+                    newValue: this._affection,
+                    delta: delta
+                });
+            }
+
+            return this._affection;
+        };
+
+        BaseCharacter.prototype.getMood = function() {
+            if (this._affection <= 0) {
+                return Constants.SpecialStates.LEFT;
+            }
+            if (this._affection >= 100) {
+                return Constants.SpecialStates.MAX;
+            }
+
+            for (var i = 0; i < this._moodThresholds.length; i++) {
+                var threshold = this._moodThresholds[i];
+                if (this._affection >= threshold.min && this._affection <= threshold.max) {
+                    return threshold.mood;
+                }
+            }
+            return '未知';
+        };
+
+        BaseCharacter.prototype.setEventBus = function(eventBus) {
+            if (!(eventBus instanceof Game.EventBus)) {
+                throw new Error('Must provide a valid EventBus instance');
+            }
+            this._eventBus = eventBus;
+        };
+
+        BaseCharacter.prototype.hasLeft = function() {
+            return this._affection <= 0;
+        };
+
+        BaseCharacter.prototype.isMaxAffection = function() {
+            return this._affection >= 100;
+        };
+
+        BaseCharacter.prototype.reset = function(initialAffection) {
+            this._affection = Math.max(0, Math.min(100, initialAffection));
+        };
+
+        Game.BaseCharacter = BaseCharacter;
+    })(Game);
+
+    // ==== 青梅竹马角色模块 ====
+    (function(Game) {
+        'use strict';
+
+        var BaseCharacter = Game.BaseCharacter;
+        var Constants = Game.Constants;
+
+        function Osananajimi() {
+            BaseCharacter.call(this, '小悠', 50, Constants.MoodThresholds.OSANAJIMI);
+            this._consecutivePositive = 0;
+        }
+
+        Osananajimi.prototype = Object.create(BaseCharacter.prototype);
+        Osananajimi.prototype.constructor = Osananajimi;
+
+        Osananajimi.prototype.getConsecutivePositive = function() {
+            return this._consecutivePositive;
+        };
+
+        Osananajimi.prototype.incrementConsecutivePositive = function() {
+            this._consecutivePositive++;
+            return this._consecutivePositive;
+        };
+
+        Osananajimi.prototype.resetConsecutivePositive = function() {
+            this._consecutivePositive = 0;
+        };
+
+        Game.Osananajimi = Osananajimi;
+    })(Game);
+
+    // ==== 高冷学姐角色模块 ====
+    (function(Game) {
+        'use strict';
+
+        var BaseCharacter = Game.BaseCharacter;
+        var Constants = Game.Constants;
+
+        function Senpai() {
+            BaseCharacter.call(this, '雪学姐', 10, Constants.MoodThresholds.SENPAI);
+            this._atmospherePoints = 0;
+        }
+
+        Senpai.prototype = Object.create(BaseCharacter.prototype);
+        Senpai.prototype.constructor = Senpai;
+
+        Senpai.prototype.getAtmospherePoints = function() {
+            return this._atmospherePoints;
+        };
+
+        Senpai.prototype.addAtmospherePoints = function(points) {
+            this._atmospherePoints += points;
+            return this._atmospherePoints;
+        };
+
+        Senpai.prototype.resetAtmospherePoints = function() {
+            this._atmospherePoints = 0;
+        };
+
+        Game.Senpai = Senpai;
+    })(Game);
+
+    // ==== 对话节点模块 ====
+    (function(Game) {
+        'use strict';
+
+        function DialogueNode(nodeId, text, options, eventTags) {
+            if (typeof nodeId !== 'string' || !nodeId) {
+                throw new Error('Node ID must be a non-empty string');
+            }
+            if (typeof text !== 'string') {
+                throw new Error('Text must be a string');
+            }
+            if (!Array.isArray(options)) {
+                throw new Error('Options must be an array');
+            }
+            if (!Array.isArray(eventTags)) {
+                throw new Error('Event tags must be an array');
+            }
+
+            this._nodeId = nodeId;
+            this._text = text;
+            this._options = options;
+            this._eventTags = eventTags;
+        }
+
+        DialogueNode.prototype.getId = function() {
+            return this._nodeId;
+        };
+
+        DialogueNode.prototype.getText = function() {
+            return this._text;
+        };
+
+        DialogueNode.prototype.getOptions = function() {
+            return this._options.slice();
+        };
+
+        DialogueNode.prototype.getEventTags = function() {
+            return this._eventTags.slice();
+        };
+
+        DialogueNode.prototype.hasOptions = function() {
+            return this._options.length > 0;
+        };
+
+        Game.DialogueNode = DialogueNode;
+    })(Game);
+
+    // ==== 对话图模块 ====
+    (function(Game) {
+        'use strict';
+
+        var Constants = Game.Constants;
+        var DialogueNode = Game.DialogueNode;
+
+        function DialogueGraph(eventBus) {
+            if (!(eventBus instanceof Game.EventBus)) {
+                throw new Error('Must provide a valid EventBus instance');
+            }
+            
+            this._eventBus = eventBus;
+            this._nodes = {};
+            this._currentNodeId = null;
+            this._character = null;
+        }
+
+        DialogueGraph.prototype.addNode = function(node) {
+            if (!(node instanceof DialogueNode)) {
+                throw new Error('Must provide a valid DialogueNode instance');
+            }
+            this._nodes[node.getId()] = node;
+        };
+
+        DialogueGraph.prototype.setStartNode = function(nodeId) {
+            if (!this._nodes[nodeId]) {
+                throw new Error('Node not found: ' + nodeId);
+            }
+            this._currentNodeId = nodeId;
+            this._publishNodeChange();
+        };
+
+        DialogueGraph.prototype.getCurrentNode = function() {
+            return this._nodes[this._currentNodeId] || null;
+        };
+
+        DialogueGraph.prototype.selectOption = function(optionIndex) {
+            var currentNode = this.getCurrentNode();
+            if (!currentNode) return false;
+
+            var options = currentNode.getOptions();
+            if (optionIndex < 0 || optionIndex >= options.length) {
+                return false;
+            }
+
+            var option = options[optionIndex];
+            
+            if (this._character && option.affectionDelta) {
+                this._character.modifyAffection(option.affectionDelta);
+            }
+
+            if (option.nextNodeId && this._nodes[option.nextNodeId]) {
+                this._currentNodeId = option.nextNodeId;
+                this._publishNodeChange();
+                return true;
+            }
+
+            return false;
+        };
+
+        DialogueGraph.prototype._publishNodeChange = function() {
+            var node = this.getCurrentNode();
+            if (node) {
+                this._eventBus.publish(Constants.Events.DIALOGUE_NODE_CHANGE, {
+                    node: node,
+                    character: this._character
+                });
+
+                var tags = node.getEventTags();
+                if (tags.indexOf('heart_signal') !== -1) {
+                    this._eventBus.publish(Constants.Events.HEART_SIGNAL_TRIGGERED, {
+                        node: node,
+                        character: this._character
+                    });
+                }
+            }
+        };
+
+        DialogueGraph.prototype.setCharacter = function(character) {
+            if (!(character instanceof Game.BaseCharacter)) {
+                throw new Error('Must provide a valid BaseCharacter instance');
+            }
+            this._character = character;
+        };
+
+        DialogueGraph.prototype.getNode = function(nodeId) {
+            return this._nodes[nodeId] || null;
+        };
+
+        DialogueGraph.prototype.jumpToNode = function(nodeId) {
+            if (this._nodes[nodeId]) {
+                this._currentNodeId = nodeId;
+                this._publishNodeChange();
+                return true;
+            }
+            return false;
+        };
+
+        DialogueGraph.prototype.reset = function() {
+            this._currentNodeId = null;
+        };
+
+        Game.DialogueGraph = DialogueGraph;
+    })(Game);
+
+    // ==== 对话工厂模块 ====
+    (function(Game) {
+        'use strict';
+
+        var DialogueNode = Game.DialogueNode;
+        var LEFT_TEXT = 'TA已经离开了...';
+        var MAX_TEXT = 'TA已为你倾心，你们幸福地在一起了～';
+
+        function createOsananajimiDialogue() {
+            var nodes = {};
+
+            nodes.start = new DialogueNode(
+                'start',
+                '小悠蹦蹦跳跳地跑到你面前，手里拿着两个包装精美的饭团："嗨！今天路上刚好路过便利店，看到你最喜欢的金枪鱼饭团，就顺手买了一个～要尝尝吗？"',
+                [
+                    { text: '哇，刚好饿了！谢谢你，小悠最好了！ (+10)', nextNodeId: 'happy_accept', affectionDelta: 10 },
+                    { text: '哦...谢谢，不过我刚吃过了。 (-5)', nextNodeId: 'polite_reject', affectionDelta: -5 },
+                    { text: '你怎么总是乱花钱？下次别买了。 (-10)', nextNodeId: 'harsh_reject', affectionDelta: -10 }
+                ],
+                ['daily', 'casual']
+            );
+
+            nodes.happy_accept = new DialogueNode(
+                'happy_accept',
+                '小悠的脸上瞬间绽放出灿烂的笑容，眼睛弯成了月牙："真的吗？太好了！那我们去操场的长椅上一起吃吧？今天天气特别好呢～"她轻轻拉住了你的袖口。',
+                [
+                    { text: '好啊，走吧！ (+5)', nextNodeId: 'roof_eating', affectionDelta: 5 },
+                    { text: '不了，我还要去图书馆查资料。 (-3)', nextNodeId: 'library_alone', affectionDelta: -3 }
+                ],
+                ['positive_response', 'casual']
+            );
+
+            nodes.roof_eating = new DialogueNode(
+                'roof_eating',
+                '阳光下，小悠坐在你身边，小口吃着饭团，偶尔偷偷看你一眼。"呐...你觉得...我们这样算是约会吗？"她的脸颊微微泛红。',
+                [
+                    { text: '当然算啦，和你在一起最开心了！ (+15)', nextNodeId: 'confession_hint', affectionDelta: 15 },
+                    { text: '哈哈，只是普通朋友一起吃饭而已啦。 (-8)', nextNodeId: 'friend_zone', affectionDelta: -8 }
+                ],
+                ['romantic', 'milestone']
+            );
+
+            nodes.confession_hint = new DialogueNode(
+                'confession_hint',
+                '小悠低下头，手指绞着衣角，声音细若蚊吟："其实...我从很久以前就...就喜欢你了！不是朋友的那种喜欢..."她抬起头，眼中闪烁着泪光。',
+                [
+                    { text: '我也是！我也一直喜欢你！ (+20)', nextNodeId: 'happy_ending', affectionDelta: 20 },
+                    { text: '小悠...我一直把你当妹妹看... (-25)', nextNodeId: 'sad_rejection', affectionDelta: -25 }
+                ],
+                ['confession', 'critical', 'heart_signal']
+            );
+
+            nodes.happy_ending = new DialogueNode(
+                'happy_ending',
+                '小悠扑进你的怀里，喜极而泣："真的吗？我不是在做梦吧！"阳光洒在你们身上，空气中弥漫着幸福的味道。这是属于你们的美好开始。',
+                [],
+                ['ending', 'happy', 'special']
+            );
+
+            nodes.sad_rejection = new DialogueNode(
+                'sad_rejection',
+                '小悠的笑容僵住了，眼泪不受控制地滑落："是...是吗...我明白了..."她慢慢站起身，"对不起，打扰你了。"说完就转身跑开了。',
+                [],
+                ['ending', 'sad']
+            );
+
+            nodes.friend_zone = new DialogueNode(
+                'friend_zone',
+                '小悠愣了一下，随即勉强挤出一个笑容："也...也是呢，我们是最好的朋友嘛。哈哈..."但你注意到她眼中一闪而过的失落。',
+                [
+                    { text: '怎么了？突然说这个？', nextNodeId: 'casual_question', affectionDelta: 0 },
+                    { text: '好了，该回教室了。', nextNodeId: 'back_to_class', affectionDelta: -3 }
+                ],
+                ['neutral']
+            );
+
+            nodes.polite_reject = new DialogueNode(
+                'polite_reject',
+                '小悠的笑容淡了一些，但还是很体贴："没关系啦，那我自己吃吧～刚好我也挺饿的，嘻嘻。"她故作轻松地笑了笑。',
+                [
+                    { text: '下次一定陪你吃！ (+3)', nextNodeId: 'promise_future', affectionDelta: 3 },
+                    { text: '嗯，那我先走了。 (-5)', nextNodeId: 'hurried_leave', affectionDelta: -5 }
+                ],
+                ['neutral']
+            );
+
+            nodes.harsh_reject = new DialogueNode(
+                'harsh_reject',
+                '小悠的手僵在半空，眼眶瞬间红了："我...我只是想对你好而已..."她把饭团塞进书包，"对不起，我多管闲事了。"',
+                [
+                    { text: '抱歉，我刚才语气太重了... (+5)', nextNodeId: 'apologize', affectionDelta: 5 },
+                    { text: '知道就好，下次别这样了。 (-15)', nextNodeId: 'further_hurt', affectionDelta: -15 }
+                ],
+                ['negative_response', 'tense']
+            );
+
+            nodes.apologize = new DialogueNode(
+                'apologize',
+                '小悠吸了吸鼻子，抬起头："真的吗？那...那你原谅我了？"她的眼中重新燃起希望。',
+                [
+                    { text: '当然，我们是最好的朋友啊。', nextNodeId: 'restore_friendship', affectionDelta: 8 }
+                ],
+                ['reconciliation']
+            );
+
+            nodes.restore_friendship = new DialogueNode(
+                'restore_friendship',
+                '小悠露出了释然的笑容："太好了！那...那个饭团你真的不要吗？我还特意加了沙拉酱呢～"',
+                [
+                    { text: '那我就不客气啦！ (+5)', nextNodeId: 'happy_accept', affectionDelta: 5 }
+                ],
+                ['positive_response']
+            );
+
+            nodes.library_alone = new DialogueNode(
+                'library_alone',
+                '小悠点点头："好...那你去吧，加油哦！"她挥挥手，但你能感觉到她语气中的失落。你独自走向图书馆，心里有些空落落的。',
+                [
+                    { text: '突然不想去图书馆了，陪你吃饭！ (+8)', nextNodeId: 'roof_eating', affectionDelta: 8 }
+                ],
+                ['second_chance']
+            );
+
+            nodes.further_hurt = new DialogueNode(
+                'further_hurt',
+                '小悠再也忍不住，转身跑开了，留下你一个人站在原地。你们的关系似乎降到了冰点。',
+                [],
+                ['ending', 'bad']
+            );
+
+            nodes.promise_future = new DialogueNode(
+                'promise_future',
+                '小悠眼睛一亮："真的？拉钩！"她伸出小拇指，脸上又恢复了往日的活力。',
+                [
+                    { text: '拉钩上吊，一百年不许变！ (+5)', nextNodeId: 'casual_question', affectionDelta: 5 }
+                ],
+                ['promise', 'positive']
+            );
+
+            nodes.casual_question = new DialogueNode(
+                'casual_question',
+                '"对了，下周学校有文化祭，你...要不要和我一起逛？"小悠期待地看着你。',
+                [
+                    { text: '当然要！我们一起玩个痛快！ (+10)', nextNodeId: 'festival_plan', affectionDelta: 10 },
+                    { text: '到时候再说吧，我可能有事。 (-3)', nextNodeId: 'vague_answer', affectionDelta: -3 }
+                ],
+                ['event_invitation']
+            );
+
+            nodes.festival_plan = new DialogueNode(
+                'festival_plan',
+                '小悠兴奋地拍手："太好了！我听说会有鬼屋和棉花糖摊位，还有烟火表演！我们一起去吧！"',
+                [
+                    { text: '好，我很期待！ (+5)', nextNodeId: 'happy_ending', affectionDelta: 5 }
+                ],
+                ['romantic', 'heart_signal']
+            );
+
+            nodes.back_to_class = new DialogueNode(
+                'back_to_class',
+                '小悠默默跟在你身后回教室，一路上没有说话。往日活泼的她变得格外安静。',
+                [
+                    { text: '小悠，刚才对不起... (+5)', nextNodeId: 'apologize', affectionDelta: 5 }
+                ],
+                ['tension']
+            );
+
+            nodes.hurried_leave = new DialogueNode(
+                'hurried_leave',
+                '你匆匆离开，没有注意到小悠失落的表情。你们之间似乎渐渐有了距离。',
+                [
+                    { text: '（回头）小悠，等一下！ (+8)', nextNodeId: 'apologize', affectionDelta: 8 }
+                ],
+                ['second_chance']
+            );
+
+            nodes.vague_answer = new DialogueNode(
+                'vague_answer',
+                '小悠有些失望，但还是笑着说："没关系，忙的话就算啦～"但你能感觉到她的不开心。',
+                [
+                    { text: '骗你的！我怎么可能不陪你！ (+12)', nextNodeId: 'festival_plan', affectionDelta: 12 }
+                ],
+                ['surprise', 'heart_signal']
+            );
+
+            return nodes;
+        }
+
+        function createSenpaiDialogue() {
+            var nodes = {};
+
+            nodes.start = new DialogueNode(
+                'start',
+                '图书馆角落，雪学姐正安静地看书，午后的阳光洒在她乌黑的长发上。她似乎注意到了你的目光，微微抬头："有事吗？"声音清冷而优雅。',
+                [
+                    { text: '学姐，我可以坐在你旁边吗？ (+3)', nextNodeId: 'sit_together', affectionDelta: 3 },
+                    { text: '没...没事，就是觉得学姐看书的样子很好看... (0)', nextNodeId: 'awkward_praise', affectionDelta: 0 },
+                    { text: '打扰了。 (-3)', nextNodeId: 'quick_leave', affectionDelta: -3 }
+                ],
+                ['first_encounter', 'library']
+            );
+
+            nodes.sit_together = new DialogueNode(
+                'sit_together',
+                '雪学姐微微点头，目光回到书上："可以。请保持安静。"你在她身旁坐下，能闻到淡淡的栀子花香气。过了一会儿，她轻声说："你也喜欢叶芝的诗？"',
+                [
+                    { text: '是的！我特别喜欢《当你老了》！ (+8)', nextNodeId: 'shared_interest', affectionDelta: 8 },
+                    { text: '其实...我不太懂，就是觉得封面好看。 (-5)', nextNodeId: 'honest_admission', affectionDelta: -5 },
+                    { text: '随便看看而已。 (-8)', nextNodeId: 'dismissive', affectionDelta: -8 }
+                ],
+                ['shared_moment', 'quiet']
+            );
+
+            nodes.shared_interest = new DialogueNode(
+                'shared_interest',
+                '雪学姐眼中闪过一丝惊喜，合上书看向你："没想到还有同龄人喜欢他。"她的嘴角似乎微微上扬，"这首诗...有一种跨越时间的温柔呢。"',
+                [
+                    { text: '学姐对诗的理解真深刻！能和我多说说吗？ (+12)', nextNodeId: 'deep_conversation', affectionDelta: 12 },
+                    { text: '是啊，写得挺好的。（沉默） (-3)', nextNodeId: 'awkward_silence', affectionDelta: -3 }
+                ],
+                ['connection', 'intellectual', 'heart_signal']
+            );
+
+            nodes.deep_conversation = new DialogueNode(
+                'deep_conversation',
+                '你们从叶芝聊到雪莱，从十四行诗聊到现代诗。不知不觉，夕阳西下。雪学姐看了看表："没想到聊了这么久...和你聊天，很开心。"她的耳根微红。',
+                [
+                    { text: '我也是！学姐，下次还能和你讨论诗词吗？ (+15)', nextNodeId: 'next_meeting', affectionDelta: 15 },
+                    { text: '时间不早了，我该走了。 (-5)', nextNodeId: 'abrupt_end', affectionDelta: -5 }
+                ],
+                ['bonding', 'romantic_undertones']
+            );
+
+            nodes.next_meeting = new DialogueNode(
+                'next_meeting',
+                '雪学姐轻轻点头，从笔记本上撕下一页写下什么："这是我周末常去的咖啡馆地址。如果...你有空的话。"她把纸条递给你时，手指微微颤抖。',
+                [
+                    { text: '我一定会去的！ (+18)', nextNodeId: 'cafe_date', affectionDelta: 18 },
+                    { text: '周末我可能有事... (-10)', nextNodeId: 'reject_date', affectionDelta: -10 }
+                ],
+                ['invitation', 'critical', 'heart_signal']
+            );
+
+            nodes.cafe_date = new DialogueNode(
+                'cafe_date',
+                '周末的咖啡馆，雪学姐穿着米色的连衣裙，比平时多了几分温柔。她看到你时，眼中闪过光芒。"你来了...我给你点了拿铁，可以吗？"',
+                [
+                    { text: '谢谢学姐，你今天真漂亮！ (+20)', nextNodeId: 'senpai_confession', affectionDelta: 20 },
+                    { text: '嗯，挺好的。 (-5)', nextNodeId: 'boring_response', affectionDelta: -5 }
+                ],
+                ['date', 'romantic', 'special']
+            );
+
+            nodes.senpai_confession = new DialogueNode(
+                'senpai_confession',
+                '雪学姐低下头，手指摩挲着咖啡杯："其实...我注意你很久了。在图书馆的时候，在走廊擦肩而过的时候...我以为这只是我的单相思。"她抬起头，眼中带着勇敢，"但是，我好像喜欢上你了。"',
+                [
+                    { text: '学姐，我也喜欢你！从第一次见到你就喜欢了！ (+22)', nextNodeId: 'senpai_happy_ending', affectionDelta: 22 },
+                    { text: '学姐...我一直把你当姐姐看待... (-25)', nextNodeId: 'senpai_rejection', affectionDelta: -25 }
+                ],
+                ['confession', 'critical_moment', 'heart_signal']
+            );
+
+            nodes.senpai_happy_ending = new DialogueNode(
+                'senpai_happy_ending',
+                '雪学姐的眼角滑落泪珠，这一次是喜悦的泪水。她隔着桌子轻轻握住你的手，冰凉的指尖却传递着炽热的情感："谢谢你...选择了我。"窗外的阳光正好，你们的故事才刚刚开始。',
+                [],
+                ['ending', 'happy', 'perfect']
+            );
+
+            nodes.senpai_rejection = new DialogueNode(
+                'senpai_rejection',
+                '雪学姐的手僵住了，随即慢慢收回。她恢复了平时清冷的表情，但你能看到她眼中的受伤："我明白了。抱歉，让你困扰了。"她起身，"我先离开了。"',
+                [],
+                ['ending', 'sad']
+            );
+
+            nodes.awkward_praise = new DialogueNode(
+                'awkward_praise',
+                '雪学姐微微一怔，随即有些不自然地移开视线："是吗...谢谢。"她似乎有些不知所措，又低头继续看书，但你注意到她的耳朵红了。',
+                [
+                    { text: '学姐，我真的可以坐这里吗？ (+5)', nextNodeId: 'sit_together', affectionDelta: 5 },
+                    { text: '那我先走了。 (-5)', nextNodeId: 'quick_leave', affectionDelta: -5 }
+                ],
+                ['awkward', 'cute']
+            );
+
+            nodes.quick_leave = new DialogueNode(
+                'quick_leave',
+                '你慌忙转身离开，没有看到雪学姐抬头望向你背影的复杂眼神。第一次相遇就这样仓促结束了。',
+                [
+                    { text: '（鼓起勇气转身）学姐，等一下！ (+8)', nextNodeId: 'sit_together', affectionDelta: 8 }
+                ],
+                ['second_chance']
+            );
+
+            nodes.honest_admission = new DialogueNode(
+                'honest_admission',
+                '雪学姐轻轻笑了，这是你第一次看到她笑，像冰雪消融："诚实是优点。这本书确实封面设计得很好。"她把书推过来一点，"要我给你讲讲吗？"',
+                [
+                    { text: '麻烦学姐了！ (+10)', nextNodeId: 'deep_conversation', affectionDelta: 10 },
+                    { text: '不用了，我还是自己看吧。 (-8)', nextNodeId: 'dismissive', affectionDelta: -8 }
+                ],
+                ['kindness', 'opportunity']
+            );
+
+            nodes.dismissive = new DialogueNode(
+                'dismissive',
+                '雪学姐皱了皱眉，重新打开书："是吗。"她的语气又恢复了冰冷，不再看你。你在她心中的印象分大打折扣。',
+                [
+                    { text: '学姐...对不起，我不是那个意思。 (+5)', nextNodeId: 'apologize_senpai', affectionDelta: 5 }
+                ],
+                ['negative', 'need_improvement']
+            );
+
+            nodes.apologize_senpai = new DialogueNode(
+                'apologize_senpai',
+                '雪学姐抬头看了你一眼，眼神柔和了一些："没事。是我多管闲事了。"虽然嘴上这么说，但她的态度明显缓和了。',
+                [
+                    { text: '不，学姐愿意教我是我的荣幸！ (+8)', nextNodeId: 'deep_conversation', affectionDelta: 8 }
+                ],
+                ['reconciliation']
+            );
+
+            nodes.awkward_silence = new DialogueNode(
+                'awkward_silence',
+                '空气突然安静下来，只有翻书的声音。雪学姐似乎想说什么，但最终还是没有开口。',
+                [
+                    { text: '学姐，能推荐一些好诗给我吗？ (+6)', nextNodeId: 'deep_conversation', affectionDelta: 6 }
+                ],
+                ['awkward', 'opportunity']
+            );
+
+            nodes.abrupt_end = new DialogueNode(
+                'abrupt_end',
+                '雪学姐点点头："好的，再见。"她继续看书，但你离开时，似乎听到她轻轻叹了口气。',
+                [
+                    { text: '突然想起来还有问题要请教学姐！ (+10)', nextNodeId: 'next_meeting', affectionDelta: 10 }
+                ],
+                ['second_chance']
+            );
+
+            nodes.reject_date = new DialogueNode(
+                'reject_date',
+                '雪学姐眼中的光芒瞬间熄灭，她收回纸条："没关系，工作学习要紧。"她的语气平静得可怕，但你能感觉到你们之间的距离变远了。',
+                [],
+                ['ending', 'neutral_bad']
+            );
+
+            nodes.boring_response = new DialogueNode(
+                'boring_response',
+                '雪学姐有些失望地垂下眼睫："是吗..."她轻轻搅拌着咖啡，"那...我们回去吧。"精心准备的约会就这样平淡地收场了。',
+                [
+                    { text: '抱歉！我只是太紧张了！学姐你真的很美！ (+15)', nextNodeId: 'senpai_confession', affectionDelta: 15 }
+                ],
+                ['second_chance', 'heart_signal']
+            );
+
+            return nodes;
+        }
+
+        function createSpecialLeftNode() {
+            return new DialogueNode('left', LEFT_TEXT, [], []);
+        }
+
+        function createSpecialMaxNode() {
+            return new DialogueNode('max', MAX_TEXT, [], ['special_ending']);
+        }
+
+        Game.DialogueFactory = {
+            createOsananajimiDialogue: createOsananajimiDialogue,
+            createSenpaiDialogue: createSenpaiDialogue,
+            createSpecialLeftNode: createSpecialLeftNode,
+            createSpecialMaxNode: createSpecialMaxNode
+        };
+    })(Game);
+
+    // ==== 心跳机制模块 ====
+    (function(Game) {
+        'use strict';
+
+        var Constants = Game.Constants;
+
+        function HeartSignalSystem(eventBus) {
+            if (!(eventBus instanceof Game.EventBus)) {
+                throw new Error('Must provide a valid EventBus instance');
+            }
+            
+            this._eventBus = eventBus;
+            this._consecutivePositiveCount = 0;
+            this._lastAffectionDelta = 0;
+            this._atmospherePoints = 0;
+            this._triggerThreshold = 3;
+            this._atmosphereThreshold = 15;
+
+            this._setupSubscriptions();
+        }
+
+        HeartSignalSystem.prototype._setupSubscriptions = function() {
+            var self = this;
+            
+            this._eventBus.subscribe(Constants.Events.AFFECTION_UPDATE, function(data) {
+                self._handleAffectionUpdate(data);
+            });
+
+            this._eventBus.subscribe(Constants.Events.DIALOGUE_NODE_CHANGE, function(data) {
+                self._handleNodeChange(data);
+            });
+        };
+
+        HeartSignalSystem.prototype._handleAffectionUpdate = function(data) {
+            var delta = data.delta;
+            
+            if (delta > 0) {
+                this._consecutivePositiveCount++;
+                this._atmospherePoints += delta;
+            } else if (delta < 0) {
+                this._consecutivePositiveCount = 0;
+                this._atmospherePoints = Math.max(0, this._atmospherePoints - 5);
+            }
+
+            this._checkHeartSignalConditions(data.character);
+        };
+
+        HeartSignalSystem.prototype._handleNodeChange = function(data) {
+            var node = data.node;
+            if (!node) return;
+
+            var tags = node.getEventTags();
+            if (tags.indexOf('romantic') !== -1) {
+                this._atmospherePoints += 3;
+            }
+            if (tags.indexOf('special') !== -1) {
+                this._atmospherePoints += 5;
+            }
+
+            this._checkHeartSignalConditions(data.character);
+        };
+
+        HeartSignalSystem.prototype._checkHeartSignalConditions = function(character) {
+            var shouldTrigger = false;
+
+            if (this._consecutivePositiveCount >= this._triggerThreshold) {
+                shouldTrigger = true;
+                this._consecutivePositiveCount = 0;
+            }
+
+            if (this._atmospherePoints >= this._atmosphereThreshold) {
+                shouldTrigger = true;
+                this._atmospherePoints = 0;
+            }
+
+            if (shouldTrigger && character && !character.hasLeft() && !character.isMaxAffection()) {
+                this._eventBus.publish(Constants.Events.HEART_SIGNAL_TRIGGERED, {
+                    character: character,
+                    reason: this._consecutivePositiveCount >= this._triggerThreshold 
+                        ? '连续好感提升' 
+                        : '氛围值累积'
+                });
+            }
+        };
+
+        HeartSignalSystem.prototype.reset = function() {
+            this._consecutivePositiveCount = 0;
+            this._atmospherePoints = 0;
+        };
+
+        HeartSignalSystem.prototype.addAtmospherePoints = function(points) {
+            this._atmospherePoints += points;
+        };
+
+        Game.HeartSignalSystem = HeartSignalSystem;
+    })(Game);
+
+    // ==== UI 渲染器模块 ====
+    (function(Game) {
+        'use strict';
+
+        var Constants = Game.Constants;
+
+        function UIRenderer(eventBus) {
+            if (!(eventBus instanceof Game.EventBus)) {
+                throw new Error('Must provide a valid EventBus instance');
+            }
+
+            this._eventBus = eventBus;
+            this._currentCharacter = null;
+            this._dialogueGraph = null;
+            
+            this._cacheElements();
+            this._setupSubscriptions();
+            this._setupEventListeners();
+        }
+
+        UIRenderer.prototype._cacheElements = function() {
+            this._elements = {
+                avatar: document.getElementById('avatar'),
+                charName: document.getElementById('charName'),
+                moodText: document.getElementById('moodText'),
+                affectionValue: document.getElementById('affectionValue'),
+                affectionFill: document.getElementById('affectionFill'),
+                dialogueText: document.getElementById('dialogueText'),
+                eventTags: document.getElementById('eventTags'),
+                optionsContainer: document.getElementById('optionsContainer'),
+                heartSignal: document.getElementById('heartSignal'),
+                btnOsananajimi: document.getElementById('btnOsananajimi'),
+                btnSenpai: document.getElementById('btnSenpai')
+            };
+        };
+
+        UIRenderer.prototype._setupSubscriptions = function() {
+            var self = this;
+
+            this._eventBus.subscribe(Constants.Events.AFFECTION_UPDATE, function(data) {
+                self._updateAffectionDisplay(data.newValue, data.character);
+            });
+
+            this._eventBus.subscribe(Constants.Events.DIALOGUE_NODE_CHANGE, function(data) {
+                self._renderDialogueNode(data.node, data.character);
+            });
+
+            this._eventBus.subscribe(Constants.Events.HEART_SIGNAL_TRIGGERED, function(data) {
+                self._showHeartSignal();
+            });
+        };
+
+        UIRenderer.prototype._setupEventListeners = function() {
+            var self = this;
+
+            this._elements.btnOsananajimi.addEventListener('click', function() {
+                self._switchCharacter('osananajimi');
+            });
+
+            this._elements.btnSenpai.addEventListener('click', function() {
+                self._switchCharacter('senpai');
+            });
+        };
+
+        UIRenderer.prototype.setDialogueGraph = function(dialogueGraph) {
+            if (!(dialogueGraph instanceof Game.DialogueGraph)) {
+                throw new Error('Must provide a valid DialogueGraph instance');
+            }
+            this._dialogueGraph = dialogueGraph;
+        };
+
+        UIRenderer.prototype.setCharacter = function(character, characterType) {
+            if (!(character instanceof Game.BaseCharacter)) {
+                throw new Error('Must provide a valid BaseCharacter instance');
+            }
+
+            this._currentCharacter = character;
+            this._currentCharacterType = characterType;
+
+            this._updateCharacterDisplay();
+            this._updateAffectionDisplay(character.getAffection(), character);
+        };
+
+        UIRenderer.prototype._switchCharacter = function(type) {
+            var event = new CustomEvent('characterSwitch', { 
+                detail: { characterType: type } 
+            });
+            document.dispatchEvent(event);
+        };
+
+        UIRenderer.prototype.updateCharacterButtons = function(activeType) {
+            this._elements.btnOsananajimi.classList.toggle('active', activeType === 'osananajimi');
+            this._elements.btnSenpai.classList.toggle('active', activeType === 'senpai');
+        };
+
+        UIRenderer.prototype._updateCharacterDisplay = function() {
+            var char = this._currentCharacter;
+            if (!char) return;
+
+            this._elements.charName.textContent = char.getName();
+            
+            var avatarEl = this._elements.avatar;
+            avatarEl.className = 'avatar';
+            
+            if (char.hasLeft()) {
+                avatarEl.classList.add('left');
+                avatarEl.textContent = '💔';
+            } else if (this._currentCharacterType === 'osananajimi') {
+                avatarEl.classList.add('osananajimi');
+                avatarEl.textContent = '🌸';
+            } else {
+                avatarEl.classList.add('senpai');
+                avatarEl.textContent = '❄️';
+            }
+
+            this._updateMoodDisplay();
+        };
+
+        UIRenderer.prototype._updateMoodDisplay = function() {
+            var char = this._currentCharacter;
+            if (!char) return;
+
+            var mood = char.getMood();
+            this._elements.moodText.textContent = '心情：' + mood;
+        };
+
+        UIRenderer.prototype._updateAffectionDisplay = function(value, character) {
+            this._elements.affectionValue.textContent = value + '/100';
+            
+            var fillEl = this._elements.affectionFill;
+            fillEl.className = 'affection-fill';
+            
+            if (character.hasLeft()) {
+                fillEl.classList.add('gray');
+            } else if (character.isMaxAffection()) {
+                fillEl.classList.add('max');
+            }
+            
+            setTimeout(function() {
+                fillEl.style.width = value + '%';
+            }, 10);
+
+            this._updateMoodDisplay();
+            this._updateCharacterDisplay();
+        };
+
+        UIRenderer.prototype._renderDialogueNode = function(node, character) {
+            if (!node) return;
+
+            var startTime = performance.now();
+
+            this._elements.dialogueText.textContent = node.getText();
+
+            this._elements.eventTags.innerHTML = '';
+            var tags = node.getEventTags();
+            tags.forEach(function(tag) {
+                var tagEl = document.createElement('span');
+                tagEl.className = 'event-tag';
+                tagEl.textContent = tag;
+                this._elements.eventTags.appendChild(tagEl);
+            }.bind(this));
+
+            this._renderOptions(node, character);
+
+            var endTime = performance.now();
+            console.log('UI更新耗时:', (endTime - startTime).toFixed(2) + 'ms');
+        };
+
+        UIRenderer.prototype._renderOptions = function(node, character) {
+            var container = this._elements.optionsContainer;
+            container.innerHTML = '';
+
+            var options = node.getOptions();
+            
+            if (options.length === 0) {
+                var endMsg = document.createElement('div');
+                endMsg.className = 'end-message';
+                endMsg.textContent = '— 对话结束 —';
+                container.appendChild(endMsg);
+                return;
+            }
+
+            var self = this;
+            options.forEach(function(option, index) {
+                var btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = option.text;
+                
+                var shouldDisable = false;
+                if (character) {
+                    if (character.hasLeft() || character.isMaxAffection()) {
+                        shouldDisable = true;
+                    }
+                    if (option.affectionDelta > 0 && character.isMaxAffection()) {
+                        shouldDisable = true;
+                    }
+                }
+
+                btn.disabled = shouldDisable;
+
+                if (!shouldDisable) {
+                    btn.addEventListener('click', function() {
+                        if (self._dialogueGraph) {
+                            self._dialogueGraph.selectOption(index);
+                        }
+                    });
+                }
+
+                container.appendChild(btn);
+            });
+        };
+
+        UIRenderer.prototype._showHeartSignal = function() {
+            var signalEl = this._elements.heartSignal;
+            signalEl.classList.add('show');
+            
+            setTimeout(function() {
+                signalEl.classList.remove('show');
+            }, 2000);
+        };
+
+        UIRenderer.prototype.refresh = function() {
+            if (this._currentCharacter) {
+                this._updateCharacterDisplay();
+                this._updateAffectionDisplay(
+                    this._currentCharacter.getAffection(), 
+                    this._currentCharacter
+                );
+            }
+        };
+
+        Game.UIRenderer = UIRenderer;
+    })(Game);
+
+    // ==== 游戏主控制器模块 ====
+    (function(Game) {
+        'use strict';
+
+        function GameController() {
+            this._eventBus = new Game.EventBus();
+            this._heartSignalSystem = new Game.HeartSignalSystem(this._eventBus);
+            this._uiRenderer = new Game.UIRenderer(this._eventBus);
+            
+            this._characters = {
+                osananajimi: new Game.Osananajimi(),
+                senpai: new Game.Senpai()
+            };
+            
+            this._dialogueGraphs = {
+                osananajimi: this._createGraphForCharacter('osananajimi'),
+                senpai: this._createGraphForCharacter('senpai')
+            };
+            
+            this._currentCharacterType = 'osananajimi';
+            
+            this._initializeCharacters();
+            this._setupEventListeners();
+            this._switchToCharacter('osananajimi');
+        }
+
+        GameController.prototype._createGraphForCharacter = function(type) {
+            var graph = new Game.DialogueGraph(this._eventBus);
+            var nodes;
+            
+            if (type === 'osananajimi') {
+                nodes = Game.DialogueFactory.createOsananajimiDialogue();
+            } else {
+                nodes = Game.DialogueFactory.createSenpaiDialogue();
+            }
+
+            for (var key in nodes) {
+                if (nodes.hasOwnProperty(key)) {
+                    graph.addNode(nodes[key]);
+                }
+            }
+
+            var leftNode = Game.DialogueFactory.createSpecialLeftNode();
+            var maxNode = Game.DialogueFactory.createSpecialMaxNode();
+            graph.addNode(leftNode);
+            graph.addNode(maxNode);
+
+            return graph;
+        };
+
+        GameController.prototype._initializeCharacters = function() {
+            for (var key in this._characters) {
+                if (this._characters.hasOwnProperty(key)) {
+                    this._characters[key].setEventBus(this._eventBus);
+                }
+            }
+        };
+
+        GameController.prototype._setupEventListeners = function() {
+            var self = this;
+
+            document.addEventListener('characterSwitch', function(e) {
+                self._switchToCharacter(e.detail.characterType);
+            });
+
+            this._eventBus.subscribe(Game.Constants.Events.AFFECTION_UPDATE, function(data) {
+                self._checkSpecialStates(data.character, data.newValue);
+            });
+        };
+
+        GameController.prototype._switchToCharacter = function(type) {
+            if (!this._characters[type]) return;
+
+            this._currentCharacterType = type;
+            var character = this._characters[type];
+            var graph = this._dialogueGraphs[type];
+
+            this._heartSignalSystem.reset();
+
+            graph.setCharacter(character);
+            this._uiRenderer.setDialogueGraph(graph);
+            this._uiRenderer.setCharacter(character, type);
+            this._uiRenderer.updateCharacterButtons(type);
+
+            if (character.hasLeft()) {
+                graph.jumpToNode('left');
+            } else if (character.isMaxAffection()) {
+                graph.jumpToNode('max');
+            } else {
+                graph.setStartNode('start');
+            }
+        };
+
+        GameController.prototype._checkSpecialStates = function(character, newValue) {
+            var graph = this._dialogueGraphs[this._currentCharacterType];
+            
+            if (newValue <= 0) {
+                graph.jumpToNode('left');
+            } else if (newValue >= 100) {
+                graph.jumpToNode('max');
+            }
+        };
+
+        GameController.prototype.start = function() {
+            console.log('💖 恋爱养成游戏启动成功！');
+            console.log('📊 对话节点统计：');
+            console.log('  - 青梅竹马:', Object.keys(Game.DialogueFactory.createOsananajimiDialogue()).length, '个节点');
+            console.log('  - 高冷学姐:', Object.keys(Game.DialogueFactory.createSenpaiDialogue()).length, '个节点');
+            console.log('  - 总计:', 
+                Object.keys(Game.DialogueFactory.createOsananajimiDialogue()).length + 
+                Object.keys(Game.DialogueFactory.createSenpaiDialogue()).length, 
+                '个节点'
+            );
+        };
+
+        Game.GameController = GameController;
+    })(Game);
+
+    // ==== 游戏启动 ====
+    (function(Game) {
+        'use strict';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var game = new Game.GameController();
+            game.start();
+        });
+    })(Game);
+    </script>
+</body>
+</html>

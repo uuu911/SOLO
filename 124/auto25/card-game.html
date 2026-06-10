@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>卡牌对战游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: white;
+            overflow: hidden;
+        }
+
+        .game-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+        }
+
+        .enemy-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+
+        .battlefield {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 50px;
+            position: relative;
+        }
+
+        .player-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        .hero-section {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            gap: 20px;
+        }
+
+        .hero {
+            width: 100px;
+            height: 120px;
+            background: linear-gradient(145deg, #2d3436, #636e72);
+            border-radius: 15px;
+            border: 4px solid #ffd700;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+        }
+
+        .hero:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 35px rgba(255,215,0,0.4);
+        }
+
+        .hero.targetable {
+            border-color: #ff4757;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); }
+            50% { box-shadow: 0 0 20px 10px rgba(255, 71, 87, 0.3); }
+        }
+
+        .hero-avatar {
+            font-size: 40px;
+            margin-bottom: 5px;
+        }
+
+        .hero-name {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .health-bar {
+            width: 80px;
+            height: 12px;
+            background: #2d3436;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 2px solid #fff;
+        }
+
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4757, #ff6b81);
+            transition: width 0.5s ease;
+        }
+
+        .health-text {
+            font-size: 14px;
+            font-weight: bold;
+            margin-top: 3px;
+            color: #ff4757;
+        }
+
+        .mana-display {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: 2px solid #3498db;
+        }
+
+        .mana-crystal {
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(145deg, #3498db, #2980b9);
+            border-radius: 50%;
+            border: 2px solid #fff;
+        }
+
+        .mana-crystal.empty {
+            background: #2d3436;
+            border-color: #636e72;
+        }
+
+        .mana-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .field {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            min-height: 130px;
+            padding: 10px;
+        }
+
+        .card-slot {
+            width: 100px;
+            height: 120px;
+            border: 3px dashed rgba(255,255,255,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.05);
+        }
+
+        .card {
+            width: 100px;
+            height: 120px;
+            background: linear-gradient(145deg, #f5f6fa, #dcdde1);
+            border-radius: 12px;
+            border: 3px solid #ffd700;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            color: #2d3436;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .card:hover {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.4);
+        }
+
+        .card.selected {
+            transform: translateY(-20px) scale(1.1);
+            border-color: #3498db;
+            box-shadow: 0 20px 40px rgba(52, 152, 219, 0.5);
+        }
+
+        .card.targetable {
+            border-color: #ff4757;
+            animation: cardPulse 0.8s infinite;
+        }
+
+        @keyframes cardPulse {
+            0%, 100% { box-shadow: 0 0 10px 2px rgba(255, 71, 87, 0.5); }
+            50% { box-shadow: 0 0 25px 8px rgba(255, 71, 87, 0.3); }
+        }
+
+        .card.can-attack {
+            border-color: #2ecc71;
+            box-shadow: 0 0 15px rgba(46, 204, 113, 0.5);
+        }
+
+        .card.exhausted {
+            filter: grayscale(50%);
+            opacity: 0.8;
+        }
+
+        .card.shake {
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .card.slide-in {
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-100px) rotate(-10deg); opacity: 0; }
+            to { transform: translateY(0) rotate(0); opacity: 1; }
+        }
+
+        .card.attack-animation {
+            animation: attackMove 0.4s ease;
+        }
+
+        @keyframes attackMove {
+            0% { transform: translateX(0); }
+            50% { transform: translateX(50px) scale(1.1); }
+            100% { transform: translateX(0); }
+        }
+
+        .card-cost {
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            width: 30px;
+            height: 30px;
+            background: linear-gradient(145deg, #3498db, #2980b9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            border: 3px solid #fff;
+            z-index: 10;
+        }
+
+        .card-name {
+            text-align: center;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 5px;
+            background: linear-gradient(90deg, #ffd700, #f39c12);
+            color: #2d3436;
+        }
+
+        .card-art {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 35px;
+            background: linear-gradient(145deg, #ecf0f1, #bdc3c7);
+        }
+
+        .card-desc {
+            font-size: 7px;
+            text-align: center;
+            padding: 3px;
+            background: rgba(0,0,0,0.1);
+            line-height: 1.2;
+        }
+
+        .card-stats {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px;
+            background: #2d3436;
+        }
+
+        .card-attack {
+            width: 25px;
+            height: 25px;
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .card-health {
+            width: 25px;
+            height: 25px;
+            background: linear-gradient(145deg, #2ecc71, #27ae60);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .hand-area {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 15px;
+            min-height: 140px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 15px;
+            margin: 0 50px;
+        }
+
+        .hand-area .card {
+            width: 90px;
+            height: 110px;
+        }
+
+        .hand-area .card .card-name {
+            font-size: 9px;
+        }
+
+        .hand-area .card .card-art {
+            font-size: 30px;
+        }
+
+        .hand-area .card .card-desc {
+            font-size: 6px;
+        }
+
+        .turn-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(145deg, #ffd700, #f39c12);
+            color: #2d3436;
+            padding: 20px 40px;
+            border-radius: 15px;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 100;
+            animation: turnPop 1s ease;
+            box-shadow: 0 10px 40px rgba(255,215,0,0.5);
+        }
+
+        @keyframes turnPop {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.2); }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        .deck-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px solid #9b59b6;
+        }
+
+        .deck-icon {
+            font-size: 30px;
+        }
+
+        .deck-count {
+            font-size: 14px;
+            font-weight: bold;
+            color: #9b59b6;
+        }
+
+        .fate-event {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(145deg, #9b59b6, #8e44ad);
+            color: white;
+            padding: 30px 50px;
+            border-radius: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            z-index: 200;
+            text-align: center;
+            animation: fateEvent 2s ease;
+            box-shadow: 0 20px 60px rgba(155, 89, 182, 0.6);
+        }
+
+        @keyframes fateEvent {
+            0% { transform: translate(-50%, -50%) scale(0) rotate(-10deg); opacity: 0; }
+            30% { transform: translate(-50%, -50%) scale(1.1) rotate(5deg); }
+            60% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        .game-over {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+        }
+
+        .game-over h1 {
+            font-size: 60px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 30px currentColor;
+        }
+
+        .game-over.victory h1 {
+            color: #ffd700;
+        }
+
+        .game-over.defeat h1 {
+            color: #e74c3c;
+        }
+
+        .restart-btn {
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            background: linear-gradient(145deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 20px rgba(52, 152, 219, 0.5);
+        }
+
+        .restart-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 10px 30px rgba(52, 152, 219, 0.7);
+        }
+
+        .thinking {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(155, 89, 182, 0.9);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            animation: thinkingBounce 0.5s infinite alternate;
+        }
+
+        @keyframes thinkingBounce {
+            from { transform: translateX(-50%) translateY(0); }
+            to { transform: translateX(-50%) translateY(-5px); }
+        }
+
+        .turn-info {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 16px;
+            border: 2px solid #ffd700;
+        }
+
+        .coin-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(145deg, #f39c12, #e67e22);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .coin-icon {
+            font-size: 16px;
+        }
+
+        .summon-sickness {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 12px;
+            background: rgba(0,0,0,0.7);
+            padding: 2px 5px;
+            border-radius: 5px;
+            color: #f39c12;
+        }
+
+        .damage-number {
+            position: absolute;
+            font-size: 30px;
+            font-weight: bold;
+            color: #e74c3c;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            animation: damageFloat 1s ease forwards;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        @keyframes damageFloat {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.5); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container" id="gameContainer">
+        <div class="enemy-area">
+            <div class="hero-section">
+                <div class="deck-info">
+                    <div class="deck-icon">🃏</div>
+                    <div class="deck-count" id="enemyDeckCount">20</div>
+                </div>
+                <div class="hero" id="enemyHero">
+                    <div class="hero-avatar">👹</div>
+                    <div class="hero-name">AI对手</div>
+                    <div class="health-bar">
+                        <div class="health-fill" id="enemyHealthBar" style="width: 100%"></div>
+                    </div>
+                    <div class="health-text" id="enemyHealthText">30</div>
+                </div>
+                <div class="mana-display" id="enemyMana">
+                    <span class="mana-text">法力: </span>
+                    <span class="mana-text" id="enemyManaText">1/1</span>
+                </div>
+            </div>
+            <div class="field" id="enemyField">
+                <div class="card-slot"></div>
+                <div class="card-slot"></div>
+                <div class="card-slot"></div>
+            </div>
+        </div>
+
+        <div class="battlefield">
+            <div class="turn-info" id="turnInfo">
+                回合: <span id="turnNumber">1</span>
+            </div>
+        </div>
+
+        <div class="player-area">
+            <div class="field" id="playerField">
+                <div class="card-slot"></div>
+                <div class="card-slot"></div>
+                <div class="card-slot"></div>
+            </div>
+            <div class="hero-section">
+                <div class="mana-display" id="playerMana">
+                    <span class="mana-text">法力: </span>
+                    <span class="mana-text" id="playerManaText">1/1</span>
+                </div>
+                <div class="hero" id="playerHero">
+                    <div class="hero-avatar">🧙</div>
+                    <div class="hero-name">玩家</div>
+                    <div class="health-bar">
+                        <div class="health-fill" id="playerHealthBar" style="width: 100%"></div>
+                    </div>
+                    <div class="health-text" id="playerHealthText">30</div>
+                </div>
+                <div class="deck-info">
+                    <div class="deck-icon">🃏</div>
+                    <div class="deck-count" id="playerDeckCount">20</div>
+                </div>
+            </div>
+            <div class="hand-area" id="playerHand"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        const cardDefinitions = [
+            { id: 1, name: '火焰精灵', cost: 1, attack: 2, health: 1, skill: '冲锋：可立即攻击', art: '🔥' },
+            { id: 2, name: '石像鬼', cost: 1, attack: 0, health: 3, skill: '嘲讽：必须优先攻击', art: '🗿' },
+            { id: 3, name: '精灵弓手', cost: 2, attack: 2, health: 2, skill: '远程攻击', art: '🏹' },
+            { id: 4, name: '治疗牧师', cost: 2, attack: 1, health: 3, skill: '战吼：恢复2点生命', art: '⛪' },
+            { id: 5, name: '森林狼', cost: 3, attack: 3, health: 2, skill: '增加相邻随从攻击', art: '🐺' },
+            { id: 6, name: '铁甲骑士', cost: 3, attack: 2, health: 4, skill: '圣盾：免疫一次伤害', art: '🛡️' },
+            { id: 7, name: '风暴元素', cost: 4, attack: 4, health: 3, skill: '战吼：对所有敌人1点伤害', art: '⚡' },
+            { id: 8, name: '暗影刺客', cost: 4, attack: 5, health: 2, skill: '潜行：无法被选中', art: '🗡️' },
+            { id: 9, name: '巨龙幼崽', cost: 5, attack: 4, health: 5, skill: '成长：每回合+1/+1', art: '🐉' },
+            { id: 10, name: '守护者', cost: 5, attack: 2, health: 5, skill: '嘲讽：守护英雄', art: '🛡️' }
+        ];
+
+        function createDeck() {
+            const deck = [];
+            cardDefinitions.forEach(card => {
+                deck.push({ ...card, instanceId: `${card.id}-1` });
+                deck.push({ ...card, instanceId: `${card.id}-2` });
+            });
+            return shuffleArray(deck);
+        }
+
+        function shuffleArray(array) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+
+        function createCardElement(card, isHand = false) {
+            const div = document.createElement('div');
+            div.className = `card ${isHand ? '' : 'exhausted'} slide-in`;
+            div.dataset.instanceId = card.instanceId;
+            div.dataset.canAttack = card.canAttack || false;
+            div.dataset.exhausted = card.exhausted || false;
+
+            div.innerHTML = `
+                <div class="card-cost">${card.cost}</div>
+                <div class="card-name">${card.name}</div>
+                <div class="card-art">${card.art}</div>
+                <div class="card-desc">${card.skill}</div>
+                <div class="card-stats">
+                    <div class="card-attack">${card.attack}</div>
+                    <div class="card-health">${card.currentHealth || card.health}</div>
+                </div>
+                ${card.exhausted ? '<div class="summon-sickness">💤</div>' : ''}
+            `;
+
+            return div;
+        }
+
+        class Player {
+            constructor(name, isAI = false) {
+                this.name = name;
+                this.isAI = isAI;
+                this.health = 30;
+                this.maxHealth = 30;
+                this.mana = 1;
+                this.maxMana = 1;
+                this.tempMana = 0;
+                this.deck = createDeck();
+                this.hand = [];
+                this.field = [];
+                this.maxFieldSize = 3;
+                this.maxHandSize = 7;
+                this.hasCoin = false;
+            }
+
+            drawCard(count = 1) {
+                for (let i = 0; i < count; i++) {
+                    if (this.deck.length === 0) break;
+                    if (this.hand.length >= this.maxHandSize) {
+                        this.deck.shift();
+                        continue;
+                    }
+                    const card = this.deck.shift();
+                    card.currentHealth = card.health;
+                    card.canAttack = false;
+                    card.exhausted = true;
+                    this.hand.push(card);
+                }
+            }
+
+            playCard(cardIndex) {
+                const card = this.hand[cardIndex];
+                const totalMana = this.mana + this.tempMana;
+                
+                if (card.cost > totalMana) return false;
+                if (this.field.length >= this.maxFieldSize) return false;
+
+                if (this.tempMana > 0 && card.cost <= this.tempMana) {
+                    this.tempMana -= card.cost;
+                } else {
+                    const remainingCost = card.cost - this.tempMana;
+                    this.tempMana = 0;
+                    this.mana -= remainingCost;
+                }
+
+                this.hand.splice(cardIndex, 1);
+                card.exhausted = true;
+                card.canAttack = false;
+                this.field.push(card);
+                return true;
+            }
+
+            useCoin() {
+                if (!this.hasCoin) return false;
+                this.hasCoin = false;
+                this.tempMana += 1;
+                return true;
+            }
+
+            startTurn() {
+                if (this.maxMana < 10) this.maxMana++;
+                this.mana = this.maxMana;
+                this.tempMana = 0;
+                this.drawCard();
+                
+                this.field.forEach(card => {
+                    card.exhausted = false;
+                    card.canAttack = card.attack > 0;
+                });
+            }
+
+            takeDamage(amount) {
+                this.health = Math.max(0, this.health - amount);
+                return this.health <= 0;
+            }
+
+            getTotalMana() {
+                return this.mana + this.tempMana;
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.player = null;
+                this.enemy = null;
+                this.currentTurn = 'player';
+                this.turnNumber = 1;
+                this.selectedCard = null;
+                this.selectedFieldCard = null;
+                this.gameOver = false;
+                this.fateTriggered = false;
+                
+                this.init();
+            }
+
+            init() {
+                this.player = new Player('玩家', false);
+                this.enemy = new Player('AI对手', true);
+                
+                this.player.drawCard(3);
+                this.enemy.drawCard(4);
+                this.enemy.hasCoin = true;
+
+                this.renderAll();
+                this.bindEvents();
+                this.showTurnIndicator('你的回合');
+            }
+
+            renderAll() {
+                this.renderPlayerHand();
+                this.renderField('player');
+                this.renderField('enemy');
+                this.renderHealth();
+                this.renderMana();
+                this.renderDeckCount();
+            }
+
+            renderPlayerHand() {
+                const handArea = document.getElementById('playerHand');
+                handArea.innerHTML = '';
+                
+                this.player.hand.forEach((card, index) => {
+                    const cardEl = createCardElement(card, true);
+                    cardEl.dataset.handIndex = index;
+                    
+                    const canPlay = card.cost <= this.player.getTotalMana() && 
+                                   this.player.field.length < this.player.maxFieldSize;
+                    
+                    if (!canPlay) {
+                        cardEl.style.opacity = '0.6';
+                        cardEl.style.filter = 'grayscale(50%)';
+                    }
+                    
+                    handArea.appendChild(cardEl);
+                });
+
+                if (this.player.hasCoin) {
+                    const coinEl = document.createElement('div');
+                    coinEl.className = 'card';
+                    coinEl.id = 'coinCard';
+                    coinEl.innerHTML = `
+                        <div class="card-cost">0</div>
+                        <div class="card-name">幸运硬币</div>
+                        <div class="card-art">🪙</div>
+                        <div class="card-desc">获得1点临时法力</div>
+                        <div class="card-stats">
+                            <div class="card-attack">-</div>
+                            <div class="card-health">-</div>
+                        </div>
+                    `;
+                    handArea.appendChild(coinEl);
+                }
+            }
+
+            renderField(side) {
+                const fieldEl = document.getElementById(`${side}Field`);
+                const slots = fieldEl.querySelectorAll('.card-slot');
+                const field = side === 'player' ? this.player.field : this.enemy.field;
+
+                slots.forEach((slot, index) => {
+                    slot.innerHTML = '';
+                    if (field[index]) {
+                        const card = field[index];
+                        const cardEl = createCardElement(card, false);
+                        cardEl.dataset.fieldIndex = index;
+                        cardEl.dataset.side = side;
+                        
+                        if (card.canAttack && side === 'player') {
+                            cardEl.classList.add('can-attack');
+                            cardEl.classList.remove('exhausted');
+                            cardEl.querySelector('.summon-sickness')?.remove();
+                        }
+                        
+                        const healthEl = cardEl.querySelector('.card-health');
+                        healthEl.textContent = card.currentHealth;
+                        
+                        slot.appendChild(cardEl);
+                    }
+                });
+            }
+
+            renderHealth() {
+                const playerPercent = (this.player.health / this.player.maxHealth) * 100;
+                const enemyPercent = (this.enemy.health / this.enemy.maxHealth) * 100;
+
+                document.getElementById('playerHealthBar').style.width = `${playerPercent}%`;
+                document.getElementById('playerHealthText').textContent = this.player.health;
+                document.getElementById('enemyHealthBar').style.width = `${enemyPercent}%`;
+                document.getElementById('enemyHealthText').textContent = this.enemy.health;
+            }
+
+            renderMana() {
+                document.getElementById('playerManaText').textContent = 
+                    `${this.player.mana}/${this.player.maxMana}${this.player.tempMana > 0 ? ` (+${this.player.tempMana})` : ''}`;
+                document.getElementById('enemyManaText').textContent = 
+                    `${this.enemy.mana}/${this.enemy.maxMana}${this.enemy.tempMana > 0 ? ` (+${this.enemy.tempMana})` : ''}`;
+            }
+
+            renderDeckCount() {
+                document.getElementById('playerDeckCount').textContent = this.player.deck.length;
+                document.getElementById('enemyDeckCount').textContent = this.enemy.deck.length;
+                document.getElementById('turnNumber').textContent = this.turnNumber;
+            }
+
+            showTurnIndicator(text) {
+                const existing = document.querySelector('.turn-indicator');
+                if (existing) existing.remove();
+
+                const indicator = document.createElement('div');
+                indicator.className = 'turn-indicator';
+                indicator.textContent = text;
+                document.querySelector('.battlefield').appendChild(indicator);
+
+                setTimeout(() => indicator.remove(), 1500);
+            }
+
+            showFateEvent(text) {
+                const event = document.createElement('div');
+                event.className = 'fate-event';
+                event.innerHTML = `✨ 命运转折 ✨<br><span style="font-size: 16px;">${text}</span>`;
+                document.body.appendChild(event);
+
+                setTimeout(() => event.remove(), 3000);
+            }
+
+            showDamageNumber(element, damage) {
+                const rect = element.getBoundingClientRect();
+                const dmgEl = document.createElement('div');
+                dmgEl.className = 'damage-number';
+                dmgEl.textContent = `-${damage}`;
+                dmgEl.style.left = `${rect.left + rect.width / 2}px`;
+                dmgEl.style.top = `${rect.top}px`;
+                document.body.appendChild(dmgEl);
+
+                setTimeout(() => dmgEl.remove(), 1000);
+            }
+
+            bindEvents() {
+                document.getElementById('playerHand').addEventListener('click', (e) => {
+                    if (this.currentTurn !== 'player' || this.gameOver) return;
+
+                    const coinCard = e.target.closest('#coinCard');
+                    if (coinCard) {
+                        this.player.useCoin();
+                        this.renderMana();
+                        this.renderPlayerHand();
+                        return;
+                    }
+
+                    const card = e.target.closest('.card');
+                    if (!card) return;
+
+                    const handIndex = parseInt(card.dataset.handIndex);
+                    const cardData = this.player.hand[handIndex];
+                    
+                    if (cardData.cost > this.player.getTotalMana() || 
+                        this.player.field.length >= this.player.maxFieldSize) {
+                        card.classList.add('shake');
+                        setTimeout(() => card.classList.remove('shake'), 500);
+                        return;
+                    }
+
+                    document.querySelectorAll('.card.selected').forEach(c => c.classList.remove('selected'));
+                    
+                    this.selectedCard = handIndex;
+                    this.selectedFieldCard = null;
+                    card.classList.add('selected');
+                    this.highlightValidTargets();
+                });
+
+                document.getElementById('playerField').addEventListener('click', (e) => {
+                    if (this.currentTurn !== 'player' || this.gameOver) return;
+
+                    const card = e.target.closest('.card');
+                    if (!card) return;
+
+                    const fieldIndex = parseInt(card.dataset.fieldIndex);
+                    const cardData = this.player.field[fieldIndex];
+
+                    if (!cardData.canAttack) {
+                        card.classList.add('shake');
+                        setTimeout(() => card.classList.remove('shake'), 500);
+                        return;
+                    }
+
+                    document.querySelectorAll('.card.selected').forEach(c => c.classList.remove('selected'));
+                    document.querySelectorAll('.targetable').forEach(c => c.classList.remove('targetable'));
+                    
+                    this.selectedCard = null;
+                    this.selectedFieldCard = fieldIndex;
+                    card.classList.add('selected');
+                    this.highlightValidAttackTargets();
+                });
+
+                document.getElementById('enemyHero').addEventListener('click', (e) => {
+                    if (this.currentTurn !== 'player' || this.gameOver) return;
+
+                    if (this.selectedFieldCard !== null) {
+                        this.attackHero('enemy', this.selectedFieldCard);
+                    } else if (this.selectedCard !== null) {
+                        this.playCardFromHand();
+                    }
+                });
+
+                document.getElementById('enemyField').addEventListener('click', (e) => {
+                    if (this.currentTurn !== 'player' || this.gameOver) return;
+
+                    const card = e.target.closest('.card');
+                    if (!card || this.selectedFieldCard === null) return;
+
+                    const targetIndex = parseInt(card.dataset.fieldIndex);
+                    this.attackMinion('enemy', targetIndex, this.selectedFieldCard);
+                });
+
+                document.getElementById('playerHero').addEventListener('click', (e) => {
+                    if (this.currentTurn !== 'player' || this.gameOver) return;
+
+                    if (this.selectedCard !== null) {
+                        this.playCardFromHand();
+                    }
+                });
+            }
+
+            highlightValidTargets() {
+                document.querySelectorAll('.targetable').forEach(c => c.classList.remove('targetable'));
+                
+                if (this.selectedCard !== null) {
+                    document.getElementById('playerHero').classList.add('targetable');
+                    document.getElementById('enemyHero').classList.add('targetable');
+                }
+            }
+
+            highlightValidAttackTargets() {
+                document.querySelectorAll('.targetable').forEach(c => c.classList.remove('targetable'));
+                
+                if (this.selectedFieldCard !== null) {
+                    document.getElementById('enemyHero').classList.add('targetable');
+                    
+                    this.enemy.field.forEach((_, index) => {
+                        const slot = document.querySelectorAll('#enemyField .card-slot')[index];
+                        const card = slot.querySelector('.card');
+                        if (card) card.classList.add('targetable');
+                    });
+                }
+            }
+
+            playCardFromHand() {
+                if (this.selectedCard === null) return;
+
+                const success = this.player.playCard(this.selectedCard);
+                if (success) {
+                    this.selectedCard = null;
+                    document.querySelectorAll('.selected').forEach(c => c.classList.remove('selected'));
+                    document.querySelectorAll('.targetable').forEach(c => c.classList.remove('targetable'));
+                    this.renderAll();
+                }
+            }
+
+            attackHero(targetSide, attackerIndex) {
+                const attacker = this.player.field[attackerIndex];
+                
+                const heroEl = document.getElementById(`${targetSide}Hero`);
+                const attackerEl = document.querySelectorAll('#playerField .card')[attackerIndex];
+                
+                attackerEl.classList.add('attack-animation');
+                
+                setTimeout(() => {
+                    attackerEl.classList.remove('attack-animation');
+                    this.showDamageNumber(heroEl, attacker.attack);
+                    
+                    const isDead = this.enemy.takeDamage(attacker.attack);
+                    attacker.canAttack = false;
+                    
+                    this.renderHealth();
+                    this.renderField('player');
+                    document.querySelectorAll('.selected').forEach(c => c.classList.remove('selected'));
+                    document.querySelectorAll('.targetable').forEach(c => c.classList.remove('targetable'));
+                    this.selectedFieldCard = null;
+
+                    if (isDead) {
+                        this.endGame(true);
+                    }
+                }, 400);
+            }
+
+            attackMinion(targetSide, targetIndex, attackerIndex) {
+                const attacker = this.player.field[attackerIndex];
+                const target = this.enemy.field[targetIndex];
+
+                const attackerEl = document.querySelectorAll('#playerField .card')[attackerIndex];
+                const targetEl = document.querySelectorAll('#enemyField .card')[targetIndex];
+
+                attackerEl.classList.add('attack-animation');
+
+                setTimeout(() => {
+                    attackerEl.classList.remove('attack-animation');
+                    
+                    this.showDamageNumber(targetEl, attacker.attack);
+                    this.showDamageNumber(attackerEl, target.attack);
+
+                    target.currentHealth -= attacker.attack;
+                    attacker.currentHealth -= target.attack;
+                    attacker.canAttack = false;
+
+                    if (target.currentHealth <= 0) {
+                        this.enemy.field.splice(targetIndex, 1);
+                    }
+                    if (attacker.currentHealth <= 0) {
+                        this.player.field.splice(attackerIndex, 1);
+                    }
+
+                    this.renderField('player');
+                    this.renderField('enemy');
+                    document.querySelectorAll('.selected').forEach(c => c.classList.remove('selected'));
+                    document.querySelectorAll('.targetable').forEach(c => c.classList.remove('targetable'));
+                    this.selectedFieldCard = null;
+                }, 400);
+            }
+
+            endTurn() {
+                if (this.currentTurn !== 'player' || this.gameOver) return;
+
+                this.selectedCard = null;
+                this.selectedFieldCard = null;
+                document.querySelectorAll('.selected').forEach(c => c.classList.remove('selected'));
+                document.querySelectorAll('.targetable').forEach(c => c.classList.remove('targetable'));
+
+                this.currentTurn = 'enemy';
+                this.turnNumber++;
+
+                if (this.turnNumber >= 4 && !this.fateTriggered) {
+                    this.triggerFateEvent();
+                }
+
+                setTimeout(() => {
+                    this.showTurnIndicator('对手回合');
+                    this.enemyTurn();
+                }, 1000);
+            }
+
+            triggerFateEvent() {
+                this.fateTriggered = true;
+                const events = [
+                    {
+                        text: '时空裂隙！所有随从获得+1/+1',
+                        effect: () => {
+                            [...this.player.field, ...this.enemy.field].forEach(card => {
+                                card.attack += 1;
+                                card.currentHealth += 1;
+                                card.health += 1;
+                            });
+                        }
+                    },
+                    {
+                        text: '生命之泉涌现！双方英雄恢复5点生命',
+                        effect: () => {
+                            this.player.health = Math.min(this.player.maxHealth, this.player.health + 5);
+                            this.enemy.health = Math.min(this.enemy.maxHealth, this.enemy.health + 5);
+                        }
+                    },
+                    {
+                        text: '法力风暴！双方获得2点临时法力',
+                        effect: () => {
+                            this.player.tempMana += 2;
+                            this.enemy.tempMana += 2;
+                        }
+                    },
+                    {
+                        text: '命运抽牌！双方各抽2张牌',
+                        effect: () => {
+                            this.player.drawCard(2);
+                            this.enemy.drawCard(2);
+                        }
+                    }
+                ];
+
+                const event = events[Math.floor(Math.random() * events.length)];
+                event.effect();
+                this.showFateEvent(event.text);
+                setTimeout(() => this.renderAll(), 500);
+            }
+
+            async enemyTurn() {
+                this.showThinking();
+
+                await this.delay(800);
+                
+                this.enemy.startTurn();
+                this.renderAll();
+                this.hideThinking();
+
+                await this.aiPlayCards();
+
+                await this.aiAttack();
+
+                if (!this.gameOver) {
+                    this.currentTurn = 'player';
+                    this.player.startTurn();
+                    this.turnNumber++;
+
+                    if (this.turnNumber >= 4 && !this.fateTriggered) {
+                        this.triggerFateEvent();
+                    }
+
+                    setTimeout(() => {
+                        this.showTurnIndicator('你的回合');
+                        this.renderAll();
+                    }, 500);
+                }
+            }
+
+            async aiPlayCards() {
+                let played = true;
+                while (played && !this.gameOver) {
+                    played = false;
+
+                    const playableCards = this.enemy.hand
+                        .map((card, index) => ({ card, index }))
+                        .filter(({ card }) => 
+                            card.cost <= this.enemy.getTotalMana() && 
+                            this.enemy.field.length < this.enemy.maxFieldSize
+                        )
+                        .sort((a, b) => b.card.cost - a.card.cost);
+
+                    if (playableCards.length > 0) {
+                        const { card, index } = playableCards[0];
+                        
+                        await this.delay(500);
+                        
+                        this.enemy.playCard(index);
+                        this.renderAll();
+                        played = true;
+                    }
+                }
+            }
+
+            async aiAttack() {
+                const attackers = this.enemy.field
+                    .map((card, index) => ({ card, index }))
+                    .filter(({ card }) => card.canAttack);
+
+                for (const { card, index } of attackers) {
+                    if (this.gameOver) break;
+
+                    await this.delay(600);
+
+                    const playerMinions = this.player.field;
+                    
+                    if (playerMinions.length > 0) {
+                        let targetIndex = 0;
+                        let minHealth = playerMinions[0].currentHealth;
+                        
+                        playerMinions.forEach((minion, idx) => {
+                            if (minion.currentHealth < minHealth) {
+                                minHealth = minion.currentHealth;
+                                targetIndex = idx;
+                            }
+                        });
+
+                        const target = playerMinions[targetIndex];
+                        target.currentHealth -= card.attack;
+                        card.currentHealth -= target.attack;
+                        card.canAttack = false;
+
+                        if (target.currentHealth <= 0) {
+                            this.player.field.splice(targetIndex, 1);
+                        }
+                        if (card.currentHealth <= 0) {
+                            this.enemy.field.splice(index, 1);
+                        }
+                    } else {
+                        const isDead = this.player.takeDamage(card.attack);
+                        card.canAttack = false;
+
+                        if (isDead) {
+                            this.endGame(false);
+                            return;
+                        }
+                    }
+
+                    this.renderAll();
+                }
+            }
+
+            showThinking() {
+                const thinking = document.createElement('div');
+                thinking.className = 'thinking';
+                thinking.textContent = '🤔 AI思考中...';
+                document.querySelector('.enemy-area').appendChild(thinking);
+            }
+
+            hideThinking() {
+                document.querySelector('.thinking')?.remove();
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            endGame(playerWon) {
+                this.gameOver = true;
+                
+                const overlay = document.createElement('div');
+                overlay.className = `game-over ${playerWon ? 'victory' : 'defeat'}`;
+                overlay.innerHTML = `
+                    <h1>${playerWon ? '🎉 胜利！' : '💀 失败...'}</h1>
+                    <button class="restart-btn" onclick="location.reload()">再来一局</button>
+                `;
+                document.body.appendChild(overlay);
+            }
+        }
+
+        const game = new Game();
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                game.endTurn();
+            }
+            if (e.key === 'Escape') {
+                game.selectedCard = null;
+                game.selectedFieldCard = null;
+                document.querySelectorAll('.selected').forEach(c => c.classList.remove('selected'));
+                document.querySelectorAll('.targetable').forEach(c => c.classList.remove('targetable'));
+            }
+        });
+
+        const endTurnBtn = document.createElement('button');
+        endTurnBtn.textContent = '结束回合';
+        endTurnBtn.style.cssText = `
+            position: absolute;
+            bottom: 160px;
+            right: 30px;
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            background: linear-gradient(145deg, #2ecc71, #27ae60);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 50;
+            box-shadow: 0 5px 20px rgba(46, 204, 113, 0.5);
+            transition: all 0.3s ease;
+        `;
+        endTurnBtn.onmouseover = () => endTurnBtn.style.transform = 'scale(1.1)';
+        endTurnBtn.onmouseout = () => endTurnBtn.style.transform = 'scale(1)';
+        endTurnBtn.onclick = () => game.endTurn();
+        document.querySelector('.game-container').appendChild(endTurnBtn);
+    </script>
+</body>
+</html>

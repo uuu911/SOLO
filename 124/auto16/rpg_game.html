@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPG 角色扮演战斗游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 15px;
+            min-height: calc(100vh - 20px);
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr 1fr;
+            }
+            .log-panel {
+                grid-column: 1 / -1;
+                max-height: 300px !important;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .panel h2 {
+            color: #ffd700;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #ffd700;
+            padding-bottom: 8px;
+        }
+
+        .character-panel {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .stat-label {
+            font-weight: bold;
+        }
+
+        .stat-value {
+            color: #4ecdc4;
+            font-weight: bold;
+        }
+
+        .hp-bar, .mp-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+
+        .hp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #ee5a5a);
+            transition: width 0.5s ease;
+        }
+
+        .mp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ecdc4, #44a08d);
+            transition: width 0.5s ease;
+        }
+
+        .battle-panel {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .enemy-display {
+            text-align: center;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .enemy-goblin {
+            background: linear-gradient(135deg, #2d5016 0%, #1a3009 100%);
+            border: 3px solid #4a7c23;
+        }
+
+        .enemy-skeleton {
+            background: linear-gradient(135deg, #4a4a4a 0%, #2a2a2a 100%);
+            border: 3px solid #8a8a8a;
+        }
+
+        .enemy-mage {
+            background: linear-gradient(135deg, #4a1a6b 0%, #2a0a4b 100%);
+            border: 3px solid #8a3dbc;
+        }
+
+        .enemy-name {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .enemy-sprite {
+            font-size: 4em;
+            margin: 15px 0;
+        }
+
+        .battle-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: auto;
+        }
+
+        .btn {
+            padding: 15px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-attack {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+            color: white;
+        }
+
+        .btn-skill {
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+            color: white;
+        }
+
+        .btn-shop {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            color: white;
+        }
+
+        .btn-restart {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            grid-column: 1 / -1;
+        }
+
+        .log-panel {
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        .log-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-panel::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        .log-panel::-webkit-scrollbar-thumb {
+            background: #ffd700;
+            border-radius: 4px;
+        }
+
+        .log-entry {
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+
+        .log-player {
+            border-left: 3px solid #4ecdc4;
+        }
+
+        .log-enemy {
+            border-left: 3px solid #ff6b6b;
+        }
+
+        .log-system {
+            border-left: 3px solid #ffd700;
+        }
+
+        .log-damage {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        .log-heal {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+
+        .char-creation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .creation-panel {
+            background: linear-gradient(135deg, #2c3e50, #1a252f);
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px solid #ffd700;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .creation-panel h1 {
+            color: #ffd700;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .points-remaining {
+            text-align: center;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            color: #4ecdc4;
+        }
+
+        .attr-control {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+
+        .attr-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 50%;
+            font-size: 1.5em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .attr-btn.plus {
+            background: #2ecc71;
+            color: white;
+        }
+
+        .attr-btn.minus {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .attr-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .attr-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .btn-start {
+            width: 100%;
+            margin-top: 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, #ffd700, #f39c12);
+            color: #1a1a2e;
+            font-size: 1.2em;
+        }
+
+        .shop-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .shop-panel {
+            background: linear-gradient(135deg, #2c3e50, #1a252f);
+            padding: 30px;
+            border-radius: 20px;
+            border: 3px solid #f39c12;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .shop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .shop-header h2 {
+            color: #f39c12;
+        }
+
+        .shop-gold {
+            color: #ffd700;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .equipment-slots {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .slot {
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #555;
+        }
+
+        .slot.weapon { border-color: #e74c3c; }
+        .slot.armor { border-color: #3498db; }
+        .slot.accessory { border-color: #9b59b6; }
+
+        .slot-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .shop-items {
+            display: grid;
+            gap: 10px;
+        }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .shop-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .item-info h4 {
+            color: #ffd700;
+            margin-bottom: 5px;
+        }
+
+        .item-stats {
+            font-size: 0.9em;
+            color: #aaa;
+        }
+
+        .item-price {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .btn-close {
+            background: #e74c3c;
+            color: white;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .victory-modal, .defeat-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .victory-panel {
+            background: linear-gradient(135deg, #1e5f3a, #0d3320);
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px solid #2ecc71;
+            text-align: center;
+        }
+
+        .defeat-panel {
+            background: linear-gradient(135deg, #5f1e1e, #330d0d);
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px solid #e74c3c;
+            text-align: center;
+        }
+
+        .victory-title {
+            color: #2ecc71;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+
+        .defeat-title {
+            color: #e74c3c;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+
+        .reward-info {
+            color: #ffd700;
+            font-size: 1.2em;
+            margin: 15px 0;
+        }
+
+        .mystery-reward {
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            color: #fff;
+        }
+
+        .enemy-select {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .enemy-select-btn {
+            padding: 15px 10px;
+            border: 2px solid #555;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .enemy-select-btn:hover {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.2);
+        }
+
+        .enemy-select-btn.selected {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.3);
+        }
+
+        .enemy-select-btn.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .gold-display {
+            color: #ffd700;
+            font-size: 1.3em;
+            font-weight: bold;
+            text-align: center;
+            padding: 10px;
+            background: rgba(255, 215, 0, 0.2);
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="char-creation" id="charCreation">
+        <div class="creation-panel">
+            <h1>⚔️ 创建你的角色</h1>
+            <div class="points-remaining">
+                剩余属性点: <span id="pointsLeft">30</span>
+            </div>
+            
+            <div class="attr-control">
+                <span>💪 力量</span>
+                <button class="attr-btn minus" onclick="adjustAttr('strength', -1)">-</button>
+                <span class="attr-value" id="strengthVal">1</span>
+                <button class="attr-btn plus" onclick="adjustAttr('strength', 1)">+</button>
+            </div>
+            
+            <div class="attr-control">
+                <span>⚡ 敏捷</span>
+                <button class="attr-btn minus" onclick="adjustAttr('agility', -1)">-</button>
+                <span class="attr-value" id="agilityVal">1</span>
+                <button class="attr-btn plus" onclick="adjustAttr('agility', 1)">+</button>
+            </div>
+            
+            <div class="attr-control">
+                <span>🧠 智力</span>
+                <button class="attr-btn minus" onclick="adjustAttr('intelligence', -1)">-</button>
+                <span class="attr-value" id="intelligenceVal">1</span>
+                <button class="attr-btn plus" onclick="adjustAttr('intelligence', 1)">+</button>
+            </div>
+            
+            <div style="margin-top: 20px; color: #aaa; font-size: 0.9em;">
+                <p>❤️ HP = 力量 × 10</p>
+                <p>💧 MP = 智力 × 8</p>
+            </div>
+            
+            <button class="btn btn-start" onclick="startGame()">开始冒险</button>
+        </div>
+    </div>
+
+    <div class="container hidden" id="gameContainer">
+        <div class="panel character-panel">
+            <h2>📊 角色状态</h2>
+            <div class="gold-display">💰 金币: <span id="goldDisplay">0</span></div>
+            
+            <div class="stat-row">
+                <span class="stat-label">❤️ 生命值</span>
+                <span class="stat-value"><span id="currentHp">100</span>/<span id="maxHp">100</span></span>
+            </div>
+            <div class="hp-bar">
+                <div class="hp-fill" id="hpFill" style="width: 100%"></div>
+            </div>
+            
+            <div class="stat-row">
+                <span class="stat-label">💧 魔法值</span>
+                <span class="stat-value"><span id="currentMp">50</span>/<span id="maxMp">50</span></span>
+            </div>
+            <div class="mp-bar">
+                <div class="mp-fill" id="mpFill" style="width: 100%"></div>
+            </div>
+            
+            <div class="stat-row">
+                <span class="stat-label">💪 力量</span>
+                <span class="stat-value" id="strengthDisplay">10</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">⚡ 敏捷</span>
+                <span class="stat-value" id="agilityDisplay">10</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">🧠 智力</span>
+                <span class="stat-value" id="intelligenceDisplay">10</span>
+            </div>
+            
+            <h2 style="margin-top: 20px;">🎒 装备栏</h2>
+            <div class="equipment-slots">
+                <div class="slot weapon">
+                    <div class="slot-name">🗡️ 武器</div>
+                    <div id="weaponSlot">无</div>
+                </div>
+                <div class="slot armor">
+                    <div class="slot-name">🛡️ 防具</div>
+                    <div id="armorSlot">无</div>
+                </div>
+                <div class="slot accessory">
+                    <div class="slot-name">💍 饰品</div>
+                    <div id="accessorySlot">无</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel battle-panel">
+            <h2>⚔️ 战斗区域</h2>
+            
+            <div class="enemy-select">
+                <button class="enemy-select-btn" id="selectGoblin" onclick="selectEnemy('goblin')">
+                    <div style="font-size: 2em;">👺</div>
+                    <div>哥布林</div>
+                    <div style="font-size: 0.8em; color: #aaa;">简单</div>
+                </button>
+                <button class="enemy-select-btn" id="selectSkeleton" onclick="selectEnemy('skeleton')">
+                    <div style="font-size: 2em;">💀</div>
+                    <div>骷髅战士</div>
+                    <div style="font-size: 0.8em; color: #aaa;">中等</div>
+                </button>
+                <button class="enemy-select-btn locked" id="selectMage" onclick="selectEnemy('mage')">
+                    <div style="font-size: 2em;">🧙</div>
+                    <div>暗影法师</div>
+                    <div style="font-size: 0.8em; color: #aaa;">困难</div>
+                </button>
+            </div>
+            
+            <div class="enemy-display enemy-goblin" id="enemyDisplay">
+                <div class="enemy-name" id="enemyName">哥布林</div>
+                <div class="enemy-sprite" id="enemySprite">👺</div>
+                <div class="stat-row">
+                    <span class="stat-label">敌人 HP</span>
+                    <span class="stat-value"><span id="enemyHp">50</span>/<span id="enemyMaxHp">50</span></span>
+                </div>
+                <div class="hp-bar">
+                    <div class="hp-fill" id="enemyHpFill" style="width: 100%"></div>
+                </div>
+            </div>
+            
+            <div class="battle-actions">
+                <button class="btn btn-attack" id="btnAttack" onclick="playerAttack()">⚔️ 普通攻击</button>
+                <button class="btn btn-skill" id="btnSkill" onclick="playerSkill()">✨ 烈焰斩 (MP:20)</button>
+                <button class="btn btn-shop" onclick="openShop()">🏪 商店</button>
+                <button class="btn btn-restart" onclick="restartGame()">🔄 重新开始</button>
+            </div>
+        </div>
+
+        <div class="panel log-panel">
+            <h2>📜 战斗日志</h2>
+            <div id="battleLog"></div>
+        </div>
+    </div>
+
+    <div class="shop-modal" id="shopModal">
+        <div class="shop-panel">
+            <div class="shop-header">
+                <h2>🏪 冒险者商店</h2>
+                <div class="shop-gold">💰 <span id="shopGold">0</span></div>
+            </div>
+            
+            <h3 style="margin: 15px 0; color: #4ecdc4;">当前装备</h3>
+            <div class="equipment-slots">
+                <div class="slot weapon">
+                    <div class="slot-name">🗡️ 武器</div>
+                    <div id="shopWeaponSlot">无</div>
+                </div>
+                <div class="slot armor">
+                    <div class="slot-name">🛡️ 防具</div>
+                    <div id="shopArmorSlot">无</div>
+                </div>
+                <div class="slot accessory">
+                    <div class="slot-name">💍 饰品</div>
+                    <div id="shopAccessorySlot">无</div>
+                </div>
+            </div>
+            
+            <h3 style="margin: 15px 0; color: #4ecdc4;">可购买物品</h3>
+            <div class="shop-items" id="shopItems"></div>
+            
+            <button class="btn btn-close" onclick="closeShop()">关闭商店</button>
+        </div>
+    </div>
+
+    <div class="victory-modal" id="victoryModal">
+        <div class="victory-panel">
+            <div class="victory-title">🎉 战斗胜利！</div>
+            <div class="reward-info">获得金币: <span id="victoryGold">0</span> 💰</div>
+            <div class="mystery-reward" id="mysteryReward"></div>
+            <button class="btn btn-shop" onclick="continueGame()">继续冒险</button>
+        </div>
+    </div>
+
+    <div class="defeat-modal" id="defeatModal">
+        <div class="defeat-panel">
+            <div class="defeat-title">💀 战斗失败</div>
+            <p style="margin: 20px 0; color: #aaa;">你被击败了，但不要放弃！</p>
+            <button class="btn btn-restart" onclick="restartGame()">🔄 重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        const GameData = {
+            player: null,
+            currentEnemy: null,
+            gold: 0,
+            equipment: { weapon: null, armor: null, accessory: null },
+            inBattle: false,
+            mysteryBonus: { damage: 0, defense: 0, hp: 0 },
+            defeatedEnemies: new Set()
+        };
+
+        const EquipmentDB = {
+            weapons: [
+                { id: 'sword1', name: '铁剑', price: 50, type: 'weapon', stats: { strength: 3 } },
+                { id: 'sword2', name: '钢剑', price: 150, type: 'weapon', stats: { strength: 8 } },
+                { id: 'sword3', name: '火焰剑', price: 400, type: 'weapon', stats: { strength: 15, intelligence: 5 } }
+            ],
+            armors: [
+                { id: 'armor1', name: '皮甲', price: 40, type: 'armor', stats: { agility: 2, strength: 1 } },
+                { id: 'armor2', name: '锁子甲', price: 120, type: 'armor', stats: { strength: 5, agility: 3 } },
+                { id: 'armor3', name: '板甲', price: 350, type: 'armor', stats: { strength: 10, agility: 5, intelligence: 2 } }
+            ],
+            accessories: [
+                { id: 'ring1', name: '智慧戒指', price: 60, type: 'accessory', stats: { intelligence: 5 } },
+                { id: 'ring2', name: '敏捷护符', price: 100, type: 'accessory', stats: { agility: 6, intelligence: 3 } },
+                { id: 'ring3', name: '龙心项链', price: 300, type: 'accessory', stats: { strength: 8, agility: 8, intelligence: 8 } }
+            ]
+        };
+
+        class ICombatant {
+            constructor() {
+                if (new.target === ICombatant) {
+                    throw new Error('不能实例化接口类 ICombatant');
+                }
+            }
+
+            getAttackDamage() {
+                throw new Error('必须实现 getAttackDamage 方法');
+            }
+
+            applyDamage(damage) {
+                throw new Error('必须实现 applyDamage 方法');
+            }
+
+            getCurrentHp() {
+                throw new Error('必须实现 getCurrentHp 方法');
+            }
+
+            getMaxHp() {
+                throw new Error('必须实现 getMaxHp 方法');
+            }
+
+            getAgility() {
+                throw new Error('必须实现 getAgility 方法');
+            }
+        }
+
+        class Player extends ICombatant {
+            constructor(strength, agility, intelligence) {
+                super();
+                this.baseStrength = strength;
+                this.baseAgility = agility;
+                this.baseIntelligence = intelligence;
+                this.maxHp = strength * 10;
+                this.currentHp = this.maxHp;
+                this.maxMp = intelligence * 8;
+                this.currentMp = this.maxMp;
+            }
+
+            getTotalStrength() {
+                let total = this.baseStrength + GameData.mysteryBonus.damage;
+                if (GameData.equipment.weapon) total += GameData.equipment.weapon.stats.strength || 0;
+                if (GameData.equipment.armor) total += GameData.equipment.armor.stats.strength || 0;
+                if (GameData.equipment.accessory) total += GameData.equipment.accessory.stats.strength || 0;
+                return total;
+            }
+
+            getTotalAgility() {
+                let total = this.baseAgility;
+                if (GameData.equipment.weapon) total += GameData.equipment.weapon.stats.agility || 0;
+                if (GameData.equipment.armor) total += GameData.equipment.armor.stats.agility || 0;
+                if (GameData.equipment.accessory) total += GameData.equipment.accessory.stats.agility || 0;
+                return total;
+            }
+
+            getTotalIntelligence() {
+                let total = this.baseIntelligence;
+                if (GameData.equipment.weapon) total += GameData.equipment.weapon.stats.intelligence || 0;
+                if (GameData.equipment.armor) total += GameData.equipment.armor.stats.intelligence || 0;
+                if (GameData.equipment.accessory) total += GameData.equipment.accessory.stats.intelligence || 0;
+                return total;
+            }
+
+            getAttackDamage() {
+                return Math.round(this.getTotalStrength() * 1.5 + Math.random() * 5);
+            }
+
+            getSkillDamage() {
+                return Math.round(this.getTotalStrength() * 2.5 + this.getTotalIntelligence() * 1.5);
+            }
+
+            applyDamage(damage) {
+                const defense = Math.round(this.getTotalAgility() * 0.3 + GameData.mysteryBonus.defense);
+                const actualDamage = Math.max(1, damage - defense);
+                this.currentHp = Math.max(0, this.currentHp - actualDamage);
+                return { actualDamage, defense };
+            }
+
+            getCurrentHp() { return this.currentHp + GameData.mysteryBonus.hp; }
+            getMaxHp() { return this.maxHp + GameData.mysteryBonus.hp; }
+            getAgility() { return this.getTotalAgility(); }
+
+            heal(amount) {
+                this.currentHp = Math.min(this.getMaxHp(), this.currentHp + amount);
+            }
+
+            restoreMp(amount) {
+                this.currentMp = Math.min(this.maxMp, this.currentMp + amount);
+            }
+
+            updateStats() {
+                this.maxHp = this.baseStrength * 10;
+                this.maxMp = this.baseIntelligence * 8;
+            }
+        }
+
+        class Enemy extends ICombatant {
+            constructor(name, sprite, cssClass, hp, strength, agility, intelligence, defense, goldReward) {
+                super();
+                this.name = name;
+                this.sprite = sprite;
+                this.cssClass = cssClass;
+                this.maxHp = hp;
+                this.currentHp = hp;
+                this.strength = strength;
+                this.agility = agility;
+                this.intelligence = intelligence;
+                this.defense = defense;
+                this.goldReward = goldReward;
+            }
+
+            getAttackDamage() {
+                return Math.round(this.strength * 1.2 + Math.random() * 5);
+            }
+
+            applyDamage(damage) {
+                const actualDamage = Math.max(1, damage - this.defense);
+                this.currentHp = Math.max(0, this.currentHp - actualDamage);
+                return { actualDamage, defense: this.defense };
+            }
+
+            getCurrentHp() { return this.currentHp; }
+            getMaxHp() { return this.maxHp; }
+            getAgility() { return this.agility; }
+        }
+
+        class Goblin extends Enemy {
+            constructor() {
+                super('哥布林', '👺', 'enemy-goblin', 60, 8, 12, 3, 2, 30);
+            }
+
+            specialSkill(player) {
+                const damage = Math.round(this.strength * 0.8);
+                const result = player.applyDamage(damage);
+                BattleManager.addLog(`${this.name} 使用了「偷袭」！造成 ${result.actualDamage} 点伤害！`, 'enemy');
+                return result;
+            }
+
+            takeAction(player) {
+                if (Math.random() < 0.3) {
+                    return this.specialSkill(player);
+                }
+                const damage = this.getAttackDamage();
+                return player.applyDamage(damage);
+            }
+        }
+
+        class Skeleton extends Enemy {
+            constructor() {
+                super('骷髅战士', '💀', 'enemy-skeleton', 100, 14, 8, 5, 5, 60);
+                this.boneShieldActive = false;
+            }
+
+            specialSkill() {
+                this.boneShieldActive = true;
+                this.defense += 10;
+                BattleManager.addLog(`${this.name} 使用了「骨盾」！防御力大幅提升！`, 'enemy');
+                setTimeout(() => {
+                    this.defense -= 10;
+                    this.boneShieldActive = false;
+                }, 3000);
+            }
+
+            takeAction(player) {
+                if (Math.random() < 0.25 && !this.boneShieldActive) {
+                    this.specialSkill();
+                    return null;
+                }
+                const damage = this.getAttackDamage();
+                return player.applyDamage(damage);
+            }
+        }
+
+        class ShadowMage extends Enemy {
+            constructor() {
+                super('暗影法师', '🧙', 'enemy-mage', 160, 10, 15, 25, 8, 120);
+                this.mana = 50;
+            }
+
+            specialSkill(player) {
+                if (this.mana >= 25) {
+                    this.mana -= 25;
+                    const damage = Math.round(this.intelligence * 2);
+                    const result = player.applyDamage(damage);
+                    BattleManager.addLog(`${this.name} 施放了「暗影箭」！造成 ${result.actualDamage} 点魔法伤害！`, 'enemy');
+                    return result;
+                }
+                return null;
+            }
+
+            drainLife(player) {
+                const damage = Math.round(this.intelligence * 0.8);
+                const result = player.applyDamage(damage);
+                this.currentHp = Math.min(this.maxHp, this.currentHp + Math.round(damage * 0.5));
+                BattleManager.addLog(`${this.name} 使用了「生命汲取」！造成 ${result.actualDamage} 点伤害并恢复生命！`, 'enemy');
+                return result;
+            }
+
+            takeAction(player) {
+                const roll = Math.random();
+                if (roll < 0.3 && this.mana >= 25) {
+                    return this.specialSkill(player);
+                } else if (roll < 0.5 && this.currentHp < this.maxHp * 0.5) {
+                    return this.drainLife(player);
+                }
+                const damage = this.getAttackDamage();
+                return player.applyDamage(damage);
+            }
+        }
+
+        const BattleManager = {
+            addLog(message, type = 'system') {
+                const logDiv = document.getElementById('battleLog');
+                const entry = document.createElement('div');
+                entry.className = `log-entry log-${type}`;
+                entry.innerHTML = message;
+                logDiv.insertBefore(entry, logDiv.firstChild);
+            },
+
+            determineTurnOrder(player, enemy) {
+                return player.getAgility() >= enemy.getAgility() ? 'player' : 'enemy';
+            },
+
+            playerAttack() {
+                if (!GameData.inBattle || !GameData.currentEnemy) return;
+                
+                const player = GameData.player;
+                const enemy = GameData.currentEnemy;
+                const rawDamage = player.getAttackDamage();
+                const result = enemy.applyDamage(rawDamage);
+                
+                this.addLog(`你发动攻击！攻击力:<span class="log-damage">${rawDamage}</span> → 敌人防御:<span class="log-heal">${result.defense}</span> → 实际伤害:<span class="log-damage">${result.actualDamage}</span>`, 'player');
+                
+                this.updateUI();
+                
+                if (enemy.getCurrentHp() <= 0) {
+                    this.victory();
+                    return;
+                }
+                
+                setTimeout(() => this.enemyTurn(), 800);
+            },
+
+            playerSkill() {
+                if (!GameData.inBattle || !GameData.currentEnemy) return;
+                
+                const player = GameData.player;
+                if (player.currentMp < 20) {
+                    this.addLog('MP不足，无法使用技能！', 'system');
+                    return;
+                }
+                
+                player.currentMp -= 20;
+                const enemy = GameData.currentEnemy;
+                const rawDamage = player.getSkillDamage();
+                const result = enemy.applyDamage(rawDamage);
+                
+                this.addLog(`你施放「烈焰斩」！技能伤害:<span class="log-damage">${rawDamage}</span> → 敌人防御:<span class="log-heal">${result.defense}</span> → 实际伤害:<span class="log-damage">${result.actualDamage}</span>`, 'player');
+                
+                this.updateUI();
+                
+                if (enemy.getCurrentHp() <= 0) {
+                    this.victory();
+                    return;
+                }
+                
+                setTimeout(() => this.enemyTurn(), 800);
+            },
+
+            enemyTurn() {
+                const player = GameData.player;
+                const enemy = GameData.currentEnemy;
+                
+                if (enemy.getCurrentHp() <= 0) return;
+                
+                const rawDamage = enemy.getAttackDamage();
+                const result = enemy.takeAction(player);
+                
+                if (result) {
+                    this.addLog(`${enemy.name} 发动攻击！攻击力:<span class="log-damage">${rawDamage}</span> → 你的防御:<span class="log-heal">${result.defense}</span> → 实际伤害:<span class="log-damage">${result.actualDamage}</span>`, 'enemy');
+                }
+                
+                this.updateUI();
+                
+                if (player.getCurrentHp() <= 0) {
+                    this.defeat();
+                }
+            },
+
+            victory() {
+                GameData.inBattle = false;
+                const enemy = GameData.currentEnemy;
+                const goldEarned = enemy.goldReward;
+                GameData.gold += goldEarned;
+                GameData.defeatedEnemies.add(enemy.constructor.name);
+
+                this.addLog(`🎉 你击败了 ${enemy.name}！获得 ${goldEarned} 金币！`, 'system');
+
+                const mysteryReward = this.generateMysteryReward();
+                document.getElementById('victoryGold').textContent = goldEarned;
+                document.getElementById('mysteryReward').innerHTML = mysteryReward.text;
+                document.getElementById('victoryModal').style.display = 'flex';
+
+                this.updateEnemySelection();
+                this.updateUI();
+            },
+
+            generateMysteryReward() {
+                const rewards = [
+                    { type: 'damage', value: 2, text: '🔥 神秘力量涌入！攻击力永久 +2！' },
+                    { type: 'defense', value: 2, text: '🛡️ 神秘护盾笼罩！防御力永久 +2！' },
+                    { type: 'hp', value: 20, text: '❤️ 神秘生命加持！最大生命值永久 +20！' },
+                    { type: 'heal', value: 999, text: '✨ 神秘治愈之光！生命值和魔法值完全恢复！' },
+                    { type: 'gold', value: 50, text: '💰 发现神秘宝藏！额外获得 50 金币！' }
+                ];
+
+                const reward = rewards[Math.floor(Math.random() * rewards.length)];
+                
+                if (reward.type === 'heal') {
+                    GameData.player.currentHp = GameData.player.getMaxHp();
+                    GameData.player.currentMp = GameData.player.maxMp;
+                } else if (reward.type === 'gold') {
+                    GameData.gold += reward.value;
+                } else {
+                    GameData.mysteryBonus[reward.type] = (GameData.mysteryBonus[reward.type] || 0) + reward.value;
+                }
+
+                return reward;
+            },
+
+            defeat() {
+                GameData.inBattle = false;
+                this.addLog('💀 你被击败了...', 'system');
+                document.getElementById('defeatModal').style.display = 'flex';
+            },
+
+            updateUI() {
+                const player = GameData.player;
+                const enemy = GameData.currentEnemy;
+
+                document.getElementById('currentHp').textContent = player.getCurrentHp();
+                document.getElementById('maxHp').textContent = player.getMaxHp();
+                document.getElementById('hpFill').style.width = (player.getCurrentHp() / player.getMaxHp() * 100) + '%';
+                
+                document.getElementById('currentMp').textContent = player.currentMp;
+                document.getElementById('maxMp').textContent = player.maxMp;
+                document.getElementById('mpFill').style.width = (player.currentMp / player.maxMp * 100) + '%';
+
+                document.getElementById('strengthDisplay').textContent = player.getTotalStrength();
+                document.getElementById('agilityDisplay').textContent = player.getTotalAgility();
+                document.getElementById('intelligenceDisplay').textContent = player.getTotalIntelligence();
+
+                document.getElementById('goldDisplay').textContent = GameData.gold;
+
+                if (enemy) {
+                    document.getElementById('enemyHp').textContent = enemy.getCurrentHp();
+                    document.getElementById('enemyMaxHp').textContent = enemy.getMaxHp();
+                    document.getElementById('enemyHpFill').style.width = (enemy.getCurrentHp() / enemy.getMaxHp() * 100) + '%';
+                }
+
+                this.updateEquipmentSlots();
+            },
+
+            updateEquipmentSlots() {
+                const slots = ['weapon', 'armor', 'accessory'];
+                slots.forEach(slot => {
+                    const item = GameData.equipment[slot];
+                    const displayText = item ? `${item.name}` : '无';
+                    document.getElementById(`${slot}Slot`).textContent = displayText;
+                    document.getElementById(`shop${slot.charAt(0).toUpperCase() + slot.slice(1)}Slot`).textContent = displayText;
+                });
+            },
+
+            updateEnemySelection() {
+                const mageBtn = document.getElementById('selectMage');
+                if (GameData.defeatedEnemies.has('Goblin') && GameData.defeatedEnemies.has('Skeleton')) {
+                    mageBtn.classList.remove('locked');
+                }
+            }
+        };
+
+        let attrPoints = { strength: 1, agility: 1, intelligence: 1 };
+        let remainingPoints = 30;
+
+        function adjustAttr(attr, delta) {
+            const newValue = attrPoints[attr] + delta;
+            const pointChange = -delta;
+            
+            if (newValue >= 1 && remainingPoints + pointChange >= 0 && remainingPoints + pointChange <= 30) {
+                attrPoints[attr] = newValue;
+                remainingPoints += pointChange;
+                
+                document.getElementById(`${attr}Val`).textContent = newValue;
+                document.getElementById('pointsLeft').textContent = remainingPoints;
+            }
+        }
+
+        function startGame() {
+            if (remainingPoints > 0) {
+                alert('请分配完所有属性点！');
+                return;
+            }
+
+            GameData.player = new Player(attrPoints.strength, attrPoints.agility, attrPoints.intelligence);
+            selectEnemy('goblin');
+            
+            document.getElementById('charCreation').classList.add('hidden');
+            document.getElementById('gameContainer').classList.remove('hidden');
+            
+            BattleManager.addLog('⚔️ 冒险开始！选择你的对手，准备战斗！', 'system');
+            BattleManager.updateUI();
+        }
+
+        function selectEnemy(type) {
+            if (type === 'mage') {
+                const mageBtn = document.getElementById('selectMage');
+                if (mageBtn.classList.contains('locked')) {
+                    alert('需要先击败哥布林和骷髅战士才能挑战暗影法师！');
+                    return;
+                }
+            }
+
+            document.querySelectorAll('.enemy-select-btn').forEach(btn => btn.classList.remove('selected'));
+            document.getElementById(`select${type.charAt(0).toUpperCase() + type.slice(1)}`).classList.add('selected');
+
+            switch(type) {
+                case 'goblin':
+                    GameData.currentEnemy = new Goblin();
+                    break;
+                case 'skeleton':
+                    GameData.currentEnemy = new Skeleton();
+                    break;
+                case 'mage':
+                    GameData.currentEnemy = new ShadowMage();
+                    break;
+            }
+
+            const enemy = GameData.currentEnemy;
+            const display = document.getElementById('enemyDisplay');
+            display.className = `enemy-display ${enemy.cssClass}`;
+            document.getElementById('enemyName').textContent = enemy.name;
+            document.getElementById('enemySprite').textContent = enemy.sprite;
+
+            GameData.inBattle = true;
+            BattleManager.addLog(`新的敌人出现：${enemy.name}！`, 'system');
+            BattleManager.updateUI();
+        }
+
+        function playerAttack() {
+            if (GameData.inBattle) {
+                BattleManager.playerAttack();
+            }
+        }
+
+        function playerSkill() {
+            if (GameData.inBattle) {
+                BattleManager.playerSkill();
+            }
+        }
+
+        function openShop() {
+            document.getElementById('shopModal').style.display = 'flex';
+            document.getElementById('shopGold').textContent = GameData.gold;
+            renderShopItems();
+        }
+
+        function closeShop() {
+            document.getElementById('shopModal').style.display = 'none';
+        }
+
+        function renderShopItems() {
+            const shopItemsDiv = document.getElementById('shopItems');
+            shopItemsDiv.innerHTML = '';
+
+            const allItems = [...EquipmentDB.weapons, ...EquipmentDB.armors, ...EquipmentDB.accessories];
+            
+            allItems.forEach(item => {
+                const owned = Object.values(GameData.equipment).some(e => e && e.id === item.id);
+                
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'shop-item';
+                itemDiv.style.opacity = owned ? '0.5' : '1';
+                
+                const statsText = Object.entries(item.stats)
+                    .map(([key, value]) => {
+                        const names = { strength: '力量', agility: '敏捷', intelligence: '智力' };
+                        return `${names[key]}+${value}`;
+                    }).join(' ');
+                
+                itemDiv.innerHTML = `
+                    <div class="item-info">
+                        <h4>${item.name}</h4>
+                        <div class="item-stats">${statsText}</div>
+                    </div>
+                    <div class="item-price">${owned ? '已装备' : item.price + ' 💰'}</div>
+                `;
+                
+                if (!owned) {
+                    itemDiv.onclick = () => purchaseItem(item);
+                }
+                
+                shopItemsDiv.appendChild(itemDiv);
+            });
+        }
+
+        function purchaseItem(item) {
+            if (GameData.gold < item.price) {
+                alert('金币不足！');
+                return;
+            }
+
+            GameData.gold -= item.price;
+            GameData.equipment[item.type] = item;
+            
+            GameData.player.updateStats();
+            
+            document.getElementById('shopGold').textContent = GameData.gold;
+            renderShopItems();
+            BattleManager.updateUI();
+            
+            BattleManager.addLog(`🛒 购买了 ${item.name}！`, 'system');
+        }
+
+        function continueGame() {
+            document.getElementById('victoryModal').style.display = 'none';
+            BattleManager.updateUI();
+        }
+
+        function restartGame() {
+            GameData.player = null;
+            GameData.currentEnemy = null;
+            GameData.gold = 0;
+            GameData.equipment = { weapon: null, armor: null, accessory: null };
+            GameData.inBattle = false;
+            GameData.mysteryBonus = { damage: 0, defense: 0, hp: 0 };
+            GameData.defeatedEnemies = new Set();
+
+            attrPoints = { strength: 1, agility: 1, intelligence: 1 };
+            remainingPoints = 27;
+
+            ['strength', 'agility', 'intelligence'].forEach(attr => {
+                document.getElementById(`${attr}Val`).textContent = 1;
+            });
+            document.getElementById('pointsLeft').textContent = 27;
+            document.getElementById('battleLog').innerHTML = '';
+
+            document.getElementById('victoryModal').style.display = 'none';
+            document.getElementById('defeatModal').style.display = 'none';
+            document.getElementById('gameContainer').classList.add('hidden');
+            document.getElementById('charCreation').classList.remove('hidden');
+
+            document.getElementById('selectMage').classList.add('locked');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>太空探索者 - Space Explorer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 50%, #0a0a2a 100%);
+            min-height: 100vh;
+            color: #e0e0ff;
+            padding: 20px;
+        }
+        #es-module-warning {
+            display: none;
+            background: #ff4444;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 18px;
+            border-radius: 8px;
+            margin: 20px;
+        }
+        .game-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 250px 1fr 280px;
+            gap: 20px;
+        }
+        .panel {
+            background: rgba(20, 20, 50, 0.9);
+            border: 2px solid #4a4a8a;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(100, 100, 255, 0.2);
+        }
+        .panel h2 {
+            color: #8080ff;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 1px solid #4a4a8a;
+            padding-bottom: 10px;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px;
+            background: rgba(60, 60, 100, 0.5);
+            border-radius: 6px;
+        }
+        .stat-label {
+            color: #a0a0cc;
+        }
+        .stat-value {
+            font-weight: bold;
+            color: #ffffff;
+        }
+        .fuel-bar {
+            width: 100%;
+            height: 20px;
+            background: #2a2a4a;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        .fuel-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6600, #ffaa00);
+            transition: width 0.3s ease;
+        }
+        .cargo-slots {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+            margin-top: 10px;
+        }
+        .cargo-slot {
+            aspect-ratio: 1;
+            background: #2a2a4a;
+            border: 2px solid #4a4a8a;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        .cargo-slot.water { background: #4488ff; }
+        .cargo-slot.metal { background: #888888; }
+        .cargo-slot.gas { background: #aa44ff; }
+        .star-map-container {
+            overflow: auto;
+            max-height: 700px;
+        }
+        .star-map {
+            display: inline-grid;
+            gap: 2px;
+            background: #050510;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .cell {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .cell:hover {
+            transform: scale(1.2);
+            z-index: 10;
+        }
+        .cell.fog {
+            background: #1a1a2a;
+            color: #3a3a5a;
+        }
+        .cell.empty {
+            background: #0a0a1a;
+            color: #2a2a4a;
+        }
+        .cell.asteroid {
+            background: linear-gradient(135deg, #5a4a3a, #8a7a6a);
+            color: #ffd700;
+        }
+        .cell.star {
+            background: radial-gradient(circle, #ffff88, #ffaa00);
+            color: #aa5500;
+        }
+        .cell.nebula {
+            background: linear-gradient(135deg, #442266, #6644aa, #4466aa);
+            color: #cc88ff;
+        }
+        .cell.station {
+            background: radial-gradient(circle, #44ff88, #22aa44);
+            color: #005522;
+        }
+        .cell.ship {
+            box-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff; }
+            50% { box-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff; }
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 20px 0;
+        }
+        .btn {
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #4a4a8a, #6a6aaa);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+        .btn:hover {
+            background: linear-gradient(135deg, #6a6aaa, #8a8aca);
+            transform: translateY(-2px);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .btn:disabled {
+            background: #3a3a5a;
+            color: #6a6a8a;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn.scan { background: linear-gradient(135deg, #0088aa, #00aacc); }
+        .btn.collect { background: linear-gradient(135deg, #00aa44, #00cc66); }
+        .btn.refuel { background: linear-gradient(135deg, #aa6600, #cc8800); }
+        .btn.unload { background: linear-gradient(135deg, #aa00aa, #cc00cc); }
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .log-panel {
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        .log-entry {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 6px;
+            background: rgba(40, 40, 80, 0.5);
+            border-left: 3px solid #8080ff;
+        }
+        .log-entry.info { border-left-color: #4488ff; }
+        .log-entry.warning { border-left-color: #ffaa00; background: rgba(80, 60, 20, 0.5); }
+        .log-entry.error { border-left-color: #ff4444; background: rgba(80, 20, 20, 0.5); }
+        .log-entry.success { border-left-color: #44ff88; background: rgba(20, 80, 40, 0.5); }
+        .log-entry.event { border-left-color: #ff44ff; background: rgba(80, 20, 80, 0.5); }
+        .planet-info {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(40, 40, 80, 0.5);
+            border-radius: 8px;
+            display: none;
+        }
+        .planet-info.visible {
+            display: block;
+        }
+        .planet {
+            padding: 8px;
+            margin: 5px 0;
+            background: rgba(60, 60, 100, 0.5);
+            border-radius: 6px;
+        }
+        .planet-name {
+            font-weight: bold;
+            color: #aaccff;
+        }
+        .planet-type {
+            font-size: 12px;
+            color: #8888aa;
+        }
+        .resources {
+            margin-top: 5px;
+            font-size: 12px;
+        }
+        .resource {
+            display: inline-block;
+            padding: 2px 8px;
+            margin: 2px;
+            border-radius: 10px;
+            font-size: 11px;
+        }
+        .resource.water { background: #4488ff; }
+        .resource.metal { background: #888888; }
+        .resource.gas { background: #aa44ff; }
+        .event-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(30, 30, 60, 0.98);
+            border: 3px solid #aa44ff;
+            border-radius: 16px;
+            padding: 30px;
+            z-index: 1000;
+            box-shadow: 0 0 50px rgba(170, 68, 255, 0.5);
+            max-width: 400px;
+            text-align: center;
+            display: none;
+        }
+        .event-popup.visible {
+            display: block;
+        }
+        .event-popup h3 {
+            color: #ff88ff;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+        .event-popup p {
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 999;
+            display: none;
+        }
+        .overlay.visible {
+            display: block;
+        }
+        .score-target {
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, rgba(100, 200, 100, 0.2), rgba(50, 150, 50, 0.2));
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .score-target h3 {
+            color: #88ff88;
+            font-size: 16px;
+        }
+        .score-target .target {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+        .legend {
+            margin-top: 20px;
+            font-size: 12px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 5px 0;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="es-module-warning">
+        <h2>⚠️ 浏览器不支持 ES Module</h2>
+        <p>您的浏览器版本过旧，不支持 ES Module 语法。请使用现代浏览器（Chrome 61+, Firefox 60+, Safari 11+）访问此游戏。</p>
+    </div>
+
+    <div id="game" style="display: none;">
+        <div class="game-container">
+            <div class="panel">
+                <h2>🚀 飞船状态</h2>
+                
+                <div class="score-target">
+                    <h3>🎯 目标分数</h3>
+                    <div class="target"><span id="current-score">0</span> / 500</div>
+                </div>
+
+                <div class="stat-row">
+                    <span class="stat-label">⛽ 燃料</span>
+                    <span class="stat-value"><span id="fuel">100</span> / <span id="max-fuel">200</span></span>
+                </div>
+                <div class="fuel-bar">
+                    <div class="fuel-fill" id="fuel-bar" style="width: 50%;"></div>
+                </div>
+
+                <div class="stat-row">
+                    <span class="stat-label">📦 货舱</span>
+                    <span class="stat-value"><span id="cargo-count">0</span> / 10</span>
+                </div>
+                <div class="cargo-slots" id="cargo-slots"></div>
+
+                <div class="stat-row">
+                    <span class="stat-label">📍 坐标</span>
+                    <span class="stat-value">(<span id="pos-x">0</span>, <span id="pos-y">0</span>)</span>
+                </div>
+
+                <div class="stat-row">
+                    <span class="stat-label">👁️ 可见范围</span>
+                    <span class="stat-value"><span id="visible-range">5</span>×<span id="visible-range-2">5</span></span>
+                </div>
+
+                <div class="legend">
+                    <h3 style="margin-bottom: 10px; color: #8080ff;">📋 图例</h3>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #0a0a1a;"></div>
+                        <span>空旷区</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: linear-gradient(135deg, #5a4a3a, #8a7a6a);"></div>
+                        <span>小行星带</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: radial-gradient(circle, #ffff88, #ffaa00);"></div>
+                        <span>恒星系</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: linear-gradient(135deg, #442266, #6644aa);"></div>
+                        <span>星云</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: radial-gradient(circle, #44ff88, #22aa44);"></div>
+                        <span>空间站</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>🗺️ 星图</h2>
+                <div class="star-map-container">
+                    <div class="star-map" id="star-map"></div>
+                </div>
+                
+                <h3 style="margin-top: 20px;">🎮 移动控制</h3>
+                <div class="controls">
+                    <button class="btn" onclick="Game.move(-1, -1)">↖</button>
+                    <button class="btn" onclick="Game.move(0, -1)">↑</button>
+                    <button class="btn" onclick="Game.move(1, -1)">↗</button>
+                    <button class="btn" onclick="Game.move(-1, 0)">←</button>
+                    <button class="btn" onclick="Game.move(0, 0)">⏸</button>
+                    <button class="btn" onclick="Game.move(1, 0)">→</button>
+                    <button class="btn" onclick="Game.move(-1, 1)">↙</button>
+                    <button class="btn" onclick="Game.move(0, 1)">↓</button>
+                    <button class="btn" onclick="Game.move(1, 1)">↘</button>
+                </div>
+                <p style="text-align: center; color: #8080aa; font-size: 12px; margin-top: 10px;">
+                    也可使用小键盘或方向键移动
+                </p>
+            </div>
+
+            <div class="panel">
+                <h2>⚡ 操作</h2>
+                
+                <div class="action-buttons">
+                    <button class="btn scan" id="btn-scan" onclick="Game.scan()">🔍 扫描星系</button>
+                    <button class="btn collect" id="btn-collect" onclick="Game.collect()" disabled>📥 采集资源</button>
+                    <button class="btn refuel" id="btn-refuel" onclick="Game.refuel()">⛽ 提炼燃料</button>
+                    <button class="btn unload" id="btn-unload" onclick="Game.unload()">📤 卸载资源</button>
+                </div>
+
+                <div class="planet-info" id="planet-info">
+                    <h3>🌍 行星详情</h3>
+                    <div id="planets-list"></div>
+                    <div class="resources" id="available-resources"></div>
+                </div>
+
+                <h2 style="margin-top: 20px;">📜 航行日志</h2>
+                <div class="log-panel" id="log-panel"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <div class="event-popup" id="event-popup">
+        <h3 id="event-title">事件</h3>
+        <p id="event-description">事件描述</p>
+        <button class="btn" onclick="Game.closeEvent()">确定</button>
+    </div>
+
+    <script type="module">
+        const MAP_SIZE = 30;
+        const VISIBLE_RANGE = 2;
+        const INITIAL_FUEL = 100;
+        const MAX_FUEL = 200;
+        const CARGO_CAPACITY = 10;
+        const TARGET_SCORE = 500;
+        const FUEL_PER_MOVE = 1;
+        const ASTEROID_EXTRA_FUEL = 2;
+        const SCORE_PER_RESOURCE = 10;
+
+        const CELL_TYPES = {
+            EMPTY: 'empty',
+            ASTEROID: 'asteroid',
+            STAR: 'star',
+            NEBULA: 'nebula',
+            STATION: 'station'
+        };
+
+        const CELL_ICONS = {
+            empty: '·',
+            asteroid: '◆',
+            star: '★',
+            nebula: '☁',
+            station: '🏠',
+            fog: '?',
+            ship: '🚀'
+        };
+
+        const PLANET_TYPES = ['岩石行星', '气态巨行星', '冰冻行星', '沙漠行星', '海洋行星'];
+        const RESOURCE_TYPES = ['water', 'metal', 'gas'];
+        const RESOURCE_NAMES = { water: '水', metal: '金属', gas: '稀有气体' };
+        const RESOURCE_ICONS = { water: '💧', metal: '⚙️', gas: '💨' };
+
+        export const StarMapModel = {
+            map: [],
+            revealed: [],
+            starSystems: {},
+
+            init() {
+                this.generateMap();
+                this.revealArea(0, 0);
+            },
+
+            generateMap() {
+                for (let y = 0; y < MAP_SIZE; y++) {
+                    this.map[y] = [];
+                    this.revealed[y] = [];
+                    for (let x = 0; x < MAP_SIZE; x++) {
+                        this.revealed[y][x] = false;
+                        if (x === 0 && y === 0) {
+                            this.map[y][x] = CELL_TYPES.STATION;
+                            continue;
+                        }
+                        const rand = Math.random();
+                        if (rand < 0.6) this.map[y][x] = CELL_TYPES.EMPTY;
+                        else if (rand < 0.75) this.map[y][x] = CELL_TYPES.ASTEROID;
+                        else if (rand < 0.9) this.map[y][x] = CELL_TYPES.STAR;
+                        else this.map[y][x] = CELL_TYPES.NEBULA;
+
+                        if (this.map[y][x] === CELL_TYPES.STAR) {
+                            this.starSystems[`${x},${y}`] = this.generateStarSystem();
+                        }
+                    }
+                }
+            },
+
+            generateStarSystem() {
+                const planetCount = Math.floor(Math.random() * 3) + 1;
+                const planets = [];
+                for (let i = 0; i < planetCount; i++) {
+                    planets.push({
+                        name: `行星-${String.fromCharCode(65 + i)}${Math.floor(Math.random() * 100)}`,
+                        type: PLANET_TYPES[Math.floor(Math.random() * PLANET_TYPES.length)]
+                    });
+                }
+                return {
+                    planets,
+                    scanned: false,
+                    resources: this.generateResources()
+                };
+            },
+
+            generateResources() {
+                const resourceCount = Math.floor(Math.random() * 3);
+                const resources = [];
+                const available = [...RESOURCE_TYPES];
+                for (let i = 0; i < resourceCount && available.length > 0; i++) {
+                    const idx = Math.floor(Math.random() * available.length);
+                    resources.push(available.splice(idx, 1)[0]);
+                }
+                return resources;
+            },
+
+            revealArea(centerX, centerY) {
+                for (let dy = -VISIBLE_RANGE; dy <= VISIBLE_RANGE; dy++) {
+                    for (let dx = -VISIBLE_RANGE; dx <= VISIBLE_RANGE; dx++) {
+                        const x = centerX + dx;
+                        const y = centerY + dy;
+                        if (x >= 0 && x < MAP_SIZE && y >= 0 && y < MAP_SIZE) {
+                            this.revealed[y][x] = true;
+                        }
+                    }
+                }
+            },
+
+            getCell(x, y) {
+                if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return null;
+                return {
+                    type: this.map[y][x],
+                    revealed: this.revealed[y][x],
+                    starSystem: this.starSystems[`${x},${y}`] || null
+                };
+            },
+
+            isRevealed(x, y) {
+                if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return false;
+                return this.revealed[y][x];
+            }
+        };
+
+        export const ShipState = {
+            x: 0,
+            y: 0,
+            fuel: INITIAL_FUEL,
+            maxFuel: MAX_FUEL,
+            cargo: [],
+            cargoCapacity: CARGO_CAPACITY,
+            score: 0,
+
+            init() {
+                this.x = 0;
+                this.y = 0;
+                this.fuel = INITIAL_FUEL;
+                this.cargo = [];
+                this.score = 0;
+            },
+
+            canMove(dx, dy) {
+                if (dx === 0 && dy === 0) return true;
+                const newX = this.x + dx;
+                const newY = this.y + dy;
+                if (newX < 0 || newX >= MAP_SIZE || newY < 0 || newY >= MAP_SIZE) {
+                    return { success: false, reason: '超出星图边界' };
+                }
+                let fuelCost = FUEL_PER_MOVE;
+                const targetCell = StarMapModel.getCell(newX, newY);
+                if (targetCell && targetCell.type === CELL_TYPES.ASTEROID) {
+                    fuelCost += ASTEROID_EXTRA_FUEL;
+                }
+                if (this.fuel < fuelCost) {
+                    return { success: false, reason: '燃料不足' };
+                }
+                return { success: true, fuelCost };
+            },
+
+            move(dx, dy) {
+                const check = this.canMove(dx, dy);
+                if (!check.success) return check;
+                if (dx === 0 && dy === 0) {
+                    return { success: true, message: '原地待命' };
+                }
+                this.x += dx;
+                this.y += dy;
+                this.fuel -= check.fuelCost;
+                StarMapModel.revealArea(this.x, this.y);
+                return { success: true };
+            },
+
+            addCargo(resource) {
+                if (this.cargo.length >= this.cargoCapacity) {
+                    return { success: false, reason: '货舱已满' };
+                }
+                this.cargo.push(resource);
+                return { success: true };
+            },
+
+            removeCargo(resourceType) {
+                const idx = this.cargo.indexOf(resourceType);
+                if (idx === -1) {
+                    return { success: false, reason: '无此资源' };
+                }
+                this.cargo.splice(idx, 1);
+                return { success: true };
+            },
+
+            hasCargo(resourceType) {
+                return this.cargo.includes(resourceType);
+            },
+
+            unloadCargo() {
+                const count = this.cargo.length;
+                this.score += count * SCORE_PER_RESOURCE;
+                this.cargo = [];
+                return { success: true, count, score: count * SCORE_PER_RESOURCE };
+            },
+
+            addFuel(amount) {
+                this.fuel = Math.min(this.maxFuel, this.fuel + amount);
+                return this.fuel;
+            }
+        };
+
+        export const EventSystem = {
+            events: [],
+
+            init() {
+                this.registerEvent({
+                    id: 'alien_ruin',
+                    name: '外星遗迹',
+                    description: '你发现了一处神秘的外星遗迹！经过研究，你获得了宝贵的科学数据，加50分！',
+                    check: () => Math.random() < 0.05,
+                    effect: () => { ShipState.score += 50; }
+                });
+
+                this.registerEvent({
+                    id: 'ion_storm',
+                    name: '离子风暴',
+                    description: '遭遇离子风暴！飞船系统受损，损失20点燃料！',
+                    check: () => Math.random() < 0.03,
+                    effect: () => { ShipState.fuel = Math.max(0, ShipState.fuel - 20); }
+                });
+
+                this.registerEvent({
+                    id: 'cargo_leak',
+                    name: '货舱泄漏',
+                    description: '微陨石击穿货舱！随机损失1个单位资源！',
+                    check: () => Math.random() < 0.03 && ShipState.cargo.length > 0,
+                    effect: () => {
+                        if (ShipState.cargo.length > 0) {
+                            ShipState.cargo.splice(Math.floor(Math.random() * ShipState.cargo.length), 1);
+                        }
+                    }
+                });
+
+                this.registerEvent({
+                    id: 'lucky_find',
+                    name: '幸运发现',
+                    description: '在太空中发现漂浮的补给舱！获得30点燃料！',
+                    check: () => Math.random() < 0.04,
+                    effect: () => { ShipState.addFuel(30); }
+                });
+
+                this.registerEvent({
+                    id: 'trader',
+                    name: '流浪商人',
+                    description: '遇到一位友好的流浪商人，他赠送了你一些资源！',
+                    check: () => Math.random() < 0.03 && ShipState.cargo.length < ShipState.cargoCapacity,
+                    effect: () => {
+                        if (ShipState.cargo.length < ShipState.cargoCapacity) {
+                            ShipState.addCargo(RESOURCE_TYPES[Math.floor(Math.random() * RESOURCE_TYPES.length)]);
+                        }
+                    }
+                });
+            },
+
+            registerEvent(event) {
+                this.events.push(event);
+            },
+
+            checkAndTrigger() {
+                for (const event of this.events) {
+                    if (event.check()) {
+                        this.triggerEvent(event);
+                        return event;
+                    }
+                }
+                return null;
+            },
+
+            triggerEvent(event) {
+                event.effect();
+                UIRenderer.showEventPopup(event.name, event.description);
+                UIRenderer.log(`🎭 事件: ${event.name}`, 'event');
+            }
+        };
+
+        export const UIRenderer = {
+            frameCount: 0,
+            lastTime: performance.now(),
+            fpsHistory: [],
+
+            init() {
+                this.updateAll();
+                this.setupKeyboard();
+                this.startFPSMonitor();
+                this.log('欢迎来到太空探索者！使用方向键或按钮移动飞船。', 'info');
+            },
+
+            setupKeyboard() {
+                document.addEventListener('keydown', (e) => {
+                    const keyMap = {
+                        'ArrowUp': [0, -1], 'ArrowDown': [0, 1],
+                        'ArrowLeft': [-1, 0], 'ArrowRight': [1, 0],
+                        'w': [0, -1], 's': [0, 1], 'a': [-1, 0], 'd': [1, 0],
+                        'W': [0, -1], 'S': [0, 1], 'A': [-1, 0], 'D': [1, 0],
+                        '7': [-1, -1], '8': [0, -1], '9': [1, -1],
+                        '4': [-1, 0], '6': [1, 0],
+                        '1': [-1, 1], '2': [0, 1], '3': [1, 1]
+                    };
+                    if (keyMap[e.key]) {
+                        e.preventDefault();
+                        Game.move(...keyMap[e.key]);
+                    }
+                });
+            },
+
+            updateAll() {
+                this.updateStats();
+                this.renderMap();
+                this.updateCargo();
+                this.updateButtons();
+                this.checkWinCondition();
+            },
+
+            updateStats() {
+                document.getElementById('fuel').textContent = ShipState.fuel;
+                document.getElementById('max-fuel').textContent = ShipState.maxFuel;
+                document.getElementById('fuel-bar').style.width = `${(ShipState.fuel / ShipState.maxFuel) * 100}%`;
+                document.getElementById('cargo-count').textContent = ShipState.cargo.length;
+                document.getElementById('pos-x').textContent = ShipState.x;
+                document.getElementById('pos-y').textContent = ShipState.y;
+                document.getElementById('current-score').textContent = ShipState.score;
+            },
+
+            renderMap() {
+                const mapEl = document.getElementById('star-map');
+                mapEl.style.gridTemplateColumns = `repeat(${MAP_SIZE}, 24px)`;
+                mapEl.innerHTML = '';
+
+                for (let y = 0; y < MAP_SIZE; y++) {
+                    for (let x = 0; x < MAP_SIZE; x++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        
+                        const isShip = x === ShipState.x && y === ShipState.y;
+                        const revealed = StarMapModel.isRevealed(x, y);
+                        const cellData = StarMapModel.getCell(x, y);
+
+                        if (!revealed) {
+                            cell.classList.add('fog');
+                            cell.textContent = CELL_ICONS.fog;
+                        } else {
+                            cell.classList.add(cellData.type);
+                            cell.textContent = isShip ? CELL_ICONS.ship : CELL_ICONS[cellData.type];
+                            if (isShip) cell.classList.add('ship');
+                        }
+
+                        cell.onclick = () => {
+                            const dx = x - ShipState.x;
+                            const dy = y - ShipState.y;
+                            if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+                                Game.move(dx, dy);
+                            }
+                        };
+
+                        mapEl.appendChild(cell);
+                    }
+                }
+            },
+
+            updateCargo() {
+                const slots = document.getElementById('cargo-slots');
+                slots.innerHTML = '';
+                for (let i = 0; i < CARGO_CAPACITY; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'cargo-slot';
+                    if (ShipState.cargo[i]) {
+                        slot.classList.add(ShipState.cargo[i]);
+                        slot.textContent = RESOURCE_ICONS[ShipState.cargo[i]];
+                    }
+                    slots.appendChild(slot);
+                }
+            },
+
+            updateButtons() {
+                const currentCell = StarMapModel.getCell(ShipState.x, ShipState.y);
+                const isStar = currentCell && currentCell.type === CELL_TYPES.STAR;
+                const isAsteroid = currentCell && currentCell.type === CELL_TYPES.ASTEROID;
+                const isStation = currentCell && currentCell.type === CELL_TYPES.STATION;
+                
+                const scanBtn = document.getElementById('btn-scan');
+                const collectBtn = document.getElementById('btn-collect');
+                const refuelBtn = document.getElementById('btn-refuel');
+                const unloadBtn = document.getElementById('btn-unload');
+
+                scanBtn.disabled = !isStar;
+                refuelBtn.disabled = !isAsteroid;
+                unloadBtn.disabled = !isStation || ShipState.cargo.length === 0;
+
+                if (isStar && currentCell.starSystem && currentCell.starSystem.scanned) {
+                    scanBtn.textContent = '✅ 已扫描';
+                    scanBtn.disabled = true;
+                } else {
+                    scanBtn.textContent = '🔍 扫描星系';
+                }
+            },
+
+            showPlanetInfo(starSystem) {
+                const infoEl = document.getElementById('planet-info');
+                const planetsList = document.getElementById('planets-list');
+                const resourcesEl = document.getElementById('available-resources');
+
+                infoEl.classList.add('visible');
+                planetsList.innerHTML = '';
+                resourcesEl.innerHTML = '';
+
+                starSystem.planets.forEach(planet => {
+                    const planetEl = document.createElement('div');
+                    planetEl.className = 'planet';
+                    planetEl.innerHTML = `
+                        <div class="planet-name">${planet.name}</div>
+                        <div class="planet-type">${planet.type}</div>
+                    `;
+                    planetsList.appendChild(planetEl);
+                });
+
+                if (starSystem.resources.length > 0) {
+                    starSystem.resources.forEach(res => {
+                        const resEl = document.createElement('span');
+                        resEl.className = `resource ${res}`;
+                        resEl.textContent = `${RESOURCE_ICONS[res]} ${RESOURCE_NAMES[res]}`;
+                        resourcesEl.appendChild(resEl);
+                    });
+                    document.getElementById('btn-collect').disabled = false;
+                } else {
+                    resourcesEl.innerHTML = '<span style="color: #888;">无可采集资源</span>';
+                    document.getElementById('btn-collect').disabled = true;
+                }
+            },
+
+            hidePlanetInfo() {
+                document.getElementById('planet-info').classList.remove('visible');
+                document.getElementById('btn-collect').disabled = true;
+            },
+
+            showEventPopup(title, description) {
+                document.getElementById('overlay').classList.add('visible');
+                document.getElementById('event-popup').classList.add('visible');
+                document.getElementById('event-title').textContent = title;
+                document.getElementById('event-description').textContent = description;
+            },
+
+            closeEventPopup() {
+                document.getElementById('overlay').classList.remove('visible');
+                document.getElementById('event-popup').classList.remove('visible');
+            },
+
+            log(message, type = 'info') {
+                const panel = document.getElementById('log-panel');
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${type}`;
+                const time = new Date().toLocaleTimeString();
+                entry.innerHTML = `<span style="color: #888; font-size: 10px;">[${time}]</span> ${message}`;
+                panel.insertBefore(entry, panel.firstChild);
+                if (panel.children.length > 50) {
+                    panel.removeChild(panel.lastChild);
+                }
+            },
+
+            startFPSMonitor() {
+                const checkFPS = () => {
+                    this.frameCount++;
+                    const now = performance.now();
+                    const elapsed = now - this.lastTime;
+
+                    if (elapsed >= 1000) {
+                        const fps = Math.round((this.frameCount * 1000) / elapsed);
+                        this.fpsHistory.push(fps);
+                        if (this.fpsHistory.length > 10) this.fpsHistory.shift();
+                        
+                        const avgFPS = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
+                        if (this.fpsHistory.length >= 2 && avgFPS < 30) {
+                            console.warn(`[性能警告] 平均帧率低于30fps: ${avgFPS.toFixed(1)}fps`);
+                        }
+                        
+                        this.frameCount = 0;
+                        this.lastTime = now;
+                    }
+                    requestAnimationFrame(checkFPS);
+                };
+                requestAnimationFrame(checkFPS);
+            },
+
+            checkWinCondition() {
+                if (ShipState.score >= TARGET_SCORE) {
+                    this.showEventPopup('🎉 恭喜获胜！', `你已达到 ${TARGET_SCORE} 分的目标！最终得分: ${ShipState.score}`);
+                }
+            }
+        };
+
+        window.Game = {
+            init() {
+                StarMapModel.init();
+                ShipState.init();
+                EventSystem.init();
+                UIRenderer.init();
+            },
+
+            move(dx, dy) {
+                const result = ShipState.move(dx, dy);
+                if (!result.success) {
+                    UIRenderer.log(`移动失败: ${result.reason}`, 'warning');
+                    console.warn(`[移动失败] ${result.reason}`);
+                    return;
+                }
+
+                if (dx !== 0 || dy !== 0) {
+                    const cell = StarMapModel.getCell(ShipState.x, ShipState.y);
+                    const typeNames = {
+                        empty: '空旷区', asteroid: '小行星带',
+                        star: '恒星系', nebula: '星云', station: '空间站'
+                    };
+                    UIRenderer.log(`移动到 (${ShipState.x}, ${ShipState.y}) - ${typeNames[cell.type]}`);
+
+                    if (cell.type === CELL_TYPES.ASTEROID) {
+                        UIRenderer.log('穿越小行星带，额外消耗2点燃料', 'warning');
+                    }
+
+                    const event = EventSystem.checkAndTrigger();
+                }
+
+                requestAnimationFrame(() => {
+                    UIRenderer.updateAll();
+                });
+            },
+
+            scan() {
+                const cell = StarMapModel.getCell(ShipState.x, ShipState.y);
+                if (!cell || cell.type !== CELL_TYPES.STAR) {
+                    UIRenderer.log('不在恒星系内，无法扫描', 'warning');
+                    console.warn('[扫描失败] 不在恒星系内');
+                    return;
+                }
+
+                const system = cell.starSystem;
+                if (!system) {
+                    UIRenderer.log('星系数据损坏', 'error');
+                    console.error('[扫描错误] 无星系数据');
+                    return;
+                }
+
+                if (system.scanned) {
+                    UIRenderer.log('该星系已扫描过', 'info');
+                    return;
+                }
+
+                system.scanned = true;
+                UIRenderer.showPlanetInfo(system);
+                UIRenderer.log(`扫描完成！发现 ${system.planets.length} 颗行星，${system.resources.length} 种可采集资源`, 'success');
+                UIRenderer.updateButtons();
+            },
+
+            collect() {
+                const cell = StarMapModel.getCell(ShipState.x, ShipState.y);
+                if (!cell || cell.type !== CELL_TYPES.STAR) {
+                    UIRenderer.log('不在恒星系内，无法采集', 'warning');
+                    console.warn('[采集失败] 不在恒星系内');
+                    return;
+                }
+
+                const system = cell.starSystem;
+                if (!system || !system.scanned) {
+                    UIRenderer.log('请先扫描星系', 'warning');
+                    console.warn('[采集失败] 未扫描星系');
+                    return;
+                }
+
+                if (system.resources.length === 0) {
+                    UIRenderer.log('该星系无可采集资源', 'info');
+                    return;
+                }
+
+                const resource = system.resources[0];
+                const result = ShipState.addCargo(resource);
+
+                if (!result.success) {
+                    UIRenderer.log(`采集失败: ${result.reason}`, 'warning');
+                    console.warn(`[采集失败] ${result.reason}`);
+                    return;
+                }
+
+                system.resources.shift();
+                UIRenderer.log(`采集了 ${RESOURCE_ICONS[resource]} ${RESOURCE_NAMES[resource]}`, 'success');
+                UIRenderer.showPlanetInfo(system);
+                UIRenderer.updateAll();
+            },
+
+            refuel() {
+                const cell = StarMapModel.getCell(ShipState.x, ShipState.y);
+                if (!cell || cell.type !== CELL_TYPES.ASTEROID) {
+                    UIRenderer.log('不在小行星带，无法提炼燃料', 'warning');
+                    console.warn('[提炼失败] 不在小行星带');
+                    return;
+                }
+
+                const hasMetal = ShipState.hasCargo('metal');
+                if (hasMetal) {
+                    ShipState.removeCargo('metal');
+                    UIRenderer.log('消耗1单位金属提炼燃料', 'info');
+                }
+
+                const fuelGain = Math.floor(Math.random() * 11) + 5;
+                ShipState.addFuel(fuelGain);
+                UIRenderer.log(`提炼获得 ${fuelGain} 点燃料`, 'success');
+                UIRenderer.updateAll();
+            },
+
+            unload() {
+                const cell = StarMapModel.getCell(ShipState.x, ShipState.y);
+                if (!cell || cell.type !== CELL_TYPES.STATION) {
+                    UIRenderer.log('不在空间站，无法卸载资源', 'warning');
+                    console.warn('[卸载失败] 不在空间站');
+                    return;
+                }
+
+                if (ShipState.cargo.length === 0) {
+                    UIRenderer.log('货舱为空，无可卸载资源', 'info');
+                    return;
+                }
+
+                const result = ShipState.unloadCargo();
+                UIRenderer.log(`卸载 ${result.count} 单位资源，获得 ${result.score} 分！`, 'success');
+                UIRenderer.updateAll();
+            },
+
+            closeEvent() {
+                UIRenderer.closeEventPopup();
+            }
+        };
+
+        function checkESModuleSupport() {
+            try {
+                new Function('import("")');
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        if (checkESModuleSupport()) {
+            document.getElementById('game').style.display = 'block';
+            window.Game.init();
+        } else {
+            document.getElementById('es-module-warning').style.display = 'block';
+            console.error('浏览器不支持 ES Module');
+        }
+    </script>
+</body>
+</html>

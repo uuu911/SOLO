@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPS 射击训练场</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            cursor: none;
+        }
+
+        #gameCanvas {
+            display: block;
+        }
+
+        .hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+            z-index: 20;
+        }
+
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: white;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .crosshair::before {
+            width: 20px;
+            height: 2px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .crosshair::after {
+            width: 2px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .crosshair .dot {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: white;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .ammo-display {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            color: white;
+            font-size: 36px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .ammo-display .reload-text {
+            font-size: 18px;
+            color: #ff6b6b;
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .score-display {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .timer-display {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .timer-display.warning {
+            color: #ff6b6b;
+            animation: pulse 0.5s infinite;
+        }
+
+        .hit-marker {
+            position: absolute;
+            color: #ff4444;
+            font-size: 48px;
+            font-weight: bold;
+            pointer-events: none;
+            opacity: 0;
+            transform: translate(-50%, -50%);
+            text-shadow: 0 0 10px rgba(255, 68, 68, 0.8);
+            z-index: 30;
+        }
+
+        .hit-marker.show {
+            animation: hitMarkerAnim 0.3s ease-out forwards;
+        }
+
+        @keyframes hitMarkerAnim {
+            0% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(0.5);
+            }
+            50% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1.2);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        .settings-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 8px;
+            cursor: pointer;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: white;
+            transition: all 0.2s;
+        }
+
+        .settings-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+
+        .settings-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 16px;
+            padding: 30px;
+            color: white;
+            pointer-events: auto;
+            display: none;
+            min-width: 350px;
+            z-index: 100;
+        }
+
+        .settings-panel.show {
+            display: block;
+        }
+
+        .settings-panel h2 {
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 24px;
+        }
+
+        .setting-item {
+            margin-bottom: 20px;
+        }
+
+        .setting-item label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .setting-item input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .setting-value {
+            text-align: right;
+            font-size: 14px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 30px;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .end-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            border-radius: 20px;
+            padding: 40px;
+            color: white;
+            pointer-events: auto;
+            display: none;
+            text-align: center;
+            min-width: 400px;
+            z-index: 100;
+        }
+
+        .end-panel.show {
+            display: block;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+            to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        .end-panel h1 {
+            font-size: 36px;
+            margin-bottom: 30px;
+            color: #4ecdc4;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 18px;
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #ffd93d;
+        }
+
+        .restart-btn {
+            margin-top: 30px;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .restart-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .start-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            border-radius: 20px;
+            padding: 50px;
+            color: white;
+            pointer-events: auto;
+            text-align: center;
+            min-width: 450px;
+            z-index: 100;
+        }
+
+        .start-panel h1 {
+            font-size: 42px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .start-panel p {
+            font-size: 16px;
+            color: #aaa;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .start-btn {
+            padding: 18px 50px;
+            font-size: 22px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .start-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(245, 87, 108, 0.4);
+        }
+
+        .controls-info {
+            text-align: left;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 25px;
+        }
+
+        .controls-info h3 {
+            margin-bottom: 15px;
+            color: #4ecdc4;
+        }
+
+        .controls-info p {
+            margin: 8px 0;
+            font-size: 14px;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="hud" id="hud">
+        <div class="crosshair" id="crosshair">
+            <div class="dot"></div>
+        </div>
+
+        <div class="ammo-display" id="ammoDisplay">30 / ∞</div>
+        <div class="score-display" id="scoreDisplay">得分: 0</div>
+        <div class="timer-display" id="timerDisplay">60</div>
+
+        <div class="hit-marker" id="hitMarker">✖</div>
+
+        <button class="settings-btn" id="settingsBtn">⚙</button>
+
+        <div class="settings-panel" id="settingsPanel">
+            <button class="close-btn" id="closeSettings">✕</button>
+            <h2>设置</h2>
+            <div class="setting-item">
+                <label>鼠标灵敏度</label>
+                <input type="range" id="sensitivitySlider" min="0.1" max="1" step="0.05" value="0.3">
+                <div class="setting-value" id="sensitivityValue">0.3</div>
+            </div>
+            <div class="setting-item">
+                <label>视野 FOV</label>
+                <input type="range" id="fovSlider" min="60" max="100" step="1" value="75">
+                <div class="setting-value" id="fovValue">75°</div>
+            </div>
+            <p style="text-align: center; margin-top: 20px; color: #888; font-size: 14px;">按 ESC 关闭设置</p>
+        </div>
+
+        <div class="end-panel" id="endPanel">
+            <h1>训练结束!</h1>
+            <div class="stat-row">
+                <span>总射击次数</span>
+                <span class="stat-value" id="totalShots">0</span>
+            </div>
+            <div class="stat-row">
+                <span>命中次数</span>
+                <span class="stat-value" id="totalHits">0</span>
+            </div>
+            <div class="stat-row">
+                <span>命中率</span>
+                <span class="stat-value" id="accuracy">0%</span>
+            </div>
+            <div class="stat-row">
+                <span>总得分</span>
+                <span class="stat-value" id="finalScore">0</span>
+            </div>
+            <button class="restart-btn" id="restartBtn">重新开始</button>
+        </div>
+
+        <div class="start-panel" id="startPanel">
+            <h1>🎯 FPS 射击训练场</h1>
+            <p>在 60 秒内尽可能多地击落移动靶标<br>距离越远、速度越快，得分越高！</p>
+            <button class="start-btn" id="startBtn">开始训练</button>
+            <div class="controls-info">
+                <h3>操作说明</h3>
+                <p>🖱 鼠标移动 - 转向瞄准</p>
+                <p>🔫 左键点击 - 射击</p>
+                <p>🔄 自动换弹 (弹匣30发)</p>
+                <p>⚙ ESC / 齿轮 - 设置</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+    <script>
+        const CONFIG = {
+            MAG_SIZE: 30,
+            RELOAD_TIME: 1500,
+            RECOIL_RECOVERY_TIME: 0.3,
+            GAME_DURATION: 60,
+            TARGET_SPAWN_INTERVAL: 1500,
+            TARGET_LIFETIME: 5000,
+            DEFAULT_FOV: 75,
+            DEFAULT_SENSITIVITY: 0.3
+        };
+
+        class AudioManager {
+            constructor() {
+                this.audioContext = null;
+                this.initialized = false;
+            }
+
+            init() {
+                if (this.initialized) return;
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                this.initialized = true;
+            }
+
+            playShoot() {
+                if (!this.initialized) return;
+                const osc = this.audioContext.createOscillator();
+                const gain = this.audioContext.createGain();
+                
+                osc.connect(gain);
+                gain.connect(this.audioContext.destination);
+                
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, this.audioContext.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, this.audioContext.currentTime + 0.1);
+                
+                gain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.15);
+                
+                osc.start();
+                osc.stop(this.audioContext.currentTime + 0.15);
+            }
+
+            playHit() {
+                if (!this.initialized) return;
+                const osc = this.audioContext.createOscillator();
+                const gain = this.audioContext.createGain();
+                
+                osc.connect(gain);
+                gain.connect(this.audioContext.destination);
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, this.audioContext.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, this.audioContext.currentTime + 0.05);
+                osc.frequency.exponentialRampToValueAtTime(400, this.audioContext.currentTime + 0.1);
+                
+                gain.gain.setValueAtTime(0.25, this.audioContext.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.1);
+                
+                osc.start();
+                osc.stop(this.audioContext.currentTime + 0.1);
+            }
+
+            playMiss() {
+                if (!this.initialized) return;
+                const osc = this.audioContext.createOscillator();
+                const gain = this.audioContext.createGain();
+                
+                osc.connect(gain);
+                gain.connect(this.audioContext.destination);
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(200, this.audioContext.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, this.audioContext.currentTime + 0.08);
+                
+                gain.gain.setValueAtTime(0.1, this.audioContext.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.08);
+                
+                osc.start();
+                osc.stop(this.audioContext.currentTime + 0.08);
+            }
+
+            playReload() {
+                if (!this.initialized) return;
+                const osc = this.audioContext.createOscillator();
+                const gain = this.audioContext.createGain();
+                
+                osc.connect(gain);
+                gain.connect(this.audioContext.destination);
+                
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(300, this.audioContext.currentTime);
+                osc.frequency.setValueAtTime(400, this.audioContext.currentTime + 0.1);
+                osc.frequency.setValueAtTime(300, this.audioContext.currentTime + 0.2);
+                
+                gain.gain.setValueAtTime(0.15, this.audioContext.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
+                
+                osc.start();
+                osc.stop(this.audioContext.currentTime + 0.3);
+            }
+        }
+
+        class WeaponModule {
+            constructor(audioManager) {
+                this.audioManager = audioManager;
+                this.currentAmmo = CONFIG.MAG_SIZE;
+                this.isReloading = false;
+                this.recoilOffset = { x: 0, y: 0 };
+                this.targetRecoil = { x: 0, y: 0 };
+                this.recoverySpeed = 1 / CONFIG.RECOIL_RECOVERY_TIME;
+                this.onAmmoChange = null;
+                this.onReloadStart = null;
+                this.onReloadEnd = null;
+            }
+
+            fire() {
+                if (this.isReloading) return false;
+                if (this.currentAmmo <= 0) {
+                    this.reload();
+                    return false;
+                }
+
+                this.currentAmmo--;
+                this.applyRecoil();
+                this.audioManager.playShoot();
+                
+                if (this.onAmmoChange) {
+                    this.onAmmoChange(this.currentAmmo, this.isReloading);
+                }
+
+                if (this.currentAmmo <= 0) {
+                    this.reload();
+                }
+
+                return true;
+            }
+
+            applyRecoil() {
+                const recoilUp = 0.8 + Math.random() * 0.4;
+                const recoilSide = (Math.random() - 0.5) * 0.3;
+                
+                this.targetRecoil.y += recoilUp;
+                this.targetRecoil.x += recoilSide;
+                
+                this.recoilOffset.y = this.targetRecoil.y;
+                this.recoilOffset.x = this.targetRecoil.x;
+            }
+
+            updateRecoil(deltaTime) {
+                const recoveryAmount = this.recoverySpeed * deltaTime;
+                
+                this.targetRecoil.y *= Math.max(0, 1 - recoveryAmount * 2);
+                this.targetRecoil.x *= Math.max(0, 1 - recoveryAmount * 2);
+                
+                this.recoilOffset.y += (this.targetRecoil.y - this.recoilOffset.y) * recoveryAmount * 3;
+                this.recoilOffset.x += (this.targetRecoil.x - this.recoilOffset.x) * recoveryAmount * 3;
+                
+                return { ...this.recoilOffset };
+            }
+
+            reload() {
+                if (this.isReloading || this.currentAmmo === CONFIG.MAG_SIZE) return;
+                
+                this.isReloading = true;
+                this.audioManager.playReload();
+                
+                if (this.onReloadStart) {
+                    this.onReloadStart();
+                }
+
+                setTimeout(() => {
+                    this.currentAmmo = CONFIG.MAG_SIZE;
+                    this.isReloading = false;
+                    
+                    if (this.onAmmoChange) {
+                        this.onAmmoChange(this.currentAmmo, this.isReloading);
+                    }
+                    if (this.onReloadEnd) {
+                        this.onReloadEnd();
+                    }
+                }, CONFIG.RELOAD_TIME);
+            }
+
+            reset() {
+                this.currentAmmo = CONFIG.MAG_SIZE;
+                this.isReloading = false;
+                this.recoilOffset = { x: 0, y: 0 };
+                this.targetRecoil = { x: 0, y: 0 };
+            }
+        }
+
+        class TargetManager {
+            constructor(scene) {
+                this.scene = scene;
+                this.targets = [];
+                this.meshes = [];
+                this.onTargetHit = null;
+            }
+
+            spawn() {
+                const distance = 30 + Math.random() * 50;
+                const angle = (Math.random() - 0.5) * Math.PI * 0.6;
+                const height = 1 + Math.random() * 4;
+                
+                const target = {
+                    id: Date.now() + Math.random(),
+                    position: new THREE.Vector3(
+                        Math.sin(angle) * distance,
+                        height,
+                        -distance
+                    ),
+                    velocity: new THREE.Vector3(
+                        (Math.random() - 0.5) * 0.1,
+                        (Math.random() - 0.5) * 0.05,
+                        0.05 + Math.random() * 0.1
+                    ),
+                    speed: 0.5 + Math.random() * 1,
+                    radius: 1.5,
+                    distance: distance,
+                    spawnTime: Date.now(),
+                    lifetime: CONFIG.TARGET_LIFETIME + Math.random() * 2000,
+                    curveOffset: Math.random() * Math.PI * 2,
+                    curveSpeed: 0.5 + Math.random() * 0.5
+                };
+
+                const geometry = new THREE.CircleGeometry(target.radius, 32);
+                const material = new THREE.MeshBasicMaterial({
+                    color: 0xff4444,
+                    side: THREE.DoubleSide
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.copy(target.position);
+                mesh.lookAt(0, 2, 0);
+                
+                const ringGeometry = new THREE.RingGeometry(target.radius * 0.6, target.radius * 0.8, 32);
+                const ringMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                mesh.add(ring);
+
+                const centerGeometry = new THREE.CircleGeometry(target.radius * 0.3, 16);
+                const centerMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffff00,
+                    side: THREE.DoubleSide
+                });
+                const center = new THREE.Mesh(centerGeometry, centerMaterial);
+                mesh.add(center);
+
+                this.scene.add(mesh);
+                target.mesh = mesh;
+                
+                this.targets.push(target);
+                this.meshes.push(mesh);
+
+                return target;
+            }
+
+            update(deltaTime) {
+                const now = Date.now();
+                
+                for (let i = this.targets.length - 1; i >= 0; i--) {
+                    const target = this.targets[i];
+                    
+                    const elapsed = (now - target.spawnTime) / 1000;
+                    target.position.x += Math.sin(elapsed * target.curveSpeed + target.curveOffset) * target.speed * 0.02;
+                    target.position.z += target.velocity.z * target.speed;
+                    target.position.y += Math.sin(elapsed * 2) * 0.01;
+                    
+                    target.mesh.position.copy(target.position);
+                    target.mesh.lookAt(0, 2, 0);
+                    
+                    const scale = Math.max(0.3, 1 - (target.position.z + 80) / 160);
+                    target.mesh.scale.setScalar(scale);
+                    target.currentRadius = target.radius * scale;
+                    
+                    if (now - target.spawnTime > target.lifetime || target.position.z > 10) {
+                        this.removeTarget(i);
+                    }
+                }
+            }
+
+            getHitTarget(raycaster, camera) {
+                const intersects = raycaster.intersectObjects(this.meshes);
+                
+                if (intersects.length > 0) {
+                    const hitMesh = intersects[0].object;
+                    const targetIndex = this.meshes.indexOf(hitMesh);
+                    
+                    if (targetIndex !== -1) {
+                        const target = this.targets[targetIndex];
+                        const targetData = { ...target };
+                        this.removeTarget(targetIndex);
+                        return targetData;
+                    }
+                }
+                
+                return null;
+            }
+
+            removeTarget(index) {
+                const target = this.targets[index];
+                this.scene.remove(target.mesh);
+                this.targets.splice(index, 1);
+                this.meshes.splice(index, 1);
+            }
+
+            clearAll() {
+                for (let i = this.targets.length - 1; i >= 0; i--) {
+                    this.removeTarget(i);
+                }
+            }
+
+            calculateScore(target) {
+                const distanceScore = Math.floor(target.distance * 2);
+                const speedScore = Math.floor(target.speed * 50);
+                return 10 + distanceScore + speedScore;
+            }
+        }
+
+        class InputController {
+            constructor() {
+                this.sensitivity = CONFIG.DEFAULT_SENSITIVITY;
+                this.yaw = 0;
+                this.pitch = 0;
+                this.isPointerLocked = false;
+                this.onMouseMove = null;
+                this.onShoot = null;
+                this.onSettingsToggle = null;
+                
+                this.wobbleTime = 0;
+                this.wobbleAmount = 0.02;
+                
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                document.addEventListener('mousemove', (e) => {
+                    if (this.isPointerLocked) {
+                        this.yaw -= e.movementX * this.sensitivity * 0.002;
+                        this.pitch -= e.movementY * this.sensitivity * 0.002;
+                        this.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, this.pitch));
+                        
+                        if (this.onMouseMove) {
+                            this.onMouseMove(this.yaw, this.pitch);
+                        }
+                    }
+                });
+
+                document.addEventListener('mousedown', (e) => {
+                    if (e.button === 0 && this.isPointerLocked) {
+                        if (this.onShoot) {
+                            this.onShoot();
+                        }
+                    }
+                });
+
+                document.addEventListener('pointerlockchange', () => {
+                    this.isPointerLocked = document.pointerLockElement === document.body;
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        if (this.onSettingsToggle) {
+                            this.onSettingsToggle();
+                        }
+                    }
+                });
+            }
+
+            requestPointerLock() {
+                document.body.requestPointerLock();
+            }
+
+            updateWobble(deltaTime) {
+                this.wobbleTime += deltaTime;
+                return {
+                    x: Math.sin(this.wobbleTime * 2) * this.wobbleAmount,
+                    y: Math.cos(this.wobbleTime * 1.5) * this.wobbleAmount * 0.5
+                };
+            }
+
+            setSensitivity(value) {
+                this.sensitivity = value;
+            }
+
+            reset() {
+                this.yaw = 0;
+                this.pitch = 0;
+                this.wobbleTime = 0;
+            }
+        }
+
+        class UIManager {
+            constructor() {
+                this.elements = {
+                    ammoDisplay: document.getElementById('ammoDisplay'),
+                    scoreDisplay: document.getElementById('scoreDisplay'),
+                    timerDisplay: document.getElementById('timerDisplay'),
+                    hitMarker: document.getElementById('hitMarker'),
+                    crosshair: document.getElementById('crosshair'),
+                    settingsPanel: document.getElementById('settingsPanel'),
+                    endPanel: document.getElementById('endPanel'),
+                    startPanel: document.getElementById('startPanel'),
+                    settingsBtn: document.getElementById('settingsBtn'),
+                    closeSettings: document.getElementById('closeSettings'),
+                    sensitivitySlider: document.getElementById('sensitivitySlider'),
+                    sensitivityValue: document.getElementById('sensitivityValue'),
+                    fovSlider: document.getElementById('fovSlider'),
+                    fovValue: document.getElementById('fovValue'),
+                    restartBtn: document.getElementById('restartBtn'),
+                    startBtn: document.getElementById('startBtn'),
+                    totalShots: document.getElementById('totalShots'),
+                    totalHits: document.getElementById('totalHits'),
+                    accuracy: document.getElementById('accuracy'),
+                    finalScore: document.getElementById('finalScore')
+                };
+            }
+
+            updateAmmo(current, isReloading) {
+                if (isReloading) {
+                    this.elements.ammoDisplay.innerHTML = '<span class="reload-text">换弹中...</span>';
+                } else {
+                    this.elements.ammoDisplay.textContent = `${current} / ∞`;
+                }
+            }
+
+            updateScore(score) {
+                this.elements.scoreDisplay.textContent = `得分: ${score}`;
+            }
+
+            updateTimer(time) {
+                this.elements.timerDisplay.textContent = Math.ceil(time);
+                if (time <= 10) {
+                    this.elements.timerDisplay.classList.add('warning');
+                } else {
+                    this.elements.timerDisplay.classList.remove('warning');
+                }
+            }
+
+            showHitMarker(x, y) {
+                this.elements.hitMarker.style.left = x + 'px';
+                this.elements.hitMarker.style.top = y + 'px';
+                this.elements.hitMarker.classList.remove('show');
+                void this.elements.hitMarker.offsetWidth;
+                this.elements.hitMarker.classList.add('show');
+            }
+
+            updateCrosshair(recoilX, recoilY) {
+                const offsetX = recoilX * 20;
+                const offsetY = -recoilY * 30;
+                this.elements.crosshair.style.transform = `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px))`;
+            }
+
+            toggleSettings(show) {
+                if (show) {
+                    this.elements.settingsPanel.classList.add('show');
+                    document.exitPointerLock();
+                } else {
+                    this.elements.settingsPanel.classList.remove('show');
+                }
+            }
+
+            showEndPanel(stats) {
+                this.elements.totalShots.textContent = stats.totalShots;
+                this.elements.totalHits.textContent = stats.totalHits;
+                this.elements.accuracy.textContent = stats.accuracy + '%';
+                this.elements.finalScore.textContent = stats.totalScore;
+                this.elements.endPanel.classList.add('show');
+                document.exitPointerLock();
+            }
+
+            hideEndPanel() {
+                this.elements.endPanel.classList.remove('show');
+            }
+
+            hideStartPanel() {
+                this.elements.startPanel.style.display = 'none';
+            }
+
+            showStartPanel() {
+                this.elements.startPanel.style.display = 'block';
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.raycaster = null;
+                
+                this.audioManager = new AudioManager();
+                this.weapon = null;
+                this.targetManager = null;
+                this.inputController = null;
+                this.uiManager = null;
+                
+                this.score = 0;
+                this.totalShots = 0;
+                this.totalHits = 0;
+                this.timeRemaining = CONFIG.GAME_DURATION;
+                this.isGameRunning = false;
+                this.isGameOver = false;
+                this.lastSpawnTime = 0;
+                
+                this.fov = CONFIG.DEFAULT_FOV;
+                
+                this.init();
+            }
+
+            init() {
+                this.setupThreeJS();
+                this.setupModules();
+                this.setupEventListeners();
+                this.animate();
+            }
+
+            setupThreeJS() {
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x87ceeb);
+                this.scene.fog = new THREE.Fog(0x87ceeb, 50, 150);
+
+                this.camera = new THREE.PerspectiveCamera(
+                    CONFIG.DEFAULT_FOV,
+                    window.innerWidth / window.innerHeight,
+                    0.1,
+                    1000
+                );
+                this.camera.position.set(0, 2, 0);
+
+                this.renderer = new THREE.WebGLRenderer({
+                    canvas: document.getElementById('gameCanvas'),
+                    antialias: true
+                });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+                this.raycaster = new THREE.Raycaster();
+
+                const groundGeometry = new THREE.PlaneGeometry(200, 200);
+                const groundMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0x3d5c3d,
+                    side: THREE.DoubleSide
+                });
+                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                ground.rotation.x = -Math.PI / 2;
+                ground.position.y = 0;
+                this.scene.add(ground);
+
+                const gridHelper = new THREE.GridHelper(200, 50, 0x444444, 0x444444);
+                gridHelper.position.y = 0.01;
+                this.scene.add(gridHelper);
+
+                for (let i = 0; i < 20; i++) {
+                    const poleGeometry = new THREE.CylinderGeometry(0.2, 0.3, 8, 8);
+                    const poleMaterial = new THREE.MeshBasicMaterial({ color: 0x5c4033 });
+                    const pole = new THREE.Mesh(poleGeometry, poleMaterial);
+                    pole.position.set(
+                        (Math.random() - 0.5) * 150,
+                        4,
+                        -20 - Math.random() * 80
+                    );
+                    this.scene.add(pole);
+                }
+            }
+
+            setupModules() {
+                this.weapon = new WeaponModule(this.audioManager);
+                this.targetManager = new TargetManager(this.scene);
+                this.inputController = new InputController();
+                this.uiManager = new UIManager();
+
+                this.weapon.onAmmoChange = (current, reloading) => {
+                    this.uiManager.updateAmmo(current, reloading);
+                };
+
+                this.inputController.onMouseMove = (yaw, pitch) => {
+                    this.updateCameraRotation();
+                };
+
+                this.inputController.onShoot = () => {
+                    this.handleShoot();
+                };
+
+                this.inputController.onSettingsToggle = () => {
+                    this.toggleSettings();
+                };
+            }
+
+            setupEventListeners() {
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+
+                this.uiManager.elements.settingsBtn.addEventListener('click', () => {
+                    this.toggleSettings();
+                });
+
+                this.uiManager.elements.closeSettings.addEventListener('click', () => {
+                    this.toggleSettings();
+                });
+
+                this.uiManager.elements.sensitivitySlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    this.inputController.setSensitivity(value);
+                    this.uiManager.elements.sensitivityValue.textContent = value.toFixed(2);
+                });
+
+                this.uiManager.elements.fovSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    this.setFOV(value);
+                    this.uiManager.elements.fovValue.textContent = value + '°';
+                });
+
+                this.uiManager.elements.restartBtn.addEventListener('click', () => {
+                    this.restartGame();
+                });
+
+                this.uiManager.elements.startBtn.addEventListener('click', () => {
+                    this.startGame();
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!this.isGameRunning || this.isGameOver) return;
+                    if (e.target.closest('.settings-panel') || e.target.closest('.settings-btn')) return;
+                    
+                    this.inputController.requestPointerLock();
+                });
+            }
+
+            updateCameraRotation() {
+                const wobble = this.inputController.updateWobble(0.016);
+                const recoil = this.weapon.recoilOffset;
+                
+                this.camera.rotation.order = 'YXZ';
+                this.camera.rotation.y = this.inputController.yaw + wobble.x + recoil.x * 0.02;
+                this.camera.rotation.x = this.inputController.pitch + wobble.y - recoil.y * 0.03;
+            }
+
+            handleShoot() {
+                if (!this.isGameRunning || this.isGameOver) return;
+
+                const fired = this.weapon.fire();
+                if (!fired) return;
+
+                this.totalShots++;
+
+                this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+                const hitTarget = this.targetManager.getHitTarget(this.raycaster, this.camera);
+
+                if (hitTarget) {
+                    this.totalHits++;
+                    const points = this.targetManager.calculateScore(hitTarget);
+                    this.score += points;
+                    this.uiManager.updateScore(this.score);
+                    this.audioManager.playHit();
+                    
+                    const screenPos = new THREE.Vector3();
+                    hitTarget.mesh.position.project(this.camera);
+                    const x = (screenPos.x + 1) / 2 * window.innerWidth;
+                    const y = (-screenPos.y + 1) / 2 * window.innerHeight;
+                    this.uiManager.showHitMarker(x, y);
+                } else {
+                    this.audioManager.playMiss();
+                }
+            }
+
+            setFOV(value) {
+                this.fov = value;
+                this.camera.fov = value;
+                this.camera.updateProjectionMatrix();
+            }
+
+            toggleSettings() {
+                const isVisible = this.uiManager.elements.settingsPanel.classList.contains('show');
+                this.uiManager.toggleSettings(!isVisible);
+            }
+
+            startGame() {
+                this.audioManager.init();
+                this.uiManager.hideStartPanel();
+                this.isGameRunning = true;
+                this.isGameOver = false;
+                this.inputController.requestPointerLock();
+            }
+
+            restartGame() {
+                this.score = 0;
+                this.totalShots = 0;
+                this.totalHits = 0;
+                this.timeRemaining = CONFIG.GAME_DURATION;
+                this.lastSpawnTime = 0;
+                
+                this.weapon.reset();
+                this.targetManager.clearAll();
+                this.inputController.reset();
+                
+                this.uiManager.updateScore(0);
+                this.uiManager.updateAmmo(CONFIG.MAG_SIZE, false);
+                this.uiManager.updateTimer(CONFIG.GAME_DURATION);
+                this.uiManager.hideEndPanel();
+                
+                this.isGameRunning = true;
+                this.isGameOver = false;
+                this.inputController.requestPointerLock();
+            }
+
+            endGame() {
+                this.isGameOver = true;
+                this.isGameRunning = false;
+                
+                const accuracy = this.totalShots > 0 
+                    ? Math.round((this.totalHits / this.totalShots) * 100) 
+                    : 0;
+                
+                this.uiManager.showEndPanel({
+                    totalShots: this.totalShots,
+                    totalHits: this.totalHits,
+                    accuracy: accuracy,
+                    totalScore: this.score
+                });
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                const deltaTime = 1 / 60;
+
+                if (this.isGameRunning && !this.isGameOver) {
+                    this.timeRemaining -= deltaTime;
+                    if (this.timeRemaining <= 0) {
+                        this.timeRemaining = 0;
+                        this.endGame();
+                    }
+                    this.uiManager.updateTimer(this.timeRemaining);
+
+                    this.lastSpawnTime += deltaTime * 1000;
+                    if (this.lastSpawnTime > CONFIG.TARGET_SPAWN_INTERVAL) {
+                        this.targetManager.spawn();
+                        this.lastSpawnTime = 0;
+                    }
+
+                    this.weapon.updateRecoil(deltaTime);
+                    this.uiManager.updateCrosshair(this.weapon.recoilOffset.x, this.weapon.recoilOffset.y);
+                    
+                    this.targetManager.update(deltaTime);
+                    this.updateCameraRotation();
+                }
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            new Game();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,2138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>像素地牢 - Pixel Dungeon RPG</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: monospace;
+  }
+  #gameContainer {
+    position: relative;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  #gameCanvas {
+    display: block;
+    border: 4px solid #3d3d5c;
+    box-shadow: 0 0 30px rgba(100, 100, 255, 0.3);
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  #hint {
+    position: absolute;
+    bottom: -30px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    color: #8888aa;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <canvas id="gameCanvas" width="480" height="320"></canvas>
+  <div id="hint">方向键/WASD移动 | Enter确认 | ESC菜单 | 1-4战斗快捷</div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  const GAME_WIDTH = 480;
+  const GAME_HEIGHT = 320;
+  const TILE_SIZE = 16;
+
+  const COLORS = {
+    black: '#0f0f1a', darkGray: '#2a2a3e', gray: '#4a4a6a', lightGray: '#7a7a9a',
+    white: '#f0f0ff', red: '#e04040', darkRed: '#a02020', green: '#40e040',
+    darkGreen: '#20a020', blue: '#4060e0', darkBlue: '#2040a0', yellow: '#f0d040',
+    gold: '#d4af37', purple: '#a040c0', darkPurple: '#602080', brown: '#8b4513', skin: '#f5c896',
+    orange: '#ff8040', cyan: '#40e0e0', pink: '#ff80c0'
+  };
+
+  const FONT_DATA = {
+    'A':[0x3E,0x51,0x51,0x7F,0x51,0x51,0x51,0x00],'B':[0x7E,0x49,0x49,0x7E,0x49,0x49,0x7E,0x00],
+    'C':[0x3E,0x41,0x41,0x41,0x41,0x41,0x3E,0x00],'D':[0x7E,0x41,0x41,0x41,0x41,0x41,0x7E,0x00],
+    'E':[0x7F,0x41,0x41,0x7E,0x41,0x41,0x7F,0x00],'F':[0x7F,0x41,0x41,0x7E,0x41,0x41,0x41,0x00],
+    'G':[0x3E,0x41,0x41,0x49,0x49,0x49,0x3F,0x00],'H':[0x51,0x51,0x51,0x7F,0x51,0x51,0x51,0x00],
+    'I':[0x3E,0x08,0x08,0x08,0x08,0x08,0x3E,0x00],'J':[0x3E,0x04,0x04,0x04,0x04,0x44,0x38,0x00],
+    'K':[0x41,0x42,0x44,0x78,0x44,0x42,0x41,0x00],'L':[0x41,0x41,0x41,0x41,0x41,0x41,0x7F,0x00],
+    'M':[0x41,0x63,0x55,0x49,0x41,0x41,0x41,0x00],'N':[0x41,0x61,0x51,0x49,0x45,0x43,0x41,0x00],
+    'O':[0x3E,0x51,0x51,0x51,0x51,0x51,0x3E,0x00],'P':[0x7E,0x49,0x49,0x7E,0x41,0x41,0x41,0x00],
+    'Q':[0x3E,0x51,0x51,0x51,0x55,0x53,0x3E,0x00],'R':[0x7E,0x49,0x49,0x7E,0x44,0x42,0x41,0x00],
+    'S':[0x3E,0x41,0x41,0x3E,0x01,0x01,0x7E,0x00],'T':[0x7F,0x08,0x08,0x08,0x08,0x08,0x08,0x00],
+    'U':[0x41,0x41,0x41,0x41,0x41,0x41,0x3E,0x00],'V':[0x41,0x41,0x41,0x41,0x41,0x22,0x14,0x00],
+    'W':[0x41,0x41,0x41,0x49,0x55,0x36,0x41,0x00],'X':[0x41,0x22,0x14,0x08,0x14,0x22,0x41,0x00],
+    'Y':[0x41,0x22,0x14,0x08,0x08,0x08,0x08,0x00],'Z':[0x7F,0x02,0x04,0x08,0x10,0x20,0x7F,0x00],
+    '0':[0x3E,0x51,0x51,0x51,0x51,0x51,0x3E,0x00],'1':[0x08,0x18,0x08,0x08,0x08,0x08,0x3E,0x00],
+    '2':[0x3E,0x41,0x01,0x02,0x04,0x08,0x7F,0x00],'3':[0x3E,0x41,0x01,0x1E,0x01,0x41,0x3E,0x00],
+    '4':[0x02,0x06,0x0A,0x12,0x7F,0x02,0x02,0x00],'5':[0x7F,0x40,0x7E,0x01,0x01,0x41,0x3E,0x00],
+    '6':[0x3E,0x41,0x40,0x7E,0x41,0x41,0x3E,0x00],'7':[0x7F,0x01,0x02,0x04,0x08,0x10,0x10,0x00],
+    '8':[0x3E,0x41,0x41,0x3E,0x41,0x41,0x3E,0x00],'9':[0x3E,0x41,0x41,0x3F,0x01,0x01,0x3E,0x00],
+    ':':[0x00,0x08,0x00,0x00,0x08,0x00,0x00,0x00],'!':[0x08,0x08,0x08,0x08,0x00,0x00,0x08,0x00],
+    '?':[0x3E,0x41,0x01,0x02,0x04,0x00,0x04,0x00],'-':[0x00,0x00,0x00,0x3F,0x00,0x00,0x00,0x00],
+    '+':[0x00,0x08,0x08,0x3E,0x08,0x08,0x00,0x00],'=':[0x00,0x00,0x3F,0x00,0x00,0x3F,0x00,0x00],
+    '/':[0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x00],'.':[0x00,0x00,0x00,0x00,0x00,0x00,0x08,0x00],
+    ',':[0x00,0x00,0x00,0x00,0x00,0x08,0x08,0x10],'\'':[0x08,0x08,0x00,0x00,0x00,0x00,0x00,0x00],
+    '"':[0x14,0x14,0x00,0x00,0x00,0x00,0x00,0x00],'(': [0x08,0x04,0x04,0x04,0x04,0x04,0x08,0x00],
+    ')':[0x04,0x08,0x08,0x08,0x08,0x08,0x04,0x00],'[': [0x1C,0x10,0x10,0x10,0x10,0x10,0x1C,0x00],
+    ']':[0x1C,0x04,0x04,0x04,0x04,0x04,0x1C,0x00],'*': [0x00,0x41,0x22,0x14,0x08,0x14,0x22,0x41],
+    ' ': [0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00],'_': [0x00,0x00,0x00,0x00,0x00,0x00,0x3F,0x00],
+    '%':[0x41,0x22,0x14,0x08,0x14,0x22,0x41,0x00],'&': [0x30,0x48,0x48,0x50,0x38,0x54,0x28,0x50],
+    '#':[0x28,0x28,0x7F,0x28,0x7F,0x28,0x28,0x00],'@': [0x3E,0x51,0x55,0x55,0x5D,0x51,0x3E,0x00]
+  };
+
+  function drawText(text, x, y, color = COLORS.white, scale = 1) {
+    text = text.toUpperCase();
+    for (let i = 0; i < text.length; i++) {
+      const charData = FONT_DATA[text[i]] || FONT_DATA['?'];
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          if (charData[row] & (1 << (7 - col))) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x + i * 8 * scale + col * scale, y + row * scale, scale, scale);
+          }
+        }
+      }
+    }
+  }
+
+  function drawRect(x, y, w, h, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w, h);
+  }
+
+  function drawBorder(x, y, w, h, color = COLORS.white, bg = COLORS.black) {
+    drawRect(x, y, w, h, bg);
+    drawRect(x, y, w, 2, color);
+    drawRect(x, y + h - 2, w, 2, color);
+    drawRect(x, y, 2, h, color);
+    drawRect(x + w - 2, y, 2, h, color);
+  }
+
+  const TILE = { FLOOR: 0, WALL: 1, GRASS: 2, WATER: 3, DOOR: 4, TREE: 5, CAVE_FLOOR: 6, CAVE_WALL: 7, STONE: 8, CHEST: 9, PORTAL: 10 };
+
+  const MAPS = {
+    town: {
+      id: 'town', name: '新手镇', width: 30, height: 20,
+      tiles: [],
+      enemies: [],
+      npcs: [
+        { x: 10, y: 10, dialog: '欢迎来到新手镇！往北走是迷雾森林，当心怪物。' },
+        { x: 20, y: 12, dialog: '听说地牢深处有一个强大的Boss...击败它就能拯救这片土地！' }
+      ],
+      exits: [
+        { x: 15, y: 0, targetMap: 'forest', targetX: 15, targetY: 18 },
+        { x: 0, y: 10, targetMap: 'shop', targetX: 28, targetY: 10 }
+      ],
+      spawnX: 15, spawnY: 15, bgm: 'town'
+    },
+    shop: {
+      id: 'shop', name: '道具商店', width: 30, height: 20,
+      tiles: [],
+      enemies: [],
+      npcs: [
+        { x: 15, y: 8, dialog: '需要买点什么吗？治疗药水只要20金币！' }
+      ],
+      exits: [
+        { x: 29, y: 10, targetMap: 'town', targetX: 1, targetY: 10 }
+      ],
+      spawnX: 28, spawnY: 10, bgm: 'town'
+    },
+    forest: {
+      id: 'forest', name: '迷雾森林', width: 30, height: 20,
+      tiles: [],
+      enemies: [
+        { x: 8, y: 8, enemyId: 'slime' },
+        { x: 20, y: 10, enemyId: 'bat' },
+        { x: 12, y: 15, enemyId: 'mushroom' },
+        { x: 22, y: 5, enemyId: 'slime' }
+      ],
+      npcs: [],
+      exits: [
+        { x: 15, y: 19, targetMap: 'town', targetX: 15, targetY: 1 },
+        { x: 15, y: 0, targetMap: 'cave', targetX: 15, targetY: 18 }
+      ],
+      spawnX: 15, spawnY: 18, bgm: 'explore'
+    },
+    cave: {
+      id: 'cave', name: '黑暗洞穴', width: 30, height: 20,
+      tiles: [],
+      enemies: [
+        { x: 8, y: 8, enemyId: 'bat' },
+        { x: 20, y: 12, enemyId: 'skeleton' },
+        { x: 10, y: 15, enemyId: 'mushroom' }
+      ],
+      npcs: [],
+      exits: [
+        { x: 15, y: 19, targetMap: 'forest', targetX: 15, targetY: 1 },
+        { x: 15, y: 0, targetMap: 'dungeon', targetX: 15, targetY: 18 }
+      ],
+      spawnX: 15, spawnY: 18, bgm: 'explore'
+    },
+    dungeon: {
+      id: 'dungeon', name: '魔王地牢', width: 30, height: 20,
+      tiles: [],
+      enemies: [
+        { x: 10, y: 10, enemyId: 'skeleton' },
+        { x: 20, y: 8, enemyId: 'darkmage' },
+        { x: 15, y: 14, enemyId: 'skeleton' }
+      ],
+      npcs: [],
+      exits: [
+        { x: 15, y: 19, targetMap: 'cave', targetX: 15, targetY: 1 },
+        { x: 15, y: 0, targetMap: 'bossroom', targetX: 15, targetY: 14 }
+      ],
+      spawnX: 15, spawnY: 18, bgm: 'explore'
+    },
+    bossroom: {
+      id: 'bossroom', name: 'Boss房间', width: 30, height: 15,
+      tiles: [],
+      enemies: [
+        { x: 15, y: 6, enemyId: 'boss' }
+      ],
+      npcs: [],
+      exits: [
+        { x: 15, y: 14, targetMap: 'dungeon', targetX: 15, targetY: 1 }
+      ],
+      spawnX: 15, spawnY: 12, bgm: 'explore'
+    }
+  };
+
+  function generateMap(mapId) {
+    const map = MAPS[mapId];
+    const tiles = [];
+    for (let y = 0; y < map.height; y++) {
+      tiles[y] = [];
+      for (let x = 0; x < map.width; x++) {
+        if (mapId === 'town' || mapId === 'shop') {
+          if (x === 0 || y === 0 || x === map.width - 1 || y === map.height - 1) tiles[y][x] = TILE.WALL;
+          else tiles[y][x] = TILE.FLOOR;
+          if (mapId === 'shop' && (x < 4 || x > map.width - 5)) tiles[y][x] = TILE.WALL;
+        } else if (mapId === 'forest') {
+          if (x === 0 || y === 0 || x === map.width - 1 || y === map.height - 1) tiles[y][x] = TILE.TREE;
+          else tiles[y][x] = TILE.GRASS;
+          if (Math.random() < 0.1 && x > 2 && y > 2 && x < map.width - 3 && y < map.height - 3) {
+            tiles[y][x] = TILE.TREE;
+          }
+        } else if (mapId === 'cave') {
+          if (x === 0 || y === 0 || x === map.width - 1 || y === map.height - 1) tiles[y][x] = TILE.CAVE_WALL;
+          else tiles[y][x] = TILE.CAVE_FLOOR;
+          if (Math.random() < 0.08 && x > 2 && y > 2 && x < map.width - 3 && y < map.height - 3) {
+            tiles[y][x] = TILE.STONE;
+          }
+        } else if (mapId === 'dungeon') {
+          if (x === 0 || y === 0 || x === map.width - 1 || y === map.height - 1) tiles[y][x] = TILE.WALL;
+          else tiles[y][x] = TILE.CAVE_FLOOR;
+          if (Math.random() < 0.06 && x > 2 && y > 2 && x < map.width - 3 && y < map.height - 3) {
+            tiles[y][x] = TILE.WALL;
+          }
+        } else if (mapId === 'bossroom') {
+          if (x === 0 || y === 0 || x === map.width - 1 || y === map.height - 1) tiles[y][x] = TILE.WALL;
+          else tiles[y][x] = TILE.CAVE_FLOOR;
+        }
+      }
+    }
+    map.exits.forEach(exit => { tiles[exit.y][exit.x] = TILE.DOOR; });
+    map.tiles = tiles;
+    return map;
+  }
+
+  function drawTile(tileType, x, y) {
+    const px = x * TILE_SIZE;
+    const py = y * TILE_SIZE;
+    switch (tileType) {
+      case TILE.FLOOR:
+        drawRect(px, py, TILE_SIZE, TILE_SIZE, '#8b7355');
+        drawRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4, '#a08060');
+        ctx.fillStyle = '#705840';
+        ctx.fillRect(px + 4, py + 4, 2, 2);
+        ctx.fillRect(px + 10, py + 8, 2, 2);
+        break;
+      case TILE.WALL:
+        drawRect(px, py, TILE_SIZE, TILE_SIZE, '#4a4a5a');
+        drawRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4, '#5a5a6a');
+        drawRect(px, py + 8, TILE_SIZE, 2, '#3a3a4a');
+        drawRect(px + 8, py, 2, TILE_SIZE, '#3a3a4a');
+        break;
+      case TILE.GRASS:
+        drawRect(px, py, TILE_SIZE, TILE_SIZE, '#3a8030');
+        ctx.fillStyle = '#4a9040';
+        for (let i = 0; i < 5; i++) {
+          const gx = px + (i * 7) % 14 + 1;
+          const gy = py + (i * 11) % 12 + 2;
+          ctx.fillRect(gx, gy, 2, 3);
+        }
+        break;
+      case TILE.TREE:
+        drawRect(px, py, TILE_SIZE, TILE_SIZE, '#2a5020');
+        drawRect(px + 4, py + 2, 8, 8, '#3a7030');
+        drawRect(px + 6, py + 10, 4, 6, '#5a3020');
+        break;
+      case TILE.CAVE_FLOOR:
+        drawRect(px, py, TILE_SIZE, TILE_SIZE, '#4a4040');
+        drawRect(px + 3, py + 3, TILE_SIZE - 6, TILE_SIZE - 6, '#5a5050');
+        break;
+      case TILE.CAVE_WALL:
+        drawRect(px, py, TILE_SIZE, TILE_SIZE, '#2a2020');
+        drawRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4, '#3a3030');
+        break;
+      case TILE.STONE:
+        drawRect(px, py, TILE_SIZE, TILE_SIZE, '#4a4040');
+        drawRect(px + 3, py + 4, 10, 8, '#6a6060');
+        break;
+      case TILE.DOOR:
+        drawRect(px, py, TILE_SIZE, TILE_SIZE, '#8b4513');
+        drawRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4, '#a05020');
+        ctx.fillStyle = '#ffd700';
+        ctx.fillRect(px + 10, py + 8, 3, 3);
+        break;
+    }
+  }
+
+  const SPRITES = {
+    player: {
+      down: [
+        [0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+        [0,0,0,1,2,2,2,2,2,2,1,0,0,0,0,0],
+        [0,0,0,1,2,3,3,3,3,2,1,0,0,0,0,0],
+        [0,0,0,1,2,3,4,4,3,2,1,0,0,0,0,0],
+        [0,0,0,1,2,2,2,2,2,2,1,0,0,0,0,0],
+        [0,0,0,0,1,2,2,2,2,1,0,0,0,0,0,0],
+        [0,0,0,0,1,5,5,5,5,1,0,0,0,0,0,0],
+        [0,0,0,1,5,5,5,5,5,5,1,0,0,0,0,0],
+        [0,0,1,5,5,6,5,5,6,5,5,1,0,0,0,0],
+        [0,0,1,5,5,5,5,5,5,5,5,1,0,0,0,0],
+        [0,0,1,5,5,5,5,5,5,5,5,1,0,0,0,0],
+        [0,0,0,1,5,5,5,5,5,5,1,0,0,0,0,0],
+        [0,0,0,1,5,1,1,1,1,5,1,0,0,0,0,0],
+        [0,0,0,1,5,1,0,0,1,5,1,0,0,0,0,0],
+        [0,0,0,1,5,1,0,0,1,5,1,0,0,0,0,0],
+        [0,0,0,1,1,1,0,0,1,1,1,0,0,0,0,0]
+      ]
+    },
+    slime: [
+      [0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+      [0,0,0,1,2,2,2,2,2,2,1,0,0,0,0,0],
+      [0,0,1,2,2,2,3,3,2,2,2,1,0,0,0,0],
+      [0,1,2,2,3,3,4,4,3,3,2,2,1,0,0,0],
+      [0,1,2,3,3,4,4,4,4,3,3,2,1,0,0,0],
+      [1,2,2,3,4,4,4,4,4,4,3,2,2,1,0,0],
+      [1,2,3,3,4,4,4,4,4,4,3,3,2,1,0,0],
+      [1,2,3,4,4,4,4,4,4,4,4,3,2,1,0,0],
+      [1,2,3,4,4,3,3,3,3,4,4,3,2,1,0,0],
+      [1,2,3,4,4,3,3,3,3,4,4,3,2,1,0,0],
+      [1,2,2,3,4,4,3,3,4,4,3,2,2,1,0,0],
+      [0,1,2,2,3,4,4,4,4,3,2,2,1,0,0,0],
+      [0,0,1,2,2,3,3,3,3,2,2,1,0,0,0,0],
+      [0,0,0,1,1,2,2,2,2,1,1,0,0,0,0,0],
+      [0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    ],
+    bat: [
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0],
+      [1,2,1,0,0,0,0,0,0,0,0,0,1,2,1,0],
+      [1,2,2,1,0,0,1,1,1,0,0,1,2,2,1,0],
+      [0,1,2,2,1,1,2,3,2,1,1,2,2,1,0,0],
+      [0,0,1,2,2,3,4,3,4,3,2,2,1,0,0,0],
+      [0,0,0,1,2,3,3,2,3,3,2,1,0,0,0,0],
+      [0,0,0,0,1,2,3,2,3,2,1,0,0,0,0,0],
+      [0,0,0,0,1,2,2,2,2,2,1,0,0,0,0,0],
+      [0,0,0,1,2,1,1,1,1,1,2,1,0,0,0,0],
+      [0,0,1,2,1,0,0,0,0,0,1,2,1,0,0,0],
+      [0,0,1,1,0,0,0,0,0,0,0,1,1,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    ],
+    mushroom: [
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0],
+      [0,0,0,1,1,2,2,3,2,2,1,1,0,0,0,0],
+      [0,0,1,2,2,3,3,2,3,3,2,2,1,0,0,0],
+      [0,1,2,2,3,3,2,2,2,3,3,2,2,1,0,0],
+      [0,1,2,3,3,2,2,3,2,2,3,3,2,1,0,0],
+      [1,2,2,3,2,2,3,3,3,2,2,3,2,2,1,0],
+      [1,2,2,3,3,2,2,3,2,2,3,3,2,2,1,0],
+      [0,1,2,2,3,3,3,2,3,3,3,2,2,1,0,0],
+      [0,0,1,1,2,2,2,2,2,2,2,1,1,0,0,0],
+      [0,0,0,0,1,4,4,4,4,4,1,0,0,0,0,0],
+      [0,0,0,0,1,4,5,5,5,4,1,0,0,0,0,0],
+      [0,0,0,0,1,4,5,5,5,4,1,0,0,0,0,0],
+      [0,0,0,0,1,4,5,5,5,4,1,0,0,0,0,0],
+      [0,0,0,0,1,4,4,4,4,4,1,0,0,0,0,0],
+      [0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0]
+    ],
+    skeleton: [
+      [0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+      [0,0,0,1,2,2,2,2,2,2,1,0,0,0,0,0],
+      [0,0,0,1,2,3,2,2,3,2,1,0,0,0,0,0],
+      [0,0,0,1,2,2,2,2,2,2,1,0,0,0,0,0],
+      [0,0,0,1,2,3,2,2,3,2,1,0,0,0,0,0],
+      [0,0,0,0,1,2,2,2,2,1,0,0,0,0,0,0],
+      [0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0],
+      [0,0,1,1,1,2,2,2,2,1,1,1,0,0,0,0],
+      [0,1,2,2,2,2,2,2,2,2,2,2,1,0,0,0],
+      [0,1,2,1,2,2,2,2,2,2,1,2,1,0,0,0],
+      [0,1,2,1,2,2,1,1,2,2,1,2,1,0,0,0],
+      [0,0,1,0,1,2,2,2,2,1,0,1,0,0,0,0],
+      [0,0,0,0,0,1,2,2,1,0,0,0,0,0,0,0],
+      [0,0,0,0,0,1,2,2,1,0,0,0,0,0,0,0],
+      [0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0],
+      [0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0]
+    ],
+    darkmage: [
+      [0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,1,2,2,1,0,0,0,0,0,0,0],
+      [0,0,0,0,1,2,2,2,2,1,0,0,0,0,0,0],
+      [0,0,0,1,2,2,2,2,2,2,1,0,0,0,0,0],
+      [0,0,1,2,3,2,4,4,2,3,2,1,0,0,0,0],
+      [0,0,1,2,2,4,4,4,4,2,2,1,0,0,0,0],
+      [0,0,0,1,2,2,4,4,2,2,1,0,0,0,0,0],
+      [0,0,0,0,1,2,2,2,2,1,0,0,0,0,0,0],
+      [0,0,0,1,5,5,5,5,5,5,1,0,0,0,0,0],
+      [0,0,1,5,5,6,5,5,6,5,5,1,0,0,0,0],
+      [0,1,5,5,6,5,5,5,5,6,5,5,1,0,0,0],
+      [0,1,5,5,5,5,5,5,5,5,5,5,1,0,0,0],
+      [0,1,5,5,5,5,6,6,5,5,5,5,1,0,0,0],
+      [0,0,1,5,5,5,5,5,5,5,5,1,0,0,0,0],
+      [0,0,0,1,5,5,5,5,5,5,1,0,0,0,0,0],
+      [0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0]
+    ],
+    boss: [
+      [0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0],
+      [0,0,1,2,2,2,2,2,2,2,2,1,0,0,0,0],
+      [0,1,2,3,3,2,2,2,2,3,3,2,1,0,0,0],
+      [0,1,2,3,4,3,2,2,3,4,3,2,1,0,0,0],
+      [1,2,2,3,4,4,3,3,4,4,3,2,2,1,0,0],
+      [1,2,2,3,4,5,5,5,5,4,3,2,2,1,0,0],
+      [1,2,3,3,5,5,5,5,5,5,3,3,2,1,0,0],
+      [1,2,3,4,5,6,6,6,6,5,4,3,2,1,0,0],
+      [1,2,3,4,5,6,7,7,6,5,4,3,2,1,0,0],
+      [1,2,3,4,5,6,7,7,6,5,4,3,2,1,0,0],
+      [0,1,2,3,5,5,6,6,5,5,3,2,1,0,0,0],
+      [0,1,2,3,4,5,5,5,5,4,3,2,1,0,0,0],
+      [0,0,1,2,3,3,4,4,3,3,2,1,0,0,0,0],
+      [0,0,0,1,2,2,3,3,2,2,1,0,0,0,0,0],
+      [0,0,0,1,2,1,2,2,1,2,1,0,0,0,0,0],
+      [0,0,0,1,1,0,0,0,0,1,1,0,0,0,0,0]
+    ]
+  };
+
+  const SPRITE_COLORS = {
+    player: ['transparent', COLORS.black, COLORS.skin, COLORS.brown, COLORS.black, COLORS.blue, COLORS.darkBlue],
+    slime: ['transparent', COLORS.black, COLORS.darkGreen, COLORS.green, COLORS.cyan],
+    bat: ['transparent', COLORS.black, COLORS.purple, COLORS.darkRed, COLORS.red],
+    mushroom: ['transparent', COLORS.black, COLORS.darkRed, COLORS.red, COLORS.skin, COLORS.brown],
+    skeleton: ['transparent', COLORS.black, COLORS.white, COLORS.black],
+    darkmage: ['transparent', COLORS.black, COLORS.purple, COLORS.skin, COLORS.red, COLORS.darkPurple, COLORS.gold],
+    boss: ['transparent', COLORS.black, COLORS.darkRed, COLORS.red, COLORS.orange, COLORS.gold, COLORS.white, COLORS.yellow]
+  };
+
+  function drawSprite(spriteData, x, y, palette, scale = 1, flipX = false) {
+    for (let row = 0; row < spriteData.length; row++) {
+      for (let col = 0; col < spriteData[row].length; col++) {
+        const colorIndex = spriteData[row][col];
+        if (colorIndex > 0 && palette[colorIndex]) {
+          const drawCol = flipX ? spriteData[row].length - 1 - col : col;
+          ctx.fillStyle = palette[colorIndex];
+          ctx.fillRect(
+            x + drawCol * scale,
+            y + row * scale,
+            scale,
+            scale
+          );
+        }
+      }
+    }
+  }
+
+  const ENEMY_DATA = {
+    slime: {
+      name: '史莱姆', maxHp: 25, attack: 5, defense: 2, speed: 3,
+      expReward: 10, goldReward: 5, aiType: 'basic',
+      sprite: SPRITES.slime, palette: SPRITE_COLORS.slime
+    },
+    bat: {
+      name: '蝙蝠', maxHp: 18, attack: 7, defense: 1, speed: 8,
+      expReward: 12, goldReward: 8, aiType: 'coward',
+      sprite: SPRITES.bat, palette: SPRITE_COLORS.bat
+    },
+    mushroom: {
+      name: '毒蘑菇', maxHp: 35, attack: 4, defense: 4, speed: 2,
+      expReward: 15, goldReward: 10, aiType: 'healer',
+      sprite: SPRITES.mushroom, palette: SPRITE_COLORS.mushroom
+    },
+    skeleton: {
+      name: '骷髅兵', maxHp: 45, attack: 10, defense: 5, speed: 5,
+      expReward: 25, goldReward: 18, aiType: 'charger',
+      sprite: SPRITES.skeleton, palette: SPRITE_COLORS.skeleton
+    },
+    darkmage: {
+      name: '黑暗法师', maxHp: 55, attack: 14, defense: 4, speed: 6,
+      expReward: 40, goldReward: 30, aiType: 'healer',
+      sprite: SPRITES.darkmage, palette: SPRITE_COLORS.darkmage
+    },
+    boss: {
+      name: '魔王', maxHp: 200, attack: 20, defense: 10, speed: 7,
+      expReward: 200, goldReward: 100, aiType: 'boss',
+      sprite: SPRITES.boss, palette: SPRITE_COLORS.boss
+    }
+  };
+
+  const ITEM_DATA = {
+    potion: {
+      id: 'potion', name: '治疗药水', type: 'consumable',
+      effect: { stat: 'hp', value: 50 },
+      description: '恢复50点生命值', price: 20
+    },
+    atkScroll: {
+      id: 'atkScroll', name: '力量卷轴', type: 'scroll',
+      effect: { stat: 'attack', value: 3 },
+      description: '永久提升3点攻击力', price: 50
+    },
+    defScroll: {
+      id: 'defScroll', name: '防御卷轴', type: 'scroll',
+      effect: { stat: 'defense', value: 3 },
+      description: '永久提升3点防御力', price: 50
+    },
+    spdPotion: {
+      id: 'spdPotion', name: '疾风药水', type: 'consumable',
+      effect: { stat: 'speed', value: 5, duration: 3 },
+      description: '战斗中提升5点速度（3回合）', price: 30
+    },
+    elixir: {
+      id: 'elixir', name: '万灵药', type: 'consumable',
+      effect: { stat: 'hp', value: 999 },
+      description: '完全恢复生命值', price: 100
+    }
+  };
+
+  const QUEST_DATA = {
+    main: {
+      id: 'main',
+      title: '击败魔王',
+      description: '深入地牢，击败统治这片土地的魔王。',
+      steps: [
+        { text: '与镇民对话，了解魔王的传说', completed: false },
+        { text: '穿越迷雾森林', completed: false },
+        { text: '探索黑暗洞穴', completed: false },
+        { text: '进入魔王地牢', completed: false },
+        { text: '击败魔王', completed: false }
+      ]
+    }
+  };
+
+  class AudioSystem {
+    constructor() {
+      this.ctx = null;
+      this.masterGain = null;
+      this.bgmGain = null;
+      this.sfxGain = null;
+      this.bgmOscillators = [];
+      this.currentBGM = null;
+      this.bgmStarted = false;
+    }
+
+    init() {
+      if (this.ctx) return;
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.value = 0.3;
+      this.masterGain.connect(this.ctx.destination);
+      this.bgmGain = this.ctx.createGain();
+      this.bgmGain.gain.value = 0.15;
+      this.bgmGain.connect(this.masterGain);
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.gain.value = 0.4;
+      this.sfxGain.connect(this.masterGain);
+    }
+
+    playNote(freq, duration, type = 'sine', gain = 0.3, target = null) {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      const t = target || this.sfxGain;
+      g.gain.setValueAtTime(0, this.ctx.currentTime);
+      g.gain.linearRampToValueAtTime(gain, this.ctx.currentTime + 0.01);
+      g.gain.linearRampToValueAtTime(0, this.ctx.currentTime + duration);
+      osc.connect(g);
+      g.connect(t);
+      osc.start();
+      osc.stop(this.ctx.currentTime + duration + 0.1);
+      return osc;
+    }
+
+    playNoise(duration, gain = 0.3, filterFreq = 1000) {
+      if (!this.ctx) return;
+      const bufferSize = this.ctx.sampleRate * duration;
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = filterFreq;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(gain, this.ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0, this.ctx.currentTime + duration);
+      noise.connect(filter);
+      filter.connect(g);
+      g.connect(this.sfxGain);
+      noise.start();
+    }
+
+    sfxAttack() {
+      this.playNote(200, 0.1, 'square', 0.4);
+      setTimeout(() => this.playNote(150, 0.15, 'sawtooth', 0.3), 50);
+      this.playNoise(0.1, 0.2, 2000);
+    }
+
+    sfxHit() {
+      this.playNote(80, 0.15, 'square', 0.5);
+      this.playNote(60, 0.2, 'sawtooth', 0.4);
+      this.playNoise(0.15, 0.3, 500);
+    }
+
+    sfxSkill() {
+      const notes = [440, 550, 660, 880];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playNote(freq, 0.15, 'sine', 0.3), i * 80);
+      });
+    }
+
+    sfxItem() {
+      this.playNote(523, 0.1, 'sine', 0.3);
+      setTimeout(() => this.playNote(659, 0.1, 'sine', 0.3), 100);
+      setTimeout(() => this.playNote(784, 0.15, 'sine', 0.3), 200);
+    }
+
+    sfxVictory() {
+      const melody = [523, 659, 784, 1047, 784, 1047];
+      melody.forEach((freq, i) => {
+        setTimeout(() => this.playNote(freq, 0.2, 'square', 0.3), i * 150);
+      });
+    }
+
+    sfxDefeat() {
+      const melody = [392, 349, 330, 294];
+      melody.forEach((freq, i) => {
+        setTimeout(() => this.playNote(freq, 0.3, 'sawtooth', 0.3), i * 200);
+      });
+    }
+
+    sfxLevelUp() {
+      const melody = [523, 659, 784, 880, 1047];
+      melody.forEach((freq, i) => {
+        setTimeout(() => this.playNote(freq, 0.15, 'sine', 0.35), i * 100);
+        setTimeout(() => this.playNote(freq * 2, 0.1, 'square', 0.2), i * 100 + 50);
+      });
+    }
+
+    sfxMenu() {
+      this.playNote(880, 0.05, 'square', 0.2);
+    }
+
+    startBGM(type) {
+      if (!this.ctx || this.currentBGM === type) return;
+      this.stopBGM();
+      this.currentBGM = type;
+
+      if (type === 'town') {
+        this.startTownBGM();
+      } else if (type === 'explore') {
+        this.startExploreBGM();
+      } else if (type === 'battle') {
+        this.startBattleBGM();
+      }
+    }
+
+    stopBGM() {
+      this.bgmOscillators.forEach(osc => {
+        try { osc.stop(); } catch (e) {}
+      });
+      this.bgmOscillators = [];
+      this.bgmStarted = false;
+    }
+
+    startTownBGM() {
+      const startTime = this.ctx.currentTime;
+      const melody = [262, 294, 330, 262, 262, 294, 330, 262, 330, 349, 392, 330, 349, 392];
+      const harmony = [196, 196, 220, 196, 196, 196, 220, 196, 220, 233, 262, 220, 233, 262];
+      const noteDur = 0.4;
+      const bassNotes = [131, 131, 131, 131, 147, 147, 147, 147, 165, 165, 131, 131, 147, 147];
+
+      const playLoop = () => {
+        if (this.currentBGM !== 'town') return;
+        const now = this.ctx.currentTime;
+        
+        melody.forEach((freq, i) => {
+          const osc = this.playNote(freq, noteDur * 0.9, 'sine', 0.08, this.bgmGain);
+          this.bgmOscillators.push(osc);
+        });
+        
+        harmony.forEach((freq, i) => {
+          const osc = this.playNote(freq, noteDur * 0.9, 'triangle', 0.05, this.bgmGain);
+          this.bgmOscillators.push(osc);
+        });
+        
+        bassNotes.forEach((freq, i) => {
+          const osc = this.playNote(freq, noteDur * 0.9, 'sawtooth', 0.04, this.bgmGain);
+          this.bgmOscillators.push(osc);
+        });
+
+        for (let i = 0; i < melody.length; i++) {
+          if (i % 2 === 0) {
+            setTimeout(() => this.playNoise(0.1, 0.03, 8000), i * noteDur * 1000);
+          }
+        }
+
+        setTimeout(playLoop, melody.length * noteDur * 1000);
+      };
+      playLoop();
+    }
+
+    startExploreBGM() {
+      const startTime = this.ctx.currentTime;
+      const melody = [294, 330, 392, 330, 294, 330, 392, 440, 392, 330, 294, 262];
+      const harmony = [196, 220, 262, 220, 196, 220, 262, 294, 262, 220, 196, 175];
+      const noteDur = 0.5;
+      const bassNotes = [98, 98, 110, 110, 98, 98, 131, 131, 110, 110, 98, 98];
+
+      const playLoop = () => {
+        if (this.currentBGM !== 'explore') return;
+        
+        melody.forEach((freq, i) => {
+          const osc = this.playNote(freq, noteDur * 0.95, 'sine', 0.06, this.bgmGain);
+          this.bgmOscillators.push(osc);
+        });
+        
+        harmony.forEach((freq, i) => {
+          const osc = this.playNote(freq, noteDur * 0.95, 'triangle', 0.04, this.bgmGain);
+          this.bgmOscillators.push(osc);
+        });
+        
+        bassNotes.forEach((freq, i) => {
+          const osc = this.playNote(freq, noteDur * 0.95, 'sawtooth', 0.03, this.bgmGain);
+          this.bgmOscillators.push(osc);
+        });
+
+        for (let i = 0; i < melody.length; i++) {
+          setTimeout(() => this.playNoise(0.08, 0.02, 6000), i * noteDur * 1000);
+        }
+
+        setTimeout(playLoop, melody.length * noteDur * 1000);
+      };
+      playLoop();
+    }
+
+    startBattleBGM() {
+      const melody = [392, 440, 494, 523, 494, 440, 392, 349, 392, 440, 494, 523, 587, 523, 494, 440];
+      const harmony = [262, 294, 330, 349, 330, 294, 262, 233, 262, 294, 330, 349, 392, 349, 330, 294];
+      const bassNotes = [131, 147, 165, 175, 165, 147, 131, 117, 131, 147, 165, 175, 196, 175, 165, 147];
+      const noteDur = 0.25;
+
+      const playLoop = () => {
+        if (this.currentBGM !== 'battle') return;
+        
+        melody.forEach((freq, i) => {
+          const osc = this.playNote(freq, noteDur * 0.9, 'square', 0.08, this.bgmGain);
+          this.bgmOscillators.push(osc);
+        });
+        
+        harmony.forEach((freq, i) => {
+          const osc = this.playNote(freq, noteDur * 0.9, 'sawtooth', 0.05, this.bgmGain);
+          this.bgmOscillators.push(osc);
+        });
+        
+        bassNotes.forEach((freq, i) => {
+          const osc = this.playNote(freq, noteDur * 0.9, 'triangle', 0.06, this.bgmGain);
+          this.bgmOscillators.push(osc);
+        });
+
+        for (let i = 0; i < melody.length; i++) {
+          setTimeout(() => this.playNoise(0.1, 0.04, 4000), i * noteDur * 1000);
+          if (i % 4 === 0) {
+            setTimeout(() => this.playNoise(0.2, 0.06, 2000), i * noteDur * 1000);
+          }
+        }
+
+        setTimeout(playLoop, melody.length * noteDur * 1000);
+      };
+      playLoop();
+    }
+  }
+
+  const audio = new AudioSystem();
+
+  class Game {
+    constructor() {
+      this.gameState = 'title';
+      this.previousState = 'title';
+      this.menuSelection = 0;
+      this.battleSelection = 0;
+      this.inventorySelection = 0;
+      this.itemUseSelection = 0;
+      this.dialogIndex = 0;
+      this.currentDialog = [];
+      this.currentNPC = null;
+      this.questLog = [];
+      this.battleLog = [];
+      this.totalDamageDealt = 0;
+      this.battleTurnCount = 0;
+      this.battleStartHp = 0;
+      this.finalEvaluation = null;
+      this.gameStartTime = Date.now();
+      this.totalBattlesWon = 0;
+      this.totalEnemiesKilled = 0;
+      
+      this.player = {
+        name: '勇者', level: 1, hp: 100, maxHp: 100,
+        attack: 10, defense: 5, speed: 5, exp: 0, expToNext: 30,
+        gold: 50, x: 15, y: 15, direction: 'down',
+        animFrame: 0, animTimer: 0,
+        buffs: []
+      };
+
+      this.inventory = [
+        { itemId: 'potion', quantity: 3 },
+        { itemId: 'atkScroll', quantity: 1 },
+        { itemId: 'defScroll', quantity: 1 },
+        { itemId: 'spdPotion', quantity: 2 },
+        { itemId: 'elixir', quantity: 1 }
+      ];
+
+      this.quests = JSON.parse(JSON.stringify(QUEST_DATA));
+      this.currentMap = null;
+      this.currentMapId = 'town';
+      this.cameraX = 0;
+      this.cameraY = 0;
+      this.enemies = [];
+      this.battleEnemy = null;
+      this.battleState = null;
+      this.battleAnim = null;
+      this.battleMessage = '';
+      this.battleMessageTimer = 0;
+      this.damageNumbers = [];
+      this.transitionAlpha = 0;
+      this.transitionTarget = null;
+      this.transitionTargetX = 0;
+      this.transitionTargetY = 0;
+      this.isTransitioning = false;
+
+      this.keys = {};
+      this.keyBuffer = {};
+      this.lastMoveTime = 0;
+      this.moveCooldown = 150;
+
+      this.initMaps();
+      this.initControls();
+    }
+
+    initMaps() {
+      Object.keys(MAPS).forEach(mapId => {
+        generateMap(mapId);
+      });
+      this.currentMap = MAPS.town;
+    }
+
+    initControls() {
+      document.addEventListener('keydown', (e) => {
+        if (!audio.ctx) audio.init();
+        
+        this.keys[e.code] = true;
+        this.keyBuffer[e.code] = true;
+        
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Enter', 'Escape'].includes(e.code)) {
+          e.preventDefault();
+        }
+      });
+
+      document.addEventListener('keyup', (e) => {
+        this.keys[e.code] = false;
+      });
+    }
+
+    consumeKey(code) {
+      if (this.keyBuffer[code]) {
+        this.keyBuffer[code] = false;
+        return true;
+      }
+      return false;
+    }
+
+    update(deltaTime) {
+      if (this.isTransitioning) {
+        this.updateTransition(deltaTime);
+        return;
+      }
+
+      switch (this.gameState) {
+        case 'title':
+          this.updateTitle();
+          break;
+        case 'explore':
+          this.updateExplore(deltaTime);
+          break;
+        case 'battle':
+          this.updateBattle(deltaTime);
+          break;
+        case 'menu':
+          this.updateMenu();
+          break;
+        case 'inventory':
+          this.updateInventory();
+          break;
+        case 'status':
+          this.updateStatus();
+          break;
+        case 'quest':
+          this.updateQuest();
+          break;
+        case 'log':
+          this.updateLog();
+          break;
+        case 'dialog':
+          this.updateDialog();
+          break;
+        case 'victory':
+          this.updateVictory();
+          break;
+        case 'gameover':
+          this.updateGameOver();
+          break;
+        case 'victoryscreen':
+          this.updateVictoryScreen();
+          break;
+      }
+
+      this.updateDamageNumbers(deltaTime);
+    }
+
+    updateTitle() {
+      if (this.consumeKey('Enter') || this.consumeKey('Space')) {
+        audio.sfxMenu();
+        this.gameState = 'explore';
+        this.addQuestLog('冒险开始了！');
+        audio.startBGM(this.currentMap.bgm);
+      }
+    }
+
+    updateExplore(deltaTime) {
+      const now = Date.now();
+      
+      if (this.consumeKey('Escape')) {
+        audio.sfxMenu();
+        this.previousState = 'explore';
+        this.gameState = 'menu';
+        this.menuSelection = 0;
+        return;
+      }
+
+      if (this.consumeKey('KeyI')) {
+        audio.sfxMenu();
+        this.previousState = 'explore';
+        this.gameState = 'inventory';
+        this.inventorySelection = 0;
+        return;
+      }
+
+      if (this.consumeKey('KeyQ')) {
+        audio.sfxMenu();
+        this.previousState = 'explore';
+        this.gameState = 'quest';
+        return;
+      }
+
+      if (now - this.lastMoveTime < this.moveCooldown) return;
+
+      let dx = 0, dy = 0;
+      if (this.keys['ArrowUp'] || this.keys['KeyW']) { dy = -1; this.player.direction = 'up'; }
+      else if (this.keys['ArrowDown'] || this.keys['KeyS']) { dy = 1; this.player.direction = 'down'; }
+      else if (this.keys['ArrowLeft'] || this.keys['KeyA']) { dx = -1; this.player.direction = 'left'; }
+      else if (this.keys['ArrowRight'] || this.keys['KeyD']) { dx = 1; this.player.direction = 'right'; }
+
+      if (dx !== 0 || dy !== 0) {
+        const newX = this.player.x + dx;
+        const newY = this.player.y + dy;
+
+        if (this.canMoveTo(newX, newY)) {
+          this.player.x = newX;
+          this.player.y = newY;
+          this.player.animTimer += deltaTime;
+          if (this.player.animTimer > 100) {
+            this.player.animFrame = (this.player.animFrame + 1) % 2;
+            this.player.animTimer = 0;
+          }
+          this.lastMoveTime = now;
+          this.checkEncounters();
+          this.checkExits();
+          this.checkNPCs();
+        }
+      }
+
+      if (this.consumeKey('Enter') || this.consumeKey('Space')) {
+        this.interact();
+      }
+
+      this.updateCamera();
+    }
+
+    canMoveTo(x, y) {
+      if (x < 0 || y < 0 || x >= this.currentMap.width || y >= this.currentMap.height) return false;
+      const tile = this.currentMap.tiles[y][x];
+      if (tile === TILE.WALL || tile === TILE.TREE || tile === TILE.CAVE_WALL || tile === TILE.STONE) return false;
+      
+      for (const enemy of this.currentMap.enemies) {
+        if (enemy.x === x && enemy.y === y) return false;
+      }
+      for (const npc of this.currentMap.npcs) {
+        if (npc.x === x && npc.y === y) return false;
+      }
+      return true;
+    }
+
+    checkEncounters() {
+      const enemyIndex = this.currentMap.enemies.findIndex(e => e.x === this.player.x && e.y === this.player.y);
+      if (enemyIndex !== -1) {
+        const enemy = this.currentMap.enemies[enemyIndex];
+        this.startBattle(enemy, enemyIndex);
+      }
+    }
+
+    checkExits() {
+      const exit = this.currentMap.exits.find(e => e.x === this.player.x && e.y === this.player.y);
+      if (exit) {
+        this.startTransition(exit.targetMap, exit.targetX, exit.targetY);
+      }
+    }
+
+    checkNPCs() {
+      const npc = this.currentMap.npcs.find(n => n.x === this.player.x && n.y === this.player.y);
+    }
+
+    interact() {
+      let checkX = this.player.x;
+      let checkY = this.player.y;
+      
+      switch (this.player.direction) {
+        case 'up': checkY--; break;
+        case 'down': checkY++; break;
+        case 'left': checkX--; break;
+        case 'right': checkX++; break;
+      }
+
+      const npc = this.currentMap.npcs.find(n => n.x === checkX && n.y === checkY);
+      if (npc) {
+        audio.sfxMenu();
+        this.currentNPC = npc;
+        this.currentDialog = this.breakText(npc.dialog, 35);
+        this.dialogIndex = 0;
+        this.gameState = 'dialog';
+        
+        if (!this.quests.main.steps[0].completed) {
+          this.quests.main.steps[0].completed = true;
+          this.addQuestLog('已了解魔王的传说');
+        }
+        return;
+      }
+
+      const enemyIndex = this.currentMap.enemies.findIndex(e => e.x === checkX && e.y === checkY);
+      if (enemyIndex !== -1) {
+        const enemy = this.currentMap.enemies[enemyIndex];
+        this.startBattle(enemy, enemyIndex);
+      }
+    }
+
+    breakText(text, maxLength) {
+      const lines = [];
+      let currentLine = '';
+      const words = text.split('');
+      for (let i = 0; i < words.length; i++) {
+        if (currentLine.length >= maxLength) {
+          lines.push(currentLine);
+          currentLine = words[i];
+        } else {
+          currentLine += words[i];
+        }
+      }
+      if (currentLine) lines.push(currentLine);
+      return lines;
+    }
+
+    updateCamera() {
+      const targetX = this.player.x * TILE_SIZE - GAME_WIDTH / 2 + TILE_SIZE / 2;
+      const targetY = this.player.y * TILE_SIZE - GAME_HEIGHT / 2 + TILE_SIZE / 2;
+      this.cameraX = Math.max(0, Math.min(targetX, this.currentMap.width * TILE_SIZE - GAME_WIDTH));
+      this.cameraY = Math.max(0, Math.min(targetY, this.currentMap.height * TILE_SIZE - GAME_HEIGHT));
+    }
+
+    startTransition(mapId, targetX, targetY) {
+      this.isTransitioning = true;
+      this.transitionTarget = mapId;
+      this.transitionTargetX = targetX;
+      this.transitionTargetY = targetY;
+      this.transitionAlpha = 0;
+    }
+
+    updateTransition(deltaTime) {
+      if (this.transitionAlpha < 1) {
+        this.transitionAlpha = Math.min(1, this.transitionAlpha + deltaTime / 300);
+        if (this.transitionAlpha >= 1) {
+          this.currentMapId = this.transitionTarget;
+          this.currentMap = MAPS[this.transitionTarget];
+          this.player.x = this.transitionTargetX;
+          this.player.y = this.transitionTargetY;
+          this.updateCamera();
+          
+          this.updateQuestProgress();
+          
+          audio.startBGM(this.currentMap.bgm);
+        }
+      } else {
+        this.transitionAlpha = Math.max(0, this.transitionAlpha - deltaTime / 300);
+        if (this.transitionAlpha <= 0) {
+          this.isTransitioning = false;
+        }
+      }
+    }
+
+    updateQuestProgress() {
+      if (this.currentMapId === 'forest' && !this.quests.main.steps[1].completed) {
+        this.quests.main.steps[1].completed = true;
+        this.addQuestLog('已穿越迷雾森林');
+      }
+      if (this.currentMapId === 'cave' && !this.quests.main.steps[2].completed) {
+        this.quests.main.steps[2].completed = true;
+        this.addQuestLog('已探索黑暗洞穴');
+      }
+      if (this.currentMapId === 'dungeon' && !this.quests.main.steps[3].completed) {
+        this.quests.main.steps[3].completed = true;
+        this.addQuestLog('已进入魔王地牢');
+      }
+    }
+
+    startBattle(enemyData, enemyIndex) {
+      const enemyTemplate = ENEMY_DATA[enemyData.enemyId];
+      this.battleEnemy = {
+        ...enemyTemplate,
+        hp: enemyTemplate.maxHp,
+        charge: 0,
+        index: enemyIndex
+      };
+      
+      this.battleState = 'playerTurn';
+      this.battleSelection = 0;
+      this.battleTurnCount = 0;
+      this.totalDamageDealt = 0;
+      this.battleStartHp = this.player.hp;
+      this.battleLog = [];
+      this.damageNumbers = [];
+      
+      this.addBattleLog(`遭遇了 ${this.battleEnemy.name}！`);
+      this.gameState = 'battle';
+      audio.startBGM('battle');
+    }
+
+    updateBattle(deltaTime) {
+      this.battleMessageTimer = Math.max(0, this.battleMessageTimer - deltaTime);
+
+      if (this.battleMessageTimer > 0) return;
+
+      if (this.battleState === 'playerTurn') {
+        if (this.consumeKey('ArrowUp')) {
+          audio.sfxMenu();
+          this.battleSelection = Math.max(0, this.battleSelection - 1);
+        }
+        if (this.consumeKey('ArrowDown')) {
+          audio.sfxMenu();
+          this.battleSelection = Math.min(3, this.battleSelection + 1);
+        }
+        if (this.consumeKey('Digit1')) { this.battleSelection = 0; this.executeBattleCommand(); }
+        if (this.consumeKey('Digit2')) { this.battleSelection = 1; this.executeBattleCommand(); }
+        if (this.consumeKey('Digit3')) { this.battleSelection = 2; this.executeBattleCommand(); }
+        if (this.consumeKey('Digit4')) { this.battleSelection = 3; this.executeBattleCommand(); }
+        
+        if (this.consumeKey('Enter') || this.consumeKey('Space')) {
+          this.executeBattleCommand();
+        }
+      } else if (this.battleState === 'enemyTurn') {
+        setTimeout(() => this.enemyAction(), 500);
+        this.battleState = 'enemyActing';
+      }
+    }
+
+    executeBattleCommand() {
+      const commands = ['attack', 'skill', 'item', 'flee'];
+      const command = commands[this.battleSelection];
+      
+      switch (command) {
+        case 'attack':
+          this.playerAttack();
+          break;
+        case 'skill':
+          this.playerSkill();
+          break;
+        case 'item':
+          this.itemUseSelection = 0;
+          this.battleState = 'selectItem';
+          break;
+        case 'flee':
+          this.playerFlee();
+          break;
+      }
+    }
+
+    playerAttack() {
+      audio.sfxAttack();
+      const baseDamage = Math.max(1, this.player.attack - this.battleEnemy.defense + Math.floor(Math.random() * 5));
+      const isCritical = Math.random() < 0.1;
+      const damage = isCritical ? Math.floor(baseDamage * 1.5) : baseDamage;
+      
+      this.battleEnemy.hp -= damage;
+      this.totalDamageDealt += damage;
+      this.addDamageNumber(damage, 320, 100, isCritical);
+      this.addBattleLog(`${this.player.name} 攻击！造成 ${damage} 点伤害${isCritical ? ' 暴击！' : ''}`);
+      
+      this.battleAnim = { type: 'playerAttack', timer: 300 };
+      this.battleMessageTimer = 800;
+      
+      setTimeout(() => {
+        if (this.battleEnemy.hp <= 0) {
+          this.battleVictory();
+        } else {
+          this.battleTurnCount++;
+          this.battleState = 'enemyTurn';
+        }
+      }, 500);
+    }
+
+    playerSkill() {
+      if (this.player.hp < 20) {
+        this.addBattleLog('HP不足，无法使用技能！');
+        this.battleMessageTimer = 1000;
+        return;
+      }
+      
+      audio.sfxSkill();
+      this.player.hp -= 10;
+      const baseDamage = Math.max(1, Math.floor(this.player.attack * 1.8) - this.battleEnemy.defense + Math.floor(Math.random() * 10));
+      this.battleEnemy.hp -= baseDamage;
+      this.totalDamageDealt += baseDamage;
+      this.addDamageNumber(baseDamage, 320, 100, true);
+      this.addBattleLog(`${this.player.name} 使用了火焰斩！造成 ${baseDamage} 点伤害！`);
+      
+      this.battleMessageTimer = 1000;
+      
+      setTimeout(() => {
+        if (this.battleEnemy.hp <= 0) {
+          this.battleVictory();
+        } else {
+          this.battleTurnCount++;
+          this.battleState = 'enemyTurn';
+        }
+      }, 600);
+    }
+
+    playerFlee() {
+      const fleeChance = 0.4 + (this.player.speed - this.battleEnemy.speed) * 0.05;
+      if (Math.random() < fleeChance) {
+        this.addBattleLog('成功逃跑了！');
+        audio.sfxItem();
+        this.battleMessageTimer = 1000;
+        setTimeout(() => {
+          this.gameState = 'explore';
+          this.battleEnemy = null;
+          audio.startBGM(this.currentMap.bgm);
+        }, 1000);
+      } else {
+        this.addBattleLog('逃跑失败！');
+        this.battleMessageTimer = 800;
+        setTimeout(() => {
+          this.battleTurnCount++;
+          this.battleState = 'enemyTurn';
+        }, 500);
+      }
+    }
+
+    enemyAction() {
+      if (!this.battleEnemy || this.battleEnemy.hp <= 0) return;
+      
+      const aiType = this.battleEnemy.aiType;
+      let action = { type: 'attack' };
+      
+      switch (aiType) {
+        case 'healer':
+          if (this.battleEnemy.hp < this.battleEnemy.maxHp * 0.5 && Math.random() < 0.7) {
+            action = { type: 'heal', value: 20 };
+          }
+          break;
+        case 'charger':
+          this.battleEnemy.charge = (this.battleEnemy.charge || 0) + 1;
+          if (this.battleEnemy.charge >= 2) {
+            this.battleEnemy.charge = 0;
+            action = { type: 'critical', multiplier: 2.5 };
+          } else {
+            action = { type: 'charge' };
+          }
+          break;
+        case 'coward':
+          if (this.battleEnemy.hp < this.battleEnemy.maxHp * 0.3 && Math.random() < 0.5) {
+            action = { type: 'flee' };
+          }
+          break;
+        case 'boss':
+          const bossRand = Math.random();
+          if (bossRand < 0.3 && this.battleEnemy.hp < this.battleEnemy.maxHp * 0.5) {
+            action = { type: 'heal', value: 30 };
+          } else if (bossRand < 0.6) {
+            action = { type: 'critical', multiplier: 2 };
+          }
+          break;
+      }
+
+      this.executeEnemyAction(action);
+    }
+
+    executeEnemyAction(action) {
+      switch (action.type) {
+        case 'attack':
+          audio.sfxAttack();
+          const atkDamage = Math.max(1, this.battleEnemy.attack - this.player.defense + Math.floor(Math.random() * 5));
+          this.player.hp -= atkDamage;
+          this.addDamageNumber(atkDamage, 100, 100, false);
+          this.addBattleLog(`${this.battleEnemy.name} 攻击！造成 ${atkDamage} 点伤害`);
+          this.battleMessageTimer = 800;
+          break;
+          
+        case 'critical':
+          audio.sfxAttack();
+          const critDamage = Math.floor(Math.max(1, this.battleEnemy.attack * action.multiplier - this.player.defense + Math.floor(Math.random() * 10)));
+          this.player.hp -= critDamage;
+          this.addDamageNumber(critDamage, 100, 100, true);
+          this.addBattleLog(`${this.battleEnemy.name} 发动暴击！造成 ${critDamage} 点伤害！`);
+          this.battleMessageTimer = 1000;
+          break;
+          
+        case 'heal':
+          audio.sfxItem();
+          const healAmount = Math.min(action.value, this.battleEnemy.maxHp - this.battleEnemy.hp);
+          this.battleEnemy.hp += healAmount;
+          this.addBattleLog(`${this.battleEnemy.name} 恢复了 ${healAmount} 点HP！`);
+          this.battleMessageTimer = 800;
+          break;
+          
+        case 'charge':
+          this.addBattleLog(`${this.battleEnemy.name} 正在蓄力...`);
+          this.battleMessageTimer = 800;
+          break;
+          
+        case 'flee':
+          this.addBattleLog(`${this.battleEnemy.name} 逃跑了！`);
+          audio.sfxItem();
+          this.battleMessageTimer = 1000;
+          setTimeout(() => {
+            this.currentMap.enemies.splice(this.battleEnemy.index, 1);
+            this.gameState = 'explore';
+            this.battleEnemy = null;
+            audio.startBGM(this.currentMap.bgm);
+          }, 1000);
+          return;
+      }
+
+      setTimeout(() => {
+        if (this.player.hp <= 0) {
+          this.player.hp = 0;
+          this.battleDefeat();
+        } else {
+          this.battleState = 'playerTurn';
+          this.battleSelection = 0;
+        }
+      }, 600);
+    }
+
+    battleVictory() {
+      audio.sfxVictory();
+      this.totalBattlesWon++;
+      this.totalEnemiesKilled++;
+      
+      const expGain = this.battleEnemy.expReward;
+      const goldGain = this.battleEnemy.goldReward;
+      
+      this.player.exp += expGain;
+      this.player.gold += goldGain;
+      
+      this.addBattleLog(`获得 ${expGain} 经验值和 ${goldGain} 金币！`);
+      
+      if (this.battleEnemy.name === '魔王') {
+        this.quests.main.steps[4].completed = true;
+        this.addQuestLog('已击败魔王！');
+        setTimeout(() => {
+          this.calculateFinalEvaluation();
+          this.gameState = 'victoryscreen';
+        }, 2000);
+        return;
+      }
+      
+      while (this.player.exp >= this.player.expToNext) {
+        this.levelUp();
+      }
+      
+      this.currentMap.enemies.splice(this.battleEnemy.index, 1);
+      
+      setTimeout(() => {
+        this.showBattleEvaluation();
+      }, 1500);
+    }
+
+    battleDefeat() {
+      audio.sfxDefeat();
+      this.addBattleLog('你被击败了...');
+      
+      const expLoss = Math.floor(this.player.exp * 0.2);
+      const goldLoss = Math.floor(this.player.gold * 0.3);
+      this.player.exp = Math.max(0, this.player.exp - expLoss);
+      this.player.gold = Math.max(0, this.player.gold - goldLoss);
+      
+      this.addQuestLog(`战败了！损失 ${expLoss} 经验和 ${goldLoss} 金币`);
+      
+      setTimeout(() => {
+        this.gameState = 'gameover';
+      }, 2000);
+    }
+
+    levelUp() {
+      audio.sfxLevelUp();
+      this.player.exp -= this.player.expToNext;
+      this.player.level++;
+      this.player.maxHp += 20;
+      this.player.hp = this.player.maxHp;
+      this.player.attack += 3;
+      this.player.defense += 2;
+      this.player.speed += 1;
+      this.player.expToNext = Math.floor(this.player.expToNext * 1.5);
+      
+      this.addBattleLog(`升级了！等级提升到 ${this.player.level}！`);
+      this.addQuestLog(`升级到 Lv.${this.player.level}！`);
+    }
+
+    showBattleEvaluation() {
+      const hpPercent = this.player.hp / this.player.maxHp;
+      const evaluation = this.evaluateBattle(hpPercent, this.battleTurnCount, this.totalDamageDealt);
+      this.finalEvaluation = evaluation;
+      this.gameState = 'victory';
+    }
+
+    evaluateBattle(hpPercent, turnCount, totalDamage) {
+      let score = 0;
+      score += hpPercent * 50;
+      score += Math.max(0, 10 - turnCount) * 3;
+      score += Math.min(totalDamage / 500, 20);
+      
+      let grade, stars;
+      if (score >= 90) { grade = 'S'; stars = 5; }
+      else if (score >= 80) { grade = 'A'; stars = 4; }
+      else if (score >= 70) { grade = 'B'; stars = 3; }
+      else if (score >= 60) { grade = 'C'; stars = 2; }
+      else { grade = 'D'; stars = 1; }
+      
+      return { score: Math.floor(score), grade, stars, hpPercent: Math.floor(hpPercent * 100), turnCount, totalDamage };
+    }
+
+    calculateFinalEvaluation() {
+      const totalPlayTime = Math.floor((Date.now() - this.gameStartTime) / 1000);
+      const minutes = Math.floor(totalPlayTime / 60);
+      const seconds = totalPlayTime % 60;
+      
+      this.finalEvaluation = {
+        totalBattles: this.totalBattlesWon,
+        totalEnemies: this.totalEnemiesKilled,
+        finalLevel: this.player.level,
+        totalGold: this.player.gold,
+        playTime: `${minutes}:${seconds.toString().padStart(2, '0')}`,
+        finalGrade: this.player.level >= 5 ? 'S' : this.player.level >= 3 ? 'A' : 'B'
+      };
+    }
+
+    addDamageNumber(value, x, y, isCritical) {
+      this.damageNumbers.push({
+        value, x, y,
+        vy: -2,
+        alpha: 1,
+        isCritical,
+        timer: 1000
+      });
+    }
+
+    updateDamageNumbers(deltaTime) {
+      for (let i = this.damageNumbers.length - 1; i >= 0; i--) {
+        const dn = this.damageNumbers[i];
+        dn.y += dn.vy;
+        dn.timer -= deltaTime;
+        dn.alpha = Math.max(0, dn.timer / 1000);
+        if (dn.timer <= 0) {
+          this.damageNumbers.splice(i, 1);
+        }
+      }
+    }
+
+    addBattleLog(message) {
+      this.battleLog.push(message);
+      if (this.battleLog.length > 4) {
+        this.battleLog.shift();
+      }
+    }
+
+    addQuestLog(message) {
+      this.questLog.unshift({ text: message, time: Date.now() });
+      if (this.questLog.length > 20) {
+        this.questLog.pop();
+      }
+    }
+
+    updateVictory() {
+      if (this.consumeKey('Enter') || this.consumeKey('Space')) {
+        audio.sfxMenu();
+        this.gameState = 'explore';
+        this.battleEnemy = null;
+        audio.startBGM(this.currentMap.bgm);
+      }
+    }
+
+    updateVictoryScreen() {
+      if (this.consumeKey('Enter') || this.consumeKey('Space')) {
+        audio.sfxMenu();
+        this.gameState = 'title';
+      }
+    }
+
+    updateGameOver() {
+      if (this.consumeKey('Enter') || this.consumeKey('Space')) {
+        audio.sfxMenu();
+        this.player.hp = Math.floor(this.player.maxHp * 0.5);
+        this.player.x = MAPS.town.spawnX;
+        this.player.y = MAPS.town.spawnY;
+        this.currentMap = MAPS.town;
+        this.currentMapId = 'town';
+        this.updateCamera();
+        this.gameState = 'explore';
+        audio.startBGM('town');
+      }
+    }
+
+    updateMenu() {
+      const menuItems = ['背包', '状态', '任务', '日志', '返回'];
+      
+      if (this.consumeKey('ArrowUp')) {
+        audio.sfxMenu();
+        this.menuSelection = Math.max(0, this.menuSelection - 1);
+      }
+      if (this.consumeKey('ArrowDown')) {
+        audio.sfxMenu();
+        this.menuSelection = Math.min(menuItems.length - 1, this.menuSelection + 1);
+      }
+      if (this.consumeKey('Escape')) {
+        audio.sfxMenu();
+        this.gameState = this.previousState;
+        return;
+      }
+      if (this.consumeKey('Enter') || this.consumeKey('Space')) {
+        audio.sfxMenu();
+        switch (this.menuSelection) {
+          case 0: this.gameState = 'inventory'; this.inventorySelection = 0; break;
+          case 1: this.gameState = 'status'; break;
+          case 2: this.gameState = 'quest'; break;
+          case 3: this.gameState = 'log'; break;
+          case 4: this.gameState = this.previousState; break;
+        }
+      }
+    }
+
+    updateInventory() {
+      if (this.consumeKey('Escape')) {
+        audio.sfxMenu();
+        if (this.battleState === 'selectItem') {
+          this.battleState = 'playerTurn';
+        } else {
+          this.gameState = this.previousState;
+        }
+        return;
+      }
+      
+      if (this.consumeKey('ArrowUp')) {
+        audio.sfxMenu();
+        this.inventorySelection = Math.max(0, this.inventorySelection - 1);
+      }
+      if (this.consumeKey('ArrowDown')) {
+        audio.sfxMenu();
+        this.inventorySelection = Math.min(this.inventory.length - 1, this.inventorySelection + 1);
+      }
+      
+      if (this.consumeKey('Enter') || this.consumeKey('Space')) {
+        const itemSlot = this.inventory[this.inventorySelection];
+        if (itemSlot && itemSlot.quantity > 0) {
+          this.useItem(itemSlot);
+        }
+      }
+    }
+
+    useItem(itemSlot) {
+      const item = ITEM_DATA[itemSlot.itemId];
+      if (!item) return;
+      
+      audio.sfxItem();
+      
+      if (item.effect.stat === 'hp') {
+        const healAmount = Math.min(item.effect.value, this.player.maxHp - this.player.hp);
+        this.player.hp += healAmount;
+        this.addQuestLog(`使用了 ${item.name}，恢复了 ${healAmount} HP`);
+        if (this.gameState === 'battle') {
+          this.addBattleLog(`使用了 ${item.name}，恢复了 ${healAmount} HP`);
+        }
+      } else if (item.effect.stat === 'attack') {
+        this.player.attack += item.effect.value;
+        this.addQuestLog(`使用了 ${item.name}，攻击力提升 ${item.effect.value}`);
+      } else if (item.effect.stat === 'defense') {
+        this.player.defense += item.effect.value;
+        this.addQuestLog(`使用了 ${item.name}，防御力提升 ${item.effect.value}`);
+      } else if (item.effect.stat === 'speed') {
+        this.player.speed += item.effect.value;
+        this.addQuestLog(`使用了 ${item.name}，速度提升 ${item.effect.value}`);
+      }
+      
+      itemSlot.quantity--;
+      if (itemSlot.quantity <= 0) {
+        const index = this.inventory.indexOf(itemSlot);
+        if (index !== -1) {
+          this.inventory.splice(index, 1);
+          if (this.inventorySelection >= this.inventory.length) {
+            this.inventorySelection = Math.max(0, this.inventory.length - 1);
+          }
+        }
+      }
+      
+      if (this.gameState === 'battle' && this.battleState === 'selectItem') {
+        this.battleMessageTimer = 800;
+        setTimeout(() => {
+          if (this.battleEnemy && this.battleEnemy.hp > 0) {
+            this.battleTurnCount++;
+            this.battleState = 'enemyTurn';
+          }
+        }, 500);
+      }
+    }
+
+    updateStatus() {
+      if (this.consumeKey('Escape') || this.consumeKey('Enter') || this.consumeKey('Space')) {
+        audio.sfxMenu();
+        this.gameState = this.previousState;
+      }
+    }
+
+    updateQuest() {
+      if (this.consumeKey('Escape') || this.consumeKey('Enter') || this.consumeKey('Space')) {
+        audio.sfxMenu();
+        this.gameState = this.previousState;
+      }
+    }
+
+    updateLog() {
+      if (this.consumeKey('Escape') || this.consumeKey('Enter') || this.consumeKey('Space')) {
+        audio.sfxMenu();
+        this.gameState = this.previousState;
+      }
+    }
+
+    updateDialog() {
+      if (this.consumeKey('Enter') || this.consumeKey('Space')) {
+        audio.sfxMenu();
+        this.dialogIndex++;
+        if (this.dialogIndex >= this.currentDialog.length) {
+          this.gameState = 'explore';
+          this.currentNPC = null;
+        }
+      }
+      if (this.consumeKey('Escape')) {
+        audio.sfxMenu();
+        this.gameState = 'explore';
+        this.currentNPC = null;
+      }
+    }
+
+    render() {
+      ctx.fillStyle = COLORS.black;
+      ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+      switch (this.gameState) {
+        case 'title':
+          this.renderTitle();
+          break;
+        case 'explore':
+        case 'dialog':
+        case 'menu':
+        case 'inventory':
+        case 'status':
+        case 'quest':
+        case 'log':
+          this.renderExplore();
+          break;
+        case 'battle':
+          this.renderBattle();
+          break;
+        case 'victory':
+          this.renderBattle();
+          this.renderVictory();
+          break;
+        case 'gameover':
+          this.renderBattle();
+          this.renderGameOver();
+          break;
+        case 'victoryscreen':
+          this.renderVictoryScreen();
+          break;
+      }
+
+      if (this.isTransitioning) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${this.transitionAlpha})`;
+        ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+      }
+    }
+
+    renderTitle() {
+      drawRect(0, 0, GAME_WIDTH, GAME_HEIGHT, '#1a0a2e');
+      
+      const title = 'PIXEL DUNGEON';
+      const subtitle = '像素地牢';
+      
+      for (let i = 0; i < title.length; i++) {
+        const color = i % 2 === 0 ? COLORS.yellow : COLORS.gold;
+        drawText(title[i], 80 + i * 24, 80, color, 3);
+      }
+      
+      drawText(subtitle, 160, 130, COLORS.white, 2);
+      
+      drawText('PRESS ENTER TO START', 120, 200, COLORS.cyan);
+      
+      const blink = Math.floor(Date.now() / 500) % 2;
+      if (blink) {
+        drawRect(116, 196, 200, 16, COLORS.darkBlue);
+        drawText('PRESS ENTER TO START', 120, 200, COLORS.cyan);
+      }
+
+      drawText('DIRECTION KEYS/WASD: MOVE', 112, 240, COLORS.lightGray);
+      drawText('ENTER/SPACE: CONFIRM', 120, 260, COLORS.lightGray);
+      drawText('ESC: MENU', 176, 280, COLORS.lightGray);
+    }
+
+    renderExplore() {
+      this.renderMap();
+      this.renderEnemies();
+      this.renderPlayer();
+      this.renderNPCs();
+      this.renderStatusBar();
+
+      if (this.gameState === 'dialog') {
+        this.renderDialog();
+      } else if (this.gameState === 'menu') {
+        this.renderMenu();
+      } else if (this.gameState === 'inventory') {
+        this.renderInventory();
+      } else if (this.gameState === 'status') {
+        this.renderStatus();
+      } else if (this.gameState === 'quest') {
+        this.renderQuest();
+      } else if (this.gameState === 'log') {
+        this.renderLog();
+      }
+    }
+
+    renderMap() {
+      const startTileX = Math.floor(this.cameraX / TILE_SIZE);
+      const startTileY = Math.floor(this.cameraY / TILE_SIZE);
+      const endTileX = Math.min(startTileX + Math.ceil(GAME_WIDTH / TILE_SIZE) + 1, this.currentMap.width);
+      const endTileY = Math.min(startTileY + Math.ceil(GAME_HEIGHT / TILE_SIZE) + 1, this.currentMap.height);
+
+      for (let y = startTileY; y < endTileY; y++) {
+        for (let x = startTileX; x < endTileX; x++) {
+          if (x >= 0 && y >= 0) {
+            drawTile(this.currentMap.tiles[y][x], x, y);
+          }
+        }
+      }
+    }
+
+    renderPlayer() {
+      const px = this.player.x * TILE_SIZE - this.cameraX;
+      const py = this.player.y * TILE_SIZE - this.cameraY;
+      drawSprite(SPRITES.player.down, px, py, SPRITE_COLORS.player, 1);
+    }
+
+    renderEnemies() {
+      for (const enemy of this.currentMap.enemies) {
+        const enemyData = ENEMY_DATA[enemy.enemyId];
+        const ex = enemy.x * TILE_SIZE - this.cameraX;
+        const ey = enemy.y * TILE_SIZE - this.cameraY;
+        const bounce = Math.sin(Date.now() / 300) * 2;
+        drawSprite(enemyData.sprite, ex, ey + bounce, enemyData.palette, 1);
+      }
+    }
+
+    renderNPCs() {
+      for (const npc of this.currentMap.npcs) {
+        const nx = npc.x * TILE_SIZE - this.cameraX;
+        const ny = npc.y * TILE_SIZE - this.cameraY;
+        
+        drawRect(nx + 4, ny + 2, 8, 6, COLORS.skin);
+        drawRect(nx + 6, ny + 4, 2, 2, COLORS.black);
+        drawRect(nx + 2, ny + 8, 12, 6, COLORS.green);
+        drawRect(nx + 4, ny + 14, 4, 2, COLORS.blue);
+        drawRect(nx + 10, ny + 14, 4, 2, COLORS.blue);
+
+        const exclaimY = ny - 10;
+        drawText('!', nx + 4, exclaimY, COLORS.yellow);
+      }
+    }
+
+    renderStatusBar() {
+      drawRect(0, 0, GAME_WIDTH, 40, COLORS.darkGray);
+      drawRect(0, 38, GAME_WIDTH, 2, COLORS.lightGray);
+
+      drawText(this.currentMap.name, 8, 8, COLORS.white);
+      
+      drawText(`LV.${this.player.level}`, 120, 8, COLORS.yellow);
+      
+      const hpBarWidth = 100;
+      const hpPercent = this.player.hp / this.player.maxHp;
+      drawRect(170, 6, hpBarWidth + 4, 12, COLORS.black);
+      drawRect(172, 8, hpBarWidth, 8, COLORS.darkRed);
+      drawRect(172, 8, hpBarWidth * hpPercent, 8, COLORS.red);
+      drawText(`HP:${this.player.hp}/${this.player.maxHp}`, 172, 22, COLORS.white);
+
+      const expBarWidth = 80;
+      const expPercent = this.player.exp / this.player.expToNext;
+      drawRect(290, 6, expBarWidth + 4, 12, COLORS.black);
+      drawRect(292, 8, expBarWidth, 8, COLORS.darkBlue);
+      drawRect(292, 8, expBarWidth * expPercent, 8, COLORS.blue);
+      drawText(`EXP:${this.player.exp}/${this.player.expToNext}`, 290, 22, COLORS.white);
+
+      drawText(`GOLD:${this.player.gold}`, 400, 8, COLORS.gold);
+    }
+
+    renderDialog() {
+      drawBorder(40, 200, 400, 100, COLORS.white, COLORS.darkGray);
+      
+      if (this.currentNPC) {
+        drawText(this.currentDialog[this.dialogIndex] || '', 56, 220, COLORS.white);
+        
+        const blink = Math.floor(Date.now() / 400) % 2;
+        if (blink) {
+          drawText('PRESS ENTER', 320, 280, COLORS.cyan);
+        }
+      }
+    }
+
+    renderMenu() {
+      drawBorder(140, 80, 200, 160, COLORS.white, COLORS.darkGray);
+      drawText('MENU', 200, 100, COLORS.yellow);
+      
+      const menuItems = ['背包', '状态', '任务', '日志', '返回'];
+      menuItems.forEach((item, i) => {
+        const color = i === this.menuSelection ? COLORS.yellow : COLORS.white;
+        if (i === this.menuSelection) {
+          drawRect(150, 130 + i * 25, 180, 20, COLORS.darkBlue);
+          drawText('>', 160, 134 + i * 25, COLORS.cyan);
+        }
+        drawText(item, 180, 134 + i * 25, color);
+      });
+    }
+
+    renderInventory() {
+      drawBorder(40, 60, 400, 220, COLORS.white, COLORS.darkGray);
+      drawText('INVENTORY', 180, 76, COLORS.yellow);
+
+      this.inventory.forEach((slot, i) => {
+        const item = ITEM_DATA[slot.itemId];
+        if (!item) return;
+        
+        const y = 110 + i * 30;
+        const isSelected = i === this.inventorySelection;
+        
+        if (isSelected) {
+          drawRect(50, y - 4, 380, 26, COLORS.darkBlue);
+          drawText('>', 60, y, COLORS.cyan);
+        }
+
+        const color = slot.quantity > 0 ? COLORS.white : COLORS.gray;
+        drawText(item.name, 80, y, color);
+        drawText(`x${slot.quantity}`, 200, y, color);
+        drawText(item.description, 250, y, COLORS.lightGray);
+        drawText(`$${item.price}`, 400, y, COLORS.gold);
+      });
+
+      drawText('ESC: BACK', 320, 260, COLORS.lightGray);
+      drawText('ENTER: USE', 380, 260, COLORS.lightGray);
+
+      if (this.battleState === 'selectItem') {
+        drawText('SELECT ITEM TO USE', 150, 260, COLORS.yellow);
+      }
+    }
+
+    renderStatus() {
+      drawBorder(80, 40, 320, 240, COLORS.white, COLORS.darkGray);
+      drawText('STATUS', 180, 56, COLORS.yellow);
+
+      drawText(`NAME: ${this.player.name}`, 100, 90, COLORS.white);
+      drawText(`LEVEL: ${this.player.level}`, 100, 110, COLORS.yellow);
+      
+      drawText(`HP: ${this.player.hp}/${this.player.maxHp}`, 100, 135, COLORS.red);
+      drawText(`ATTACK: ${this.player.attack}`, 100, 155, COLORS.orange);
+      drawText(`DEFENSE: ${this.player.defense}`, 100, 175, COLORS.blue);
+      drawText(`SPEED: ${this.player.speed}`, 100, 195, COLORS.cyan);
+      drawText(`EXP: ${this.player.exp}/${this.player.expToNext}`, 100, 215, COLORS.green);
+      drawText(`GOLD: ${this.player.gold}`, 100, 235, COLORS.gold);
+
+      const expPercent = this.player.exp / this.player.expToNext;
+      drawRect(200, 213, 150, 8, COLORS.black);
+      drawRect(202, 215, 146 * expPercent, 4, COLORS.green);
+
+      drawText('PRESS ENTER TO RETURN', 120, 260, COLORS.lightGray);
+    }
+
+    renderQuest() {
+      drawBorder(40, 40, 400, 240, COLORS.white, COLORS.darkGray);
+      drawText('QUESTS', 190, 56, COLORS.yellow);
+
+      const quest = this.quests.main;
+      drawText(quest.title, 60, 90, COLORS.cyan);
+      drawText(quest.description, 60, 110, COLORS.lightGray);
+
+      quest.steps.forEach((step, i) => {
+        const y = 140 + i * 25;
+        const marker = step.completed ? '[X]' : '[ ]';
+        const color = step.completed ? COLORS.green : COLORS.gray;
+        drawText(marker, 60, y, color);
+        drawText(step.text, 96, y, step.completed ? COLORS.white : COLORS.gray);
+      });
+
+      drawText('PRESS ENTER TO RETURN', 120, 260, COLORS.lightGray);
+    }
+
+    renderLog() {
+      drawBorder(40, 40, 400, 240, COLORS.white, COLORS.darkGray);
+      drawText('EVENT LOG', 170, 56, COLORS.yellow);
+
+      this.questLog.forEach((entry, i) => {
+        if (i < 10) {
+          const y = 90 + i * 18;
+          drawText(entry.text, 56, y, i === 0 ? COLORS.white : COLORS.lightGray);
+        }
+      });
+
+      drawText('PRESS ENTER TO RETURN', 120, 260, COLORS.lightGray);
+    }
+
+    renderBattle() {
+      const bgColors = {
+        town: '#3a3a5a',
+        forest: '#2a4a2a',
+        cave: '#3a2a2a',
+        dungeon: '#2a2a3a',
+        bossroom: '#4a1a1a'
+      };
+      
+      const bgColor = bgColors[this.currentMapId] || '#2a2a3a';
+      drawRect(0, 0, GAME_WIDTH, GAME_HEIGHT, bgColor);
+
+      for (let i = 0; i < 50; i++) {
+        const sx = (i * 37) % GAME_WIDTH;
+        const sy = (i * 53) % GAME_HEIGHT;
+        ctx.fillStyle = `rgba(255,255,255,0.1)`;
+        ctx.fillRect(sx, sy, 2, 2);
+      }
+
+      drawRect(0, 200, GAME_WIDTH, 120, COLORS.darkGray);
+      drawRect(0, 198, GAME_WIDTH, 2, COLORS.lightGray);
+
+      if (this.battleEnemy) {
+        const enemyX = 300;
+        const enemyY = 80;
+        const shake = this.battleAnim && this.battleAnim.type === 'playerAttack' ? Math.sin(Date.now() / 30) * 4 : 0;
+        drawSprite(this.battleEnemy.sprite, enemyX + shake, enemyY, this.battleEnemy.palette, 3);
+
+        const enemyHpPercent = this.battleEnemy.hp / this.battleEnemy.maxHp;
+        drawRect(enemyX - 10, enemyY - 20, 100, 12, COLORS.black);
+        drawRect(enemyX - 8, enemyY - 18, 96, 8, COLORS.darkRed);
+        drawRect(enemyX - 8, enemyY - 18, 96 * enemyHpPercent, 8, COLORS.red);
+        drawText(this.battleEnemy.name, enemyX - 10, enemyY - 35, COLORS.white);
+      }
+
+      const playerX = 80;
+      const playerY = 100;
+      drawSprite(SPRITES.player.down, playerX, playerY, SPRITE_COLORS.player, 3);
+
+      const playerHpPercent = this.player.hp / this.player.maxHp;
+      drawRect(playerX - 10, playerY - 20, 100, 12, COLORS.black);
+      drawRect(playerX - 8, playerY - 18, 96, 8, COLORS.darkGreen);
+      drawRect(playerX - 8, playerY - 18, 96 * playerHpPercent, 8, COLORS.green);
+      drawText(this.player.name, playerX - 10, playerY - 35, COLORS.white);
+
+      this.damageNumbers.forEach(dn => {
+        ctx.globalAlpha = dn.alpha;
+        const color = dn.isCritical ? COLORS.yellow : COLORS.white;
+        drawText(`${dn.value}`, dn.x, dn.y, color, 2);
+        if (dn.isCritical) {
+          drawText('CRITICAL!', dn.x - 20, dn.y - 16, COLORS.red);
+        }
+        ctx.globalAlpha = 1;
+      });
+
+      drawBorder(10, 210, 460, 60, COLORS.white, COLORS.black);
+      this.battleLog.forEach((log, i) => {
+        drawText(log, 20, 220 + i * 14, COLORS.white);
+      });
+
+      if (this.battleState === 'playerTurn') {
+        drawBorder(320, 210, 150, 100, COLORS.white, COLORS.darkGray);
+        drawText('COMMANDS', 340, 218, COLORS.yellow);
+        
+        const commands = ['1.ATTACK', '2.SKILL', '3.ITEM', '4.FLEE'];
+        commands.forEach((cmd, i) => {
+          const color = i === this.battleSelection ? COLORS.yellow : COLORS.white;
+          if (i === this.battleSelection) {
+            drawRect(324, 240 + i * 18, 140, 16, COLORS.darkBlue);
+            drawText('>', 330, 244 + i * 18, COLORS.cyan);
+          }
+          drawText(cmd, 346, 244 + i * 18, color);
+        });
+      } else if (this.battleState === 'selectItem') {
+        this.renderInventory();
+      } else {
+        drawText('...', 380, 250, COLORS.lightGray);
+      }
+    }
+
+    renderVictory() {
+      if (!this.finalEvaluation) return;
+
+      drawBorder(80, 60, 320, 200, COLORS.gold, COLORS.darkGray);
+      drawText('BATTLE VICTORY!', 140, 80, COLORS.yellow, 2);
+
+      const e = this.finalEvaluation;
+      
+      drawText(`SCORE: ${e.score}`, 120, 120, COLORS.white);
+      
+      for (let i = 0; i < 5; i++) {
+        const starColor = i < e.stars ? COLORS.gold : COLORS.gray;
+        drawText('*', 200 + i * 20, 120, starColor, 3);
+      }
+      
+      drawText(`GRADE: ${e.grade}`, 120, 150, e.grade === 'S' ? COLORS.gold : COLORS.white);
+      
+      drawText(`HP REMAINING: ${e.hpPercent}%`, 120, 175, COLORS.green);
+      drawText(`TURNS: ${e.turnCount}`, 120, 195, COLORS.cyan);
+      drawText(`DAMAGE: ${e.totalDamage}`, 120, 215, COLORS.orange);
+      drawText(`EXP +${this.battleEnemy ? this.battleEnemy.expReward : 0}`, 280, 175, COLORS.yellow);
+      drawText(`GOLD +${this.battleEnemy ? this.battleEnemy.goldReward : 0}`, 280, 195, COLORS.gold);
+
+      const blink = Math.floor(Date.now() / 400) % 2;
+      if (blink) {
+        drawText('PRESS ENTER TO CONTINUE', 120, 240, COLORS.cyan);
+      }
+    }
+
+    renderGameOver() {
+      drawBorder(80, 80, 320, 160, COLORS.red, COLORS.black);
+      drawText('YOU DIED', 160, 110, COLORS.red, 3);
+      
+      drawText('YOU LOST SOME EXP AND GOLD...', 90, 170, COLORS.lightGray);
+
+      const blink = Math.floor(Date.now() / 400) % 2;
+      if (blink) {
+        drawText('PRESS ENTER TO RESPAWN', 120, 210, COLORS.cyan);
+      }
+    }
+
+    renderVictoryScreen() {
+      drawRect(0, 0, GAME_WIDTH, GAME_HEIGHT, '#1a0a2e');
+      
+      for (let i = 0; i < 100; i++) {
+        const sx = (i * 73 + Date.now() / 50) % GAME_WIDTH;
+        const sy = (i * 47) % GAME_HEIGHT;
+        const colors = [COLORS.gold, COLORS.yellow, COLORS.red, COLORS.blue, COLORS.cyan];
+        ctx.fillStyle = colors[i % 5];
+        ctx.fillRect(sx, sy, 3, 3);
+      }
+
+      drawText('VICTORY!', 140, 60, COLORS.gold, 4);
+      drawText('YOU DEFEATED THE DARK LORD!', 60, 110, COLORS.yellow, 2);
+
+      if (this.finalEvaluation) {
+        const e = this.finalEvaluation;
+        drawText('FINAL EVALUATION', 130, 150, COLORS.cyan);
+        
+        drawText(`GRADE: ${e.finalGrade}`, 180, 175, e.finalGrade === 'S' ? COLORS.gold : COLORS.yellow, 2);
+        
+        drawText(`LEVEL: ${e.finalLevel}`, 80, 205, COLORS.white);
+        drawText(`BATTLES: ${e.totalBattles}`, 80, 225, COLORS.white);
+        drawText(`ENEMIES: ${e.totalEnemies}`, 250, 205, COLORS.white);
+        drawText(`GOLD: ${e.totalGold}`, 250, 225, COLORS.gold);
+        drawText(`TIME: ${e.playTime}`, 170, 245, COLORS.cyan);
+      }
+
+      const blink = Math.floor(Date.now() / 400) % 2;
+      if (blink) {
+        drawText('THANK YOU FOR PLAYING!', 100, 280, COLORS.white);
+      }
+    }
+  }
+
+  const game = new Game();
+  let lastTime = 0;
+
+  function gameLoop(currentTime) {
+    const deltaTime = currentTime - lastTime;
+    lastTime = currentTime;
+
+    game.update(deltaTime);
+    game.render();
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function resizeCanvas() {
+    const scale = Math.min(
+      Math.floor(window.innerWidth / GAME_WIDTH),
+      Math.floor(window.innerHeight / GAME_HEIGHT)
+    ) - 1;
+    
+    const actualScale = Math.max(1, Math.min(scale, 3));
+    canvas.style.width = `${GAME_WIDTH * actualScale}px`;
+    canvas.style.height = `${GAME_HEIGHT * actualScale}px`;
+  }
+
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  requestAnimationFrame(gameLoop);
+
+})();
+</script>
+</body>
+</html>

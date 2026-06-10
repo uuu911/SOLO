@@ -1,0 +1,1455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>精神病院逃生 - 生存恐怖</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #000; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+        }
+        #gameContainer { position: relative; }
+        canvas { 
+            display: block; 
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            border: 2px solid #333;
+        }
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        #ui > * { pointer-events: auto; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="640" height="480"></canvas>
+        <div id="ui"></div>
+    </div>
+
+    <script>
+    // ==================== 游戏常量配置 ====================
+    const CONFIG = {
+        TILE_SIZE: 32,
+        MAP_WIDTH: 30,
+        MAP_HEIGHT: 20,
+        CANVAS_WIDTH: 640,
+        CANVAS_HEIGHT: 480,
+        PLAYER_SPEED: 4,
+        PLAYER_RUN_SPEED: 7,
+        MONSTER_SPEED_PATROL: 1.5,
+        MONSTER_SPEED_CHASE: 3,
+        FLASHLIGHT_DURATION: 90000,
+        BATTERY_CHARGE: 30000,
+        MAX_HEALTH: 100,
+        MEDKIT_HEAL: 40,
+        HIDE_BASE_CHANCE: 0.7,
+        HIDE_MIN_CHANCE: 0.2,
+        MAX_INVENTORY: 5,
+        ROOM_MIN_SIZE: 4,
+        ROOM_MAX_SIZE: 8,
+        MIN_ROOMS: 20,
+        FPS_TARGET: 60
+    };
+
+    // ==================== 工具模块 ====================
+    const Utils = {
+        random: (min, max) => Math.random() * (max - min) + min,
+        randomInt: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
+        distance: (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2),
+        clamp: (val, min, max) => Math.max(min, Math.min(max, val)),
+        lerp: (a, b, t) => a + (b - a) * t,
+        noise: (x) => Math.sin(x * 12.9898 + 78.233) * 43758.5453 % 1
+    };
+
+    // ==================== 音效模块 ====================
+    const AudioModule = {
+        ctx: null,
+        masterGain: null,
+        
+        init() {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.gain.value = 0.5;
+            this.masterGain.connect(this.ctx.destination);
+        },
+
+        resume() {
+            if (this.ctx && this.ctx.state === 'suspended') {
+                this.ctx.resume();
+            }
+        },
+
+        playFootstep(isWood = false) {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            
+            osc.type = isWood ? 'triangle' : 'square';
+            osc.frequency.setValueAtTime(isWood ? 150 : 200, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.1);
+            
+            gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
+            
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.1);
+        },
+
+        playHeartbeat(intensity = 1) {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(80, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.15);
+            
+            gain.gain.setValueAtTime(0.3 * intensity, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.2);
+            
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.2);
+        },
+
+        playDoor() {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(100, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.3);
+            
+            gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.3);
+            
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.3);
+        },
+
+        playHurt() {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.2);
+            
+            gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.2);
+            
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.2);
+        },
+
+        playPickup() {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.1);
+            
+            gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
+            
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.1);
+        },
+
+        playFlicker() {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(1000, this.ctx.currentTime);
+            
+            gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            gain.gain.setValueAtTime(0, this.ctx.currentTime + 0.02);
+            gain.gain.setValueAtTime(0.1, this.ctx.currentTime + 0.04);
+            gain.gain.setValueAtTime(0, this.ctx.currentTime + 0.06);
+            
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.08);
+        },
+
+        playWind() {
+            const bufferSize = this.ctx.sampleRate * 2;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = buffer;
+            noise.loop = true;
+            
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 200;
+            
+            const gain = this.ctx.createGain();
+            gain.gain.value = 0.05;
+            
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.masterGain);
+            
+            noise.start();
+            return { noise, gain };
+        }
+    };
+
+    // ==================== 地图模块 ====================
+    const MapModule = {
+        tiles: [],
+        rooms: [],
+        corridors: [],
+        items: [],
+        furniture: [],
+        narrativeItems: [],
+        
+        generate() {
+            this.tiles = Array(CONFIG.MAP_HEIGHT).fill(null).map(() => 
+                Array(CONFIG.MAP_WIDTH).fill(1)
+            );
+            this.rooms = [];
+            this.corridors = [];
+            this.items = [];
+            this.furniture = [];
+            this.narrativeItems = [];
+            
+            this.generateRooms();
+            this.connectRooms();
+            this.placeItems();
+            this.placeFurniture();
+            this.placeNarrativeItems();
+            this.ensureExitReachable();
+        },
+
+        generateRooms() {
+            const roomTypes = ['ward', 'pharmacy', 'office', 'bathroom', 'storage', 'morgue', 'lobby'];
+            let attempts = 0;
+            
+            while (this.rooms.length < CONFIG.MIN_ROOMS && attempts < 1000) {
+                attempts++;
+                const w = Utils.randomInt(CONFIG.ROOM_MIN_SIZE, CONFIG.ROOM_MAX_SIZE);
+                const h = Utils.randomInt(CONFIG.ROOM_MIN_SIZE, CONFIG.ROOM_MAX_SIZE);
+                const x = Utils.randomInt(1, CONFIG.MAP_WIDTH - w - 1);
+                const y = Utils.randomInt(1, CONFIG.MAP_HEIGHT - h - 1);
+                
+                let overlaps = false;
+                for (const room of this.rooms) {
+                    if (x < room.x + room.w + 2 && x + w + 2 > room.x &&
+                        y < room.y + room.h + 2 && y + h + 2 > room.y) {
+                        overlaps = true;
+                        break;
+                    }
+                }
+                
+                if (!overlaps) {
+                    const type = roomTypes[Utils.randomInt(0, roomTypes.length - 1)];
+                    const room = { x, y, w, h, type, id: this.rooms.length };
+                    this.rooms.push(room);
+                    
+                    for (let ry = y; ry < y + h; ry++) {
+                        for (let rx = x; rx < x + w; rx++) {
+                            this.tiles[ry][rx] = 0;
+                        }
+                    }
+                }
+            }
+            
+            this.rooms[0].type = 'start';
+            this.rooms[this.rooms.length - 1].type = 'exit';
+        },
+
+        connectRooms() {
+            for (let i = 1; i < this.rooms.length; i++) {
+                const roomA = this.rooms[i - 1];
+                const roomB = this.rooms[i];
+                
+                const cx1 = Math.floor(roomA.x + roomA.w / 2);
+                const cy1 = Math.floor(roomA.y + roomA.h / 2);
+                const cx2 = Math.floor(roomB.x + roomB.w / 2);
+                const cy2 = Math.floor(roomB.y + roomB.h / 2);
+                
+                if (Math.random() < 0.5) {
+                    this.createHorizontalCorridor(cx1, cx2, cy1);
+                    this.createVerticalCorridor(cy1, cy2, cx2);
+                } else {
+                    this.createVerticalCorridor(cy1, cy2, cx1);
+                    this.createHorizontalCorridor(cx1, cx2, cy2);
+                }
+            }
+        },
+
+        createHorizontalCorridor(x1, x2, y) {
+            for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+                if (y >= 0 && y < CONFIG.MAP_HEIGHT && x >= 0 && x < CONFIG.MAP_WIDTH) {
+                    this.tiles[y][x] = 0;
+                    this.corridors.push({ x, y });
+                }
+            }
+        },
+
+        createVerticalCorridor(y1, y2, x) {
+            for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+                if (y >= 0 && y < CONFIG.MAP_HEIGHT && x >= 0 && x < CONFIG.MAP_WIDTH) {
+                    this.tiles[y][x] = 0;
+                    this.corridors.push({ x, y });
+                }
+            }
+        },
+
+        placeItems() {
+            const emptyTiles = this.getEmptyTiles();
+            
+            for (let i = 0; i < 4; i++) {
+                if (emptyTiles.length > 0) {
+                    const idx = Utils.randomInt(0, emptyTiles.length - 1);
+                    const tile = emptyTiles.splice(idx, 1)[0];
+                    this.items.push({ x: tile.x, y: tile.y, type: 'battery', name: '电池' });
+                }
+            }
+            
+            for (let i = 0; i < 2; i++) {
+                if (emptyTiles.length > 0) {
+                    const idx = Utils.randomInt(0, emptyTiles.length - 1);
+                    const tile = emptyTiles.splice(idx, 1)[0];
+                    this.items.push({ x: tile.x, y: tile.y, type: 'medkit', name: '药品' });
+                }
+            }
+            
+            const exitRoom = this.rooms.find(r => r.type === 'exit');
+            if (exitRoom && emptyTiles.length > 0) {
+                const keyX = Utils.randomInt(exitRoom.x + 1, exitRoom.x + exitRoom.w - 2);
+                const keyY = Utils.randomInt(exitRoom.y + 1, exitRoom.y + exitRoom.h - 2);
+                this.items.push({ x: keyX, y: keyY, type: 'key', name: '钥匙' });
+            }
+        },
+
+        placeFurniture() {
+            for (const room of this.rooms) {
+                if (room.type === 'start' || room.type === 'exit') continue;
+                
+                const furnitureCount = Utils.randomInt(0, 2);
+                for (let i = 0; i < furnitureCount; i++) {
+                    const fx = Utils.randomInt(room.x + 1, room.x + room.w - 2);
+                    const fy = Utils.randomInt(room.y + 1, room.y + room.h - 2);
+                    const type = Math.random() < 0.5 ? 'cabinet' : 'bed';
+                    this.furniture.push({ x: fx, y: fy, type, roomId: room.id });
+                }
+            }
+        },
+
+        placeNarrativeItems() {
+            const texts = [
+                '墙上的血迹写着：它看着你...',
+                '一本日记：第47天，他们还在听',
+                '涂鸦：不要相信光亮',
+                '报纸残片：精神病院离奇失火，全员下落不明',
+                '死者手中的纸条：跑，别回头',
+                '墙上刻着：出口在何处',
+                '病人记录：出现严重幻觉，声称看到不存在的东西'
+            ];
+            
+            const emptyTiles = this.getEmptyTiles();
+            for (let i = 0; i < 5; i++) {
+                if (emptyTiles.length > 0) {
+                    const idx = Utils.randomInt(0, emptyTiles.length - 1);
+                    const tile = emptyTiles.splice(idx, 1)[0];
+                    const text = texts[Utils.randomInt(0, texts.length - 1)];
+                    this.narrativeItems.push({ x: tile.x, y: tile.y, text, discovered: false });
+                }
+            }
+        },
+
+        getEmptyTiles() {
+            const tiles = [];
+            for (const room of this.rooms) {
+                for (let y = room.y + 1; y < room.y + room.h - 1; y++) {
+                    for (let x = room.x + 1; x < room.x + room.w - 1; x++) {
+                        tiles.push({ x, y });
+                    }
+                }
+            }
+            return tiles;
+        },
+
+        ensureExitReachable() {
+            const exitRoom = this.rooms.find(r => r.type === 'exit');
+            if (!exitRoom) return;
+            
+            for (let y = exitRoom.y; y < exitRoom.y + exitRoom.h; y++) {
+                for (let x = exitRoom.x; x < exitRoom.x + exitRoom.w; x++) {
+                    this.tiles[y][x] = 0;
+                }
+            }
+        },
+
+        isWall(x, y) {
+            const tx = Math.floor(x);
+            const ty = Math.floor(y);
+            if (tx < 0 || tx >= CONFIG.MAP_WIDTH || ty < 0 || ty >= CONFIG.MAP_HEIGHT) return true;
+            return this.tiles[ty][tx] === 1;
+        },
+
+        getRoomAt(x, y) {
+            const tx = Math.floor(x);
+            const ty = Math.floor(y);
+            for (const room of this.rooms) {
+                if (tx >= room.x && tx < room.x + room.w && ty >= room.y && ty < room.y + room.h) {
+                    return room;
+                }
+            }
+            return null;
+        },
+
+        getFurnitureAt(x, y) {
+            const tx = Math.floor(x);
+            const ty = Math.floor(y);
+            return this.furniture.find(f => f.x === tx && f.y === ty);
+        }
+    };
+
+    // ==================== 玩家模块 ====================
+    const PlayerModule = {
+        x: 0,
+        y: 0,
+        health: CONFIG.MAX_HEALTH,
+        sanity: 100,
+        flashlight: CONFIG.FLASHLIGHT_DURATION,
+        inventory: [],
+        isHiding: false,
+        hidingSpot: null,
+        isRunning: false,
+        facing: { x: 1, y: 0 },
+        exploredRooms: new Set(),
+        noiseLevel: 0,
+        itemCooldown: 0,
+
+        init() {
+            const startRoom = MapModule.rooms[0];
+            this.x = startRoom.x + startRoom.w / 2;
+            this.y = startRoom.y + startRoom.h / 2;
+            this.health = CONFIG.MAX_HEALTH;
+            this.sanity = 100;
+            this.flashlight = CONFIG.FLASHLIGHT_DURATION;
+            this.inventory = [];
+            this.isHiding = false;
+            this.hidingSpot = null;
+            this.exploredRooms = new Set([0]);
+            this.noiseLevel = 0;
+            this.itemCooldown = 0;
+        },
+
+        update(dt, keys) {
+            if (this.itemCooldown > 0) this.itemCooldown -= dt;
+            
+            if (this.isHiding) {
+                this.sanity = Math.max(0, this.sanity - dt * 0.002);
+                return;
+            }
+            
+            let dx = 0, dy = 0;
+            if (keys['w'] || keys['W'] || keys['ArrowUp']) dy -= 1;
+            if (keys['s'] || keys['S'] || keys['ArrowDown']) dy += 1;
+            if (keys['a'] || keys['A'] || keys['ArrowLeft']) dx -= 1;
+            if (keys['d'] || keys['D'] || keys['ArrowRight']) dx += 1;
+            
+            this.isRunning = keys['Shift'];
+            
+            if (dx !== 0 || dy !== 0) {
+                const len = Math.sqrt(dx * dx + dy * dy);
+                dx /= len;
+                dy /= len;
+                this.facing = { x: dx, y: dy };
+                
+                const speed = this.isRunning ? CONFIG.PLAYER_RUN_SPEED : CONFIG.PLAYER_SPEED;
+                const newX = this.x + dx * speed * dt / 1000;
+                const newY = this.y + dy * speed * dt / 1000;
+                
+                if (!MapModule.isWall(newX, this.y)) this.x = newX;
+                if (!MapModule.isWall(this.x, newY)) this.y = newY;
+                
+                this.noiseLevel = this.isRunning ? 2 : 0.5;
+                
+                const room = MapModule.getRoomAt(this.x, this.y);
+                if (room) this.exploredRooms.add(room.id);
+            } else {
+                this.noiseLevel = 0;
+            }
+            
+            if (this.flashlight > 0) {
+                this.flashlight = Math.max(0, this.flashlight - dt);
+            }
+            
+            const room = MapModule.getRoomAt(this.x, this.y);
+            if (room && room.type !== 'morgue') {
+                this.sanity = Math.min(100, this.sanity + dt * 0.001);
+            } else {
+                this.sanity = Math.max(0, this.sanity - dt * 0.0005);
+            }
+        },
+
+        pickupItem(item) {
+            if (this.inventory.length >= CONFIG.MAX_INVENTORY) return false;
+            this.inventory.push(item);
+            return true;
+        },
+
+        useItem(index) {
+            if (this.itemCooldown > 0) return false;
+            if (index < 0 || index >= this.inventory.length) return false;
+            
+            const item = this.inventory[index];
+            if (item.type === 'battery') {
+                this.flashlight = Math.min(CONFIG.FLASHLIGHT_DURATION, this.flashlight + CONFIG.BATTERY_CHARGE);
+                this.inventory.splice(index, 1);
+                this.itemCooldown = 1000;
+                return true;
+            } else if (item.type === 'medkit') {
+                this.health = Math.min(CONFIG.MAX_HEALTH, this.health + CONFIG.MEDKIT_HEAL);
+                this.inventory.splice(index, 1);
+                this.itemCooldown = 1000;
+                return true;
+            }
+            return false;
+        },
+
+        dropItem(index) {
+            if (index < 0 || index >= this.inventory.length) return;
+            const item = this.inventory.splice(index, 1)[0];
+            MapModule.items.push({ ...item, x: Math.floor(this.x), y: Math.floor(this.y) });
+        },
+
+        toggleHide() {
+            if (this.isHiding) {
+                this.isHiding = false;
+                this.hidingSpot = null;
+                return true;
+            }
+            
+            const furniture = MapModule.getFurnitureAt(this.x, this.y);
+            if (furniture) {
+                this.isHiding = true;
+                this.hidingSpot = furniture;
+                return true;
+            }
+            return false;
+        },
+
+        calculateHideChance(monsterDistance) {
+            let chance = CONFIG.HIDE_BASE_CHANCE;
+            chance -= (100 - this.sanity) / 10 * 0.05;
+            chance -= Math.max(0, (5 - monsterDistance)) * 0.1;
+            return Math.max(CONFIG.HIDE_MIN_CHANCE, chance);
+        }
+    };
+
+    // ==================== 怪物模块 ====================
+    const MonsterModule = {
+        x: 0,
+        y: 0,
+        state: 'patrol',
+        facing: { x: 1, y: 0 },
+        target: null,
+        patrolPath: [],
+        patrolIndex: 0,
+        lastPlayerSeen: 0,
+        viewDistance: 8,
+        viewAngle: Math.PI / 3,
+        unpredictableTimer: 0,
+        unpredictableBehavior: null,
+
+        init() {
+            const room = MapModule.rooms[Math.floor(MapModule.rooms.length / 2)];
+            this.x = room.x + room.w / 2;
+            this.y = room.y + room.h / 2;
+            this.state = 'patrol';
+            this.generatePatrolPath();
+            this.unpredictableTimer = 0;
+            this.unpredictableBehavior = null;
+        },
+
+        generatePatrolPath() {
+            this.patrolPath = [];
+            const startRoom = MapModule.getRoomAt(this.x, this.y);
+            let currentRoom = startRoom;
+            
+            for (let i = 0; i < 10; i++) {
+                const nextRoom = MapModule.rooms[Utils.randomInt(0, MapModule.rooms.length - 1)];
+                this.patrolPath.push({
+                    x: nextRoom.x + nextRoom.w / 2,
+                    y: nextRoom.y + nextRoom.h / 2
+                });
+                currentRoom = nextRoom;
+            }
+            this.patrolIndex = 0;
+        },
+
+        update(dt, player) {
+            const distToPlayer = Utils.distance(this.x, this.y, player.x, player.y);
+            
+            this.unpredictableTimer -= dt;
+            if (this.unpredictableTimer <= 0 && this.state === 'patrol') {
+                this.unpredictableTimer = Utils.randomInt(3000, 8000);
+                const behaviors = ['pause', 'speed_up', 'change_dir', 'random_turn'];
+                this.unpredictableBehavior = behaviors[Utils.randomInt(0, behaviors.length - 1)];
+            }
+            
+            const canSeePlayer = this.canSeePlayer(player);
+            
+            if (canSeePlayer || player.noiseLevel > 1.5) {
+                if (this.state !== 'chase') {
+                    this.state = 'chase';
+                }
+                this.lastPlayerSeen = Date.now();
+                this.target = { x: player.x, y: player.y };
+            }
+            
+            if (this.state === 'chase') {
+                if (Date.now() - this.lastPlayerSeen > 5000 && !canSeePlayer) {
+                    this.state = 'patrol';
+                    this.generatePatrolPath();
+                } else {
+                    this.chasePlayer(dt, player);
+                }
+            } else {
+                this.patrol(dt);
+            }
+            
+            if (this.state === 'chase' && !player.isHiding) {
+                if (distToPlayer < 1) {
+                    player.health -= 20;
+                    PlayerModule.sanity = Math.max(0, PlayerModule.sanity - 15);
+                    AudioModule.playHurt();
+                    this.state = 'patrol';
+                    this.generatePatrolPath();
+                    const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                    player.x += Math.cos(angle) * 3;
+                    player.y += Math.sin(angle) * 3;
+                }
+            }
+            
+            if (player.isHiding && distToPlayer < 3) {
+                const chance = player.calculateHideChance(distToPlayer);
+                if (Math.random() > chance) {
+                    player.isHiding = false;
+                    player.hidingSpot = null;
+                    player.health -= 15;
+                    PlayerModule.sanity = Math.max(0, PlayerModule.sanity - 20);
+                    AudioModule.playHurt();
+                    this.state = 'chase';
+                    this.lastPlayerSeen = Date.now();
+                }
+            }
+        },
+
+        canSeePlayer(player) {
+            if (player.isHiding) return false;
+            
+            const dist = Utils.distance(this.x, this.y, player.x, player.y);
+            if (dist > this.viewDistance) return false;
+            
+            const angleToPlayer = Math.atan2(player.y - this.y, player.x - this.x);
+            const monsterAngle = Math.atan2(this.facing.y, this.facing.x);
+            let angleDiff = Math.abs(angleToPlayer - monsterAngle);
+            if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+            
+            if (angleDiff > this.viewAngle) return false;
+            
+            const steps = Math.floor(dist * 2);
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                const cx = this.x + (player.x - this.x) * t;
+                const cy = this.y + (player.y - this.y) * t;
+                if (MapModule.isWall(cx, cy)) return false;
+            }
+            
+            return true;
+        },
+
+        patrol(dt) {
+            if (this.patrolPath.length === 0) {
+                this.generatePatrolPath();
+                return;
+            }
+            
+            let speed = CONFIG.MONSTER_SPEED_PATROL;
+            
+            if (this.unpredictableBehavior === 'pause') {
+                speed = 0;
+            } else if (this.unpredictableBehavior === 'speed_up') {
+                speed *= 1.3;
+            } else if (this.unpredictableBehavior === 'random_turn') {
+                this.facing = {
+                    x: Math.cos(Utils.random(0, Math.PI * 2)),
+                    y: Math.sin(Utils.random(0, Math.PI * 2))
+                };
+                this.unpredictableBehavior = null;
+            }
+            
+            const target = this.patrolPath[this.patrolIndex];
+            const dx = target.x - this.x;
+            const dy = target.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < 0.5) {
+                this.patrolIndex = (this.patrolIndex + 1) % this.patrolPath.length;
+                if (Math.random() < 0.3) {
+                    this.generatePatrolPath();
+                }
+            } else {
+                const moveX = (dx / dist) * speed * dt / 1000;
+                const moveY = (dy / dist) * speed * dt / 1000;
+                
+                if (!MapModule.isWall(this.x + moveX, this.y)) {
+                    this.x += moveX;
+                    this.facing.x = dx / dist;
+                }
+                if (!MapModule.isWall(this.x, this.y + moveY)) {
+                    this.y += moveY;
+                    this.facing.y = dy / dist;
+                }
+            }
+        },
+
+        chasePlayer(dt, player) {
+            const dx = player.x - this.x;
+            const dy = player.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist > 0) {
+                const speed = CONFIG.MONSTER_SPEED_CHASE;
+                const moveX = (dx / dist) * speed * dt / 1000;
+                const moveY = (dy / dist) * speed * dt / 1000;
+                
+                if (!MapModule.isWall(this.x + moveX, this.y)) {
+                    this.x += moveX;
+                }
+                if (!MapModule.isWall(this.x, this.y + moveY)) {
+                    this.y += moveY;
+                }
+                
+                this.facing = { x: dx / dist, y: dy / dist };
+            }
+        }
+    };
+
+    // ==================== 渲染模块 ====================
+    const RenderModule = {
+        ctx: null,
+        camera: { x: 0, y: 0 },
+        flashlightIntensity: 1,
+        sanityEffect: 0,
+        fps: 60,
+        fpsFrames: 0,
+        fpsLastUpdate: 0,
+
+        init() {
+            const canvas = document.getElementById('gameCanvas');
+            this.ctx = canvas.getContext('2d');
+            this.ctx.imageSmoothingEnabled = false;
+        },
+
+        updateCamera() {
+            const targetX = PlayerModule.x * CONFIG.TILE_SIZE - CONFIG.CANVAS_WIDTH / 2;
+            const targetY = PlayerModule.y * CONFIG.TILE_SIZE - CONFIG.CANVAS_HEIGHT / 2;
+            this.camera.x = Utils.lerp(this.camera.x, targetX, 0.1);
+            this.camera.y = Utils.lerp(this.camera.y, targetY, 0.1);
+        },
+
+        render(dt, gameTime) {
+            this.updateCamera();
+            this.updateFPS(dt, gameTime);
+            
+            this.ctx.save();
+            
+            let shakeX = 0, shakeY = 0;
+            if (PlayerModule.sanity < 50) {
+                const shakeIntensity = (50 - PlayerModule.sanity) / 50 * 3;
+                shakeX = (Math.random() - 0.5) * shakeIntensity;
+                shakeY = (Math.random() - 0.5) * shakeIntensity;
+                this.ctx.translate(shakeX, shakeY);
+            }
+            
+            this.ctx.fillStyle = '#0a0a0a';
+            this.ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+            
+            this.renderMap();
+            this.renderItems();
+            this.renderFurniture();
+            this.renderNarrativeItems();
+            this.renderMonster();
+            this.renderPlayer();
+            this.renderFlashlight(gameTime);
+            
+            this.ctx.restore();
+            
+            this.renderSanityEffects(gameTime);
+            this.renderFPS();
+        },
+
+        renderMap() {
+            const startX = Math.max(0, Math.floor(this.camera.x / CONFIG.TILE_SIZE) - 1);
+            const endX = Math.min(CONFIG.MAP_WIDTH, Math.ceil((this.camera.x + CONFIG.CANVAS_WIDTH) / CONFIG.TILE_SIZE) + 1);
+            const startY = Math.max(0, Math.floor(this.camera.y / CONFIG.TILE_SIZE) - 1);
+            const endY = Math.min(CONFIG.MAP_HEIGHT, Math.ceil((this.camera.y + CONFIG.CANVAS_HEIGHT) / CONFIG.TILE_SIZE) + 1);
+            
+            for (let y = startY; y < endY; y++) {
+                for (let x = startX; x < endX; x++) {
+                    const screenX = x * CONFIG.TILE_SIZE - this.camera.x;
+                    const screenY = y * CONFIG.TILE_SIZE - this.camera.y;
+                    
+                    if (MapModule.tiles[y][x] === 1) {
+                        this.ctx.fillStyle = '#1a1a1a';
+                        this.ctx.fillRect(screenX, screenY, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+                        this.ctx.fillStyle = '#252525';
+                        this.ctx.fillRect(screenX, screenY, CONFIG.TILE_SIZE, 4);
+                        this.ctx.strokeStyle = '#0f0f0f';
+                        this.ctx.lineWidth = 1;
+                        this.ctx.strokeRect(screenX + 0.5, screenY + 0.5, CONFIG.TILE_SIZE - 1, CONFIG.TILE_SIZE - 1);
+                    } else {
+                        const room = MapModule.getRoomAt(x, y);
+                        if (room) {
+                            const colors = {
+                                ward: '#1c1c1c',
+                                pharmacy: '#1a1a20',
+                                office: '#1e1e1e',
+                                bathroom: '#1d1d25',
+                                storage: '#151515',
+                                morgue: '#121218',
+                                lobby: '#1f1f1f',
+                                start: '#202025',
+                                exit: '#252520'
+                            };
+                            this.ctx.fillStyle = colors[room.type] || '#1c1c1c';
+                        } else {
+                            this.ctx.fillStyle = '#151515';
+                        }
+                        this.ctx.fillRect(screenX, screenY, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+                        
+                        const gridShade = (x + y) % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'rgba(0,0,0,0.03)';
+                        this.ctx.fillStyle = gridShade;
+                        this.ctx.fillRect(screenX, screenY, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+                        
+                        this.ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+                        this.ctx.lineWidth = 1;
+                        this.ctx.strokeRect(screenX + 0.5, screenY + 0.5, CONFIG.TILE_SIZE - 1, CONFIG.TILE_SIZE - 1);
+                    }
+                }
+            }
+        },
+
+        renderItems() {
+            for (const item of MapModule.items) {
+                const screenX = item.x * CONFIG.TILE_SIZE - this.camera.x + CONFIG.TILE_SIZE / 2;
+                const screenY = item.y * CONFIG.TILE_SIZE - this.camera.y + CONFIG.TILE_SIZE / 2;
+                
+                const colors = {
+                    battery: '#ffff00',
+                    medkit: '#ff4444',
+                    key: '#ffaa00'
+                };
+                
+                this.ctx.fillStyle = colors[item.type] || '#ffffff';
+                this.ctx.beginPath();
+                this.ctx.arc(screenX, screenY, 6, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+        },
+
+        renderFurniture() {
+            for (const furniture of MapModule.furniture) {
+                const screenX = furniture.x * CONFIG.TILE_SIZE - this.camera.x;
+                const screenY = furniture.y * CONFIG.TILE_SIZE - this.camera.y;
+                
+                if (furniture.type === 'cabinet') {
+                    this.ctx.fillStyle = '#3d2817';
+                    this.ctx.fillRect(screenX + 4, screenY + 2, CONFIG.TILE_SIZE - 8, CONFIG.TILE_SIZE - 4);
+                    this.ctx.fillStyle = '#4d3827';
+                    this.ctx.fillRect(screenX + 6, screenY + 4, CONFIG.TILE_SIZE - 12, 2);
+                } else {
+                    this.ctx.fillStyle = '#4a4a4a';
+                    this.ctx.fillRect(screenX + 2, screenY + 8, CONFIG.TILE_SIZE - 4, CONFIG.TILE_SIZE - 10);
+                    this.ctx.fillStyle = '#6a6a6a';
+                    this.ctx.fillRect(screenX + 4, screenY + 10, CONFIG.TILE_SIZE - 8, CONFIG.TILE_SIZE - 14);
+                }
+            }
+        },
+
+        renderNarrativeItems() {
+            for (const item of MapModule.narrativeItems) {
+                if (item.discovered) continue;
+                const screenX = item.x * CONFIG.TILE_SIZE - this.camera.x + CONFIG.TILE_SIZE / 2;
+                const screenY = item.y * CONFIG.TILE_SIZE - this.camera.y + CONFIG.TILE_SIZE / 2;
+                
+                this.ctx.fillStyle = '#880000';
+                this.ctx.beginPath();
+                this.ctx.arc(screenX, screenY, 4, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+        },
+
+        renderMonster() {
+            const screenX = MonsterModule.x * CONFIG.TILE_SIZE - this.camera.x + CONFIG.TILE_SIZE / 2;
+            const screenY = MonsterModule.y * CONFIG.TILE_SIZE - this.camera.y + CONFIG.TILE_SIZE / 2;
+            
+            this.ctx.save();
+            this.ctx.translate(screenX, screenY);
+            
+            const glowSize = 30 + Math.sin(Date.now() / 200) * 5;
+            const gradient = this.ctx.createRadialGradient(0, 0, 0, 0, 0, glowSize);
+            gradient.addColorStop(0, 'rgba(100, 0, 0, 0.3)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            this.ctx.fillStyle = gradient;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, glowSize, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            this.ctx.fillStyle = MonsterModule.state === 'chase' ? '#440000' : '#220000';
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, 12, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            this.ctx.fillStyle = '#ff0000';
+            const eyeAngle = Math.atan2(MonsterModule.facing.y, MonsterModule.facing.x);
+            this.ctx.beginPath();
+            this.ctx.arc(Math.cos(eyeAngle - 0.5) * 5, Math.sin(eyeAngle - 0.5) * 5, 2, 0, Math.PI * 2);
+            this.ctx.arc(Math.cos(eyeAngle + 0.5) * 5, Math.sin(eyeAngle + 0.5) * 5, 2, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            this.ctx.restore();
+        },
+
+        renderPlayer() {
+            if (PlayerModule.isHiding) return;
+            
+            const screenX = PlayerModule.x * CONFIG.TILE_SIZE - this.camera.x + CONFIG.TILE_SIZE / 2;
+            const screenY = PlayerModule.y * CONFIG.TILE_SIZE - this.camera.y + CONFIG.TILE_SIZE / 2;
+            
+            this.ctx.fillStyle = '#4488ff';
+            this.ctx.beginPath();
+            this.ctx.arc(screenX, screenY, 8, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            this.ctx.strokeStyle = '#88bbff';
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            this.ctx.moveTo(screenX, screenY);
+            this.ctx.lineTo(
+                screenX + PlayerModule.facing.x * 15,
+                screenY + PlayerModule.facing.y * 15
+            );
+            this.ctx.stroke();
+        },
+
+        renderFlashlight(gameTime) {
+            const batteryRatio = PlayerModule.flashlight / CONFIG.FLASHLIGHT_DURATION;
+            let intensity = Math.max(0.1, batteryRatio);
+            let range = 150 + batteryRatio * 200;
+            
+            if (batteryRatio < 0.2) {
+                const flicker = Math.sin(gameTime * 20) * 0.3 + 0.7;
+                intensity *= flicker;
+                range *= flicker;
+            }
+            
+            const wobble = Math.sin(gameTime * 5) * 0.1;
+            
+            if (!this.maskCanvas) {
+                this.maskCanvas = document.createElement('canvas');
+                this.maskCanvas.width = CONFIG.CANVAS_WIDTH;
+                this.maskCanvas.height = CONFIG.CANVAS_HEIGHT;
+                this.maskCtx = this.maskCanvas.getContext('2d');
+            }
+            
+            const mctx = this.maskCtx;
+            mctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+            
+            mctx.fillStyle = 'rgba(0, 0, 0, 1)';
+            mctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+            
+            const screenX = PlayerModule.x * CONFIG.TILE_SIZE - this.camera.x + CONFIG.TILE_SIZE / 2;
+            const screenY = PlayerModule.y * CONFIG.TILE_SIZE - this.camera.y + CONFIG.TILE_SIZE / 2;
+            
+            mctx.save();
+            mctx.globalCompositeOperation = 'destination-out';
+            
+            const baseAngle = Math.atan2(PlayerModule.facing.y, PlayerModule.facing.x);
+            
+            mctx.beginPath();
+            mctx.moveTo(screenX, screenY);
+            
+            for (let i = 0; i <= 20; i++) {
+                const angle = baseAngle - Math.PI / 4 + (i / 20) * Math.PI / 2 + wobble;
+                const r = range * (0.8 + Math.sin(i * 0.5 + gameTime * 3) * 0.2);
+                mctx.lineTo(
+                    screenX + Math.cos(angle) * r,
+                    screenY + Math.sin(angle) * r
+                );
+            }
+            
+            mctx.closePath();
+            
+            const gradient = mctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, range);
+            gradient.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+            gradient.addColorStop(0.7, `rgba(255, 255, 255, ${intensity * 0.5})`);
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            mctx.fillStyle = gradient;
+            mctx.fill();
+            
+            const ambientGradient = mctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, 60);
+            ambientGradient.addColorStop(0, 'rgba(255, 255, 255, 0.6)');
+            ambientGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            mctx.fillStyle = ambientGradient;
+            mctx.beginPath();
+            mctx.arc(screenX, screenY, 60, 0, Math.PI * 2);
+            mctx.fill();
+            
+            mctx.restore();
+            
+            this.ctx.save();
+            this.ctx.globalCompositeOperation = 'source-over';
+            this.ctx.drawImage(this.maskCanvas, 0, 0);
+            this.ctx.restore();
+            
+            if (PlayerModule.sanity < 30) {
+                this.ctx.save();
+                this.ctx.globalCompositeOperation = 'source-over';
+                
+                if (Math.random() < 0.005) {
+                    const hx = Utils.randomInt(50, CONFIG.CANVAS_WIDTH - 50);
+                    const hy = Utils.randomInt(50, CONFIG.CANVAS_HEIGHT - 50);
+                    this.ctx.fillStyle = `rgba(100, 0, 0, ${0.1 + Math.random() * 0.2})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(hx, hy, 5 + Math.random() * 10, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                
+                this.ctx.restore();
+            }
+        },
+
+        renderSanityEffects(gameTime) {
+        },
+
+        updateFPS(dt, gameTime) {
+            this.fpsFrames++;
+            if (gameTime - this.fpsLastUpdate > 1000) {
+                this.fps = Math.round(this.fpsFrames * 1000 / (gameTime - this.fpsLastUpdate));
+                this.fpsFrames = 0;
+                this.fpsLastUpdate = gameTime;
+            }
+        },
+
+        renderFPS() {
+            this.ctx.fillStyle = '#00ff00';
+            this.ctx.font = '12px monospace';
+            this.ctx.fillText(`FPS: ${this.fps}`, 10, 20);
+        }
+    };
+
+    // ==================== UI模块 ====================
+    const UIModule = {
+        uiElement: null,
+        messageQueue: [],
+        messageTimer: 0,
+        heartbeatTimer: 0,
+        selectedItem: 0,
+
+        init() {
+            this.uiElement = document.getElementById('ui');
+        },
+
+        update(dt, gameTime) {
+            if (this.messageTimer > 0) {
+                this.messageTimer -= dt;
+                if (this.messageTimer <= 0 && this.messageQueue.length > 0) {
+                    this.messageQueue.shift();
+                    if (this.messageQueue.length > 0) {
+                        this.messageTimer = 3000;
+                    }
+                }
+            }
+            
+            const distToMonster = Utils.distance(
+                PlayerModule.x, PlayerModule.y,
+                MonsterModule.x, MonsterModule.y
+            );
+            
+            this.heartbeatTimer -= dt;
+            if (this.heartbeatTimer <= 0 && distToMonster < 15) {
+                const intensity = Math.max(0.3, 1 - distToMonster / 15);
+                AudioModule.playHeartbeat(intensity);
+                this.heartbeatTimer = 600 - intensity * 400;
+            }
+            
+            this.render();
+        },
+
+        showMessage(text) {
+            this.messageQueue.push(text);
+            if (this.messageTimer <= 0) {
+                this.messageTimer = 3000;
+            }
+        },
+
+        render() {
+            let html = '';
+            
+            html += `
+                <div style="position: absolute; top: 30px; left: 10px; color: white; font-size: 14px;">
+                    <div style="margin-bottom: 8px;">
+                        <span style="color: #ff4444;">❤ 生命值: </span>
+                        <div style="display: inline-block; width: 100px; height: 10px; background: #333; vertical-align: middle;">
+                            <div style="width: ${PlayerModule.health}%; height: 100%; background: #ff4444;"></div>
+                        </div>
+                        <span> ${Math.floor(PlayerModule.health)}</span>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <span style="color: #8888ff;">🧠 理智值: </span>
+                        <div style="display: inline-block; width: 100px; height: 10px; background: #333; vertical-align: middle;">
+                            <div style="width: ${PlayerModule.sanity}%; height: 100%; background: #8888ff;"></div>
+                        </div>
+                        <span> ${Math.floor(PlayerModule.sanity)}</span>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <span style="color: #ffff44;">🔦 电量: </span>
+                        <div style="display: inline-block; width: 100px; height: 10px; background: #333; vertical-align: middle;">
+                            <div style="width: ${(PlayerModule.flashlight / CONFIG.FLASHLIGHT_DURATION) * 100}%; height: 100%; background: #ffff44;"></div>
+                        </div>
+                        <span> ${Math.floor(PlayerModule.flashlight / 1000)}s</span>
+                    </div>
+                </div>
+            `;
+            
+            html += `
+                <div style="position: absolute; bottom: 10px; left: 10px; color: #aaa; font-size: 11px;">
+                    WASD-移动 | Shift-奔跑 | 空格-交互/躲藏 | E-使用物品
+                </div>
+            `;
+            
+            html += `
+                <div style="position: absolute; bottom: 60px; right: 10px; background: rgba(0,0,0,0.7); padding: 10px; border: 1px solid #444;">
+                    <div style="color: #88ff88; margin-bottom: 8px; font-size: 12px;">背包 (${PlayerModule.inventory.length}/${CONFIG.MAX_INVENTORY})</div>
+            `;
+            
+            for (let i = 0; i < CONFIG.MAX_INVENTORY; i++) {
+                const item = PlayerModule.inventory[i];
+                const selected = this.selectedItem === i;
+                const bgColor = selected ? '#444' : '#222';
+                const borderColor = selected ? '#88ff88' : '#444';
+                
+                if (item) {
+                    const icons = { battery: '🔋', medkit: '💊', key: '🔑' };
+                    html += `
+                        <div style="display: inline-block; width: 36px; height: 36px; background: ${bgColor}; border: 1px solid ${borderColor}; margin: 2px; text-align: center; line-height: 36px; cursor: pointer;"
+                             onclick="GameModule.useOrDropItem(${i})">
+                            ${icons[item.type] || '?'}
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div style="display: inline-block; width: 36px; height: 36px; background: ${bgColor}; border: 1px solid ${borderColor}; margin: 2px;"></div>
+                    `;
+                }
+            }
+            
+            html += `
+                    <div style="color: #666; font-size: 10px; margin-top: 4px;">点击使用/按Q丢弃</div>
+                </div>
+            `;
+            
+            if (this.messageQueue.length > 0) {
+                html += `
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                background: rgba(0,0,0,0.8); color: #ffcc88; padding: 15px 30px; 
+                                font-size: 16px; text-align: center; border: 1px solid #664422;">
+                        ${this.messageQueue[0]}
+                    </div>
+                `;
+            }
+            
+            if (PlayerModule.isHiding) {
+                html += `
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                color: #88ff88; font-size: 18px; text-shadow: 0 0 10px #000;">
+                        正在躲藏中... 按空格离开
+                    </div>
+                `;
+            }
+            
+            this.uiElement.innerHTML = html;
+        },
+
+        showEndScreen(stats, escaped) {
+            const sanityNote = stats.minSanity < 30 
+                ? '你感觉自己已经分不清什么是真实，什么是幻觉了...' 
+                : stats.minSanity < 50 
+                    ? '这段经历在你心中留下了难以磨灭的阴影。'
+                    : '你成功保持了理智，这简直是个奇迹。';
+            
+            const outcome = escaped 
+                ? '<span style="color: #44ff44;">你成功逃离了这座地狱！</span>'
+                : '<span style="color: #ff4444;">你没能逃出去...</span>';
+            
+            this.uiElement.innerHTML = `
+                <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+                            background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
+                            justify-content: center; align-items: center; color: white;">
+                    <h2 style="color: ${escaped ? '#44ff44' : '#ff4444'}; margin-bottom: 30px;">
+                        ${escaped ? '逃 生' : '死 亡'}
+                    </h2>
+                    
+                    <div style="background: #1a1a1a; padding: 30px; border: 1px solid #333; margin-bottom: 30px;">
+                        <h3 style="color: #ffaa00; margin-bottom: 20px; text-align: center;">本局统计</h3>
+                        <div style="color: #aaa; line-height: 2;">
+                            <div>存活时间: <span style="color: #fff;">${Math.floor(stats.survivalTime / 1000)}秒</span></div>
+                            <div>探索房间: <span style="color: #fff;">${stats.exploredRooms}</span></div>
+                            <div>收集物品: <span style="color: #fff;">${stats.itemsCollected}</span></div>
+                            <div>理智值最低: <span style="color: #fff;">${Math.floor(stats.minSanity)}%</span></div>
+                        </div>
+                    </div>
+                    
+                    <div style="color: #aa8866; font-style: italic; max-width: 400px; text-align: center; margin-bottom: 30px;">
+                        "${sanityNote}"
+                    </div>
+                    
+                    <button onclick="GameModule.restart()" 
+                            style="padding: 15px 40px; font-size: 18px; background: #333; 
+                                   color: white; border: 1px solid #666; cursor: pointer;">
+                        再来一局
+                    </button>
+                </div>
+            `;
+        }
+    };
+
+    // ==================== 主游戏模块 ====================
+    const GameModule = {
+        state: 'playing',
+        keys: {},
+        lastTime: 0,
+        gameTime: 0,
+        footstepTimer: 0,
+        stats: {
+            survivalTime: 0,
+            exploredRooms: 0,
+            itemsCollected: 0,
+            minSanity: 100
+        },
+        windSound: null,
+
+        init() {
+            AudioModule.init();
+            MapModule.generate();
+            PlayerModule.init();
+            MonsterModule.init();
+            RenderModule.init();
+            UIModule.init();
+            
+            this.stats = {
+                survivalTime: 0,
+                exploredRooms: 0,
+                itemsCollected: 0,
+                minSanity: 100
+            };
+            
+            this.setupInput();
+            this.windSound = AudioModule.playWind();
+            
+            UIModule.showMessage('你在一间废弃的病房中醒来...');
+            setTimeout(() => UIModule.showMessage('找到钥匙，逃离这里。'), 3500);
+        },
+
+        setupInput() {
+            document.addEventListener('keydown', (e) => {
+                AudioModule.resume();
+                this.keys[e.key] = true;
+                
+                if (e.key === ' ' || e.key === 'Spacebar') {
+                    e.preventDefault();
+                    this.handleInteraction();
+                }
+                
+                if (e.key === 'e' || e.key === 'E') {
+                    this.useOrDropItem(UIModule.selectedItem);
+                }
+                
+                if (e.key === 'q' || e.key === 'Q') {
+                    PlayerModule.dropItem(UIModule.selectedItem);
+                }
+                
+                if (e.key >= '1' && e.key <= '5') {
+                    UIModule.selectedItem = parseInt(e.key) - 1;
+                }
+            });
+            
+            document.addEventListener('keyup', (e) => {
+                this.keys[e.key] = false;
+            });
+        },
+
+        handleInteraction() {
+            if (PlayerModule.isHiding) {
+                PlayerModule.toggleHide();
+                AudioModule.playDoor();
+                return;
+            }
+            
+            for (let i = MapModule.items.length - 1; i >= 0; i--) {
+                const item = MapModule.items[i];
+                const dist = Utils.distance(PlayerModule.x, PlayerModule.y, item.x, item.y);
+                if (dist < 1.5) {
+                    if (PlayerModule.pickupItem(item)) {
+                        MapModule.items.splice(i, 1);
+                        AudioModule.playPickup();
+                        UIModule.showMessage(`拾取了 ${item.name}`);
+                        this.stats.itemsCollected++;
+                    } else {
+                        UIModule.showMessage('背包已满！');
+                    }
+                    return;
+                }
+            }
+            
+            for (const item of MapModule.narrativeItems) {
+                if (item.discovered) continue;
+                const dist = Utils.distance(PlayerModule.x, PlayerModule.y, item.x, item.y);
+                if (dist < 1.5) {
+                    item.discovered = true;
+                    UIModule.showMessage(item.text);
+                    PlayerModule.sanity = Math.max(0, PlayerModule.sanity - 5);
+                    return;
+                }
+            }
+            
+            const furniture = MapModule.getFurnitureAt(PlayerModule.x, PlayerModule.y);
+            if (furniture) {
+                PlayerModule.toggleHide();
+                AudioModule.playDoor();
+                return;
+            }
+            
+            const room = MapModule.getRoomAt(PlayerModule.x, PlayerModule.y);
+            if (room && room.type === 'exit') {
+                const hasKey = PlayerModule.inventory.some(i => i.type === 'key');
+                if (hasKey) {
+                    this.endGame(true);
+                } else {
+                    UIModule.showMessage('这扇门需要钥匙...');
+                }
+            }
+        },
+
+        useOrDropItem(index) {
+            if (PlayerModule.useItem(index)) {
+                AudioModule.playPickup();
+            }
+        },
+
+        update(dt) {
+            if (this.state !== 'playing') return;
+            
+            this.gameTime += dt;
+            this.stats.survivalTime += dt;
+            
+            PlayerModule.update(dt, this.keys);
+            MonsterModule.update(dt, PlayerModule);
+            
+            this.stats.minSanity = Math.min(this.stats.minSanity, PlayerModule.sanity);
+            this.stats.exploredRooms = PlayerModule.exploredRooms.size;
+            
+            this.footstepTimer -= dt;
+            if (!PlayerModule.isHiding && (this.keys['w'] || this.keys['s'] || this.keys['a'] || this.keys['d'])) {
+                const interval = PlayerModule.isRunning ? 180 : 300;
+                if (this.footstepTimer <= 0) {
+                    AudioModule.playFootstep(Math.random() < 0.3);
+                    this.footstepTimer = interval;
+                }
+            }
+            
+            if (PlayerModule.flashlight <= 10000 && PlayerModule.flashlight > 0 && Math.random() < 0.01) {
+                AudioModule.playFlicker();
+            }
+            
+            if (PlayerModule.health <= 0) {
+                this.endGame(false);
+            }
+            
+            RenderModule.render(dt, this.gameTime);
+            UIModule.update(dt, this.gameTime);
+        },
+
+        endGame(escaped) {
+            this.state = 'end';
+            if (this.windSound && this.windSound.noise) {
+                this.windSound.noise.stop();
+            }
+            UIModule.showEndScreen(this.stats, escaped);
+        },
+
+        restart() {
+            this.state = 'playing';
+            this.gameTime = 0;
+            MapModule.generate();
+            PlayerModule.init();
+            MonsterModule.init();
+            this.stats = {
+                survivalTime: 0,
+                exploredRooms: 0,
+                itemsCollected: 0,
+                minSanity: 100
+            };
+            this.windSound = AudioModule.playWind();
+            UIModule.showMessage('你在一间废弃的病房中醒来...');
+        },
+
+        gameLoop(timestamp) {
+            const dt = timestamp - this.lastTime;
+            this.lastTime = timestamp;
+            
+            this.update(Math.min(dt, 50));
+            
+            requestAnimationFrame((t) => this.gameLoop(t));
+        },
+
+        start() {
+            this.init();
+            this.lastTime = performance.now();
+            requestAnimationFrame((t) => this.gameLoop(t));
+        }
+    };
+
+    window.onload = () => {
+        GameModule.start();
+    };
+    </script>
+</body>
+</html>

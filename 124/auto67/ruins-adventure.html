@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>遗迹探险 - Ruins Adventure</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+            border: 4px solid #4a4a6a;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+        }
+        #gameCanvas {
+            display: block;
+            background: #2d2d44;
+        }
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #f0e68c;
+            font-size: 18px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            z-index: 10;
+        }
+        #hud div {
+            margin: 5px 0;
+        }
+        #victoryScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #f0e68c;
+            z-index: 100;
+        }
+        #victoryScreen h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #ffd700;
+        }
+        #victoryScreen p {
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+        #restartBtn {
+            padding: 15px 40px;
+            font-size: 20px;
+            background: linear-gradient(180deg, #8b4513, #5c3317);
+            color: #f0e68c;
+            border: 3px solid #d4a574;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        #restartBtn:hover {
+            background: linear-gradient(180deg, #a0522d, #8b4513);
+            transform: scale(1.05);
+        }
+        #deathScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(139, 0, 0, 0.7);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            z-index: 99;
+        }
+        #deathScreen h2 {
+            font-size: 36px;
+            text-shadow: 0 0 10px #000;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="1200" height="600"></canvas>
+        <div id="hud">
+            <div>❤️ 生命: <span id="health">100</span></div>
+            <div>🏆 分数: <span id="score">0</span></div>
+            <div>💎 遗物碎片: <span id="fragments">0</span></div>
+        </div>
+        <div id="victoryScreen">
+            <h1>🏆 恭喜通关！</h1>
+            <p>最终得分: <span id="finalScore">0</span></p>
+            <p>收集遗物: <span id="finalFragments">0</span></p>
+            <button id="restartBtn">重新开始</button>
+        </div>
+        <div id="deathScreen">
+            <h2>💀 你已死亡，正在复活...</h2>
+        </div>
+    </div>
+
+    <script>
+    // ==================== 配置模块 ====================
+    const CONFIG = {
+        CANVAS_WIDTH: 1200,
+        CANVAS_HEIGHT: 600,
+        GRAVITY: 0.6,
+        PLAYER: {
+            WIDTH: 40,
+            HEIGHT: 60,
+            SPEED: 5,
+            JUMP_FORCE: -14,
+            DOUBLE_JUMP_FORCE: -9.8,
+            MAX_HEALTH: 100,
+            ATTACK_RANGE: 30,
+            ATTACK_DAMAGE: 25,
+            ATTACK_WINDUP: 10,
+            ATTACK_ACTIVE: 8,
+            ATTACK_RECOVERY: 15,
+            EDGE_GRAB_TOLERANCE: 10
+        },
+        ENEMY: {
+            PATROL: {
+                WIDTH: 45,
+                HEIGHT: 55,
+                SPEED: 2,
+                CHASE_SPEED: 3.5,
+                VISION_RANGE: 200,
+                PATROL_RANGE: 150,
+                MAX_HEALTH: 80,
+                DAMAGE: 15,
+                KNOCKBACK: 8,
+                HIT_STUN: 30
+            },
+            TURRET: {
+                WIDTH: 50,
+                HEIGHT: 50,
+                FIRE_RATE: 120,
+                BULLET_SPEED: 6,
+                BULLET_DAMAGE: 20,
+                MAX_HEALTH: 100
+            }
+        },
+        GAME: {
+            RESPAWN_TIME: 180,
+            INVINCIBLE_TIME: 120
+        }
+    };
+
+    // ==================== 工具函数模块 ====================
+    const Utils = {
+        clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        },
+        rectCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        },
+        distance(x1, y1, x2, y2) {
+            return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        }
+    };
+
+    // ==================== 音频模块 ====================
+    const AudioManager = (function() {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playCollectSound() {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(1046.5, audioContext.currentTime + 0.1);
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.2);
+        }
+
+        function playHitSound() {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.type = 'square';
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.15);
+            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.15);
+        }
+
+        function playJumpSound() {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.1);
+            gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        }
+
+        return { playCollectSound, playHitSound, playJumpSound };
+    })();
+
+    // ==================== 输入模块 ====================
+    const InputManager = (function() {
+        const keys = {};
+        
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+                e.preventDefault();
+            }
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        function isKeyPressed(keyCode) {
+            return keys[keyCode] || false;
+        }
+
+        function getHorizontalAxis() {
+            const left = isKeyPressed('ArrowLeft') || isKeyPressed('KeyA');
+            const right = isKeyPressed('ArrowRight') || isKeyPressed('KeyD');
+            if (left && right) return 0;
+            if (left) return -1;
+            if (right) return 1;
+            return 0;
+        }
+
+        function isJumpPressed() {
+            return isKeyPressed('Space') || isKeyPressed('ArrowUp') || isKeyPressed('KeyW');
+        }
+
+        function isAttackPressed() {
+            return isKeyPressed('KeyJ') || isKeyPressed('KeyZ');
+        }
+
+        return { isKeyPressed, getHorizontalAxis, isJumpPressed, isAttackPressed };
+    })();
+
+    // ==================== 玩家模块 ====================
+    class Player {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.vx = 0;
+            this.vy = 0;
+            this.width = CONFIG.PLAYER.WIDTH;
+            this.height = CONFIG.PLAYER.HEIGHT;
+            this.health = CONFIG.PLAYER.MAX_HEALTH;
+            this.maxHealth = CONFIG.PLAYER.MAX_HEALTH;
+            this.facingRight = true;
+            this.onGround = false;
+            this.jumpCount = 0;
+            this.maxJumps = 2;
+            this.score = 0;
+            this.fragments = 0;
+            
+            this.isAttacking = false;
+            this.attackFrame = 0;
+            this.attackWindup = CONFIG.PLAYER.ATTACK_WINDUP;
+            this.attackActive = CONFIG.PLAYER.ATTACK_ACTIVE;
+            this.attackRecovery = CONFIG.PLAYER.ATTACK_RECOVERY;
+            
+            this.invincible = false;
+            this.invincibleTimer = 0;
+            this.isDead = false;
+            this.respawnTimer = 0;
+            
+            this.jumpPressed = false;
+            this.attackPressed = false;
+        }
+
+        update(platforms, camera) {
+            if (this.isDead) {
+                this.respawnTimer--;
+                if (this.respawnTimer <= 0) {
+                    this.respawn();
+                }
+                return;
+            }
+
+            if (this.invincible) {
+                this.invincibleTimer--;
+                if (this.invincibleTimer <= 0) {
+                    this.invincible = false;
+                }
+            }
+
+            this.handleInput();
+            this.handleAttack();
+
+            if (!this.isAttacking || this.attackFrame < this.attackWindup) {
+                this.vx = InputManager.getHorizontalAxis() * CONFIG.PLAYER.SPEED;
+            }
+
+            if (this.vx > 0) this.facingRight = true;
+            if (this.vx < 0) this.facingRight = false;
+
+            this.vy += CONFIG.GRAVITY;
+            this.vy = Math.min(this.vy, 15);
+
+            this.x += this.vx;
+            this.handleHorizontalCollision(platforms);
+            
+            this.y += this.vy;
+            this.handleVerticalCollision(platforms);
+
+            if (this.x < 0) this.x = 0;
+            if (this.y > CONFIG.CANVAS_HEIGHT + 100) {
+                this.die();
+            }
+        }
+
+        handleInput() {
+            const jumpPressed = InputManager.isJumpPressed();
+            if (jumpPressed && !this.jumpPressed) {
+                if (this.jumpCount < this.maxJumps) {
+                    const force = this.jumpCount === 0 ? CONFIG.PLAYER.JUMP_FORCE : CONFIG.PLAYER.DOUBLE_JUMP_FORCE;
+                    this.vy = force;
+                    this.jumpCount++;
+                    this.onGround = false;
+                    AudioManager.playJumpSound();
+                }
+            }
+            this.jumpPressed = jumpPressed;
+
+            const attackPressed = InputManager.isAttackPressed();
+            if (attackPressed && !this.attackPressed && !this.isAttacking && this.onGround) {
+                this.startAttack();
+            }
+            this.attackPressed = attackPressed;
+        }
+
+        startAttack() {
+            this.isAttacking = true;
+            this.attackFrame = 0;
+            this.vx = 0;
+        }
+
+        handleAttack() {
+            if (this.isAttacking) {
+                this.attackFrame++;
+                const totalFrames = this.attackWindup + this.attackActive + this.attackRecovery;
+                if (this.attackFrame >= totalFrames) {
+                    this.isAttacking = false;
+                    this.attackFrame = 0;
+                }
+            }
+        }
+
+        isAttackActive() {
+            return this.isAttacking && 
+                   this.attackFrame >= this.attackWindup && 
+                   this.attackFrame < this.attackWindup + this.attackActive;
+        }
+
+        getAttackHitbox() {
+            return {
+                x: this.facingRight ? this.x + this.width : this.x - CONFIG.PLAYER.ATTACK_RANGE,
+                y: this.y,
+                width: CONFIG.PLAYER.ATTACK_RANGE,
+                height: this.height
+            };
+        }
+
+        handleHorizontalCollision(platforms) {
+            for (const platform of platforms) {
+                if (Utils.rectCollision(this, platform)) {
+                    if (this.vx > 0) {
+                        this.x = platform.x - this.width;
+                    } else if (this.vx < 0) {
+                        this.x = platform.x + platform.width;
+                    }
+                    this.vx = 0;
+                }
+            }
+        }
+
+        handleVerticalCollision(platforms) {
+            this.onGround = false;
+            for (const platform of platforms) {
+                if (Utils.rectCollision(this, platform)) {
+                    if (this.vy > 0) {
+                        this.y = platform.y - this.height;
+                        this.vy = 0;
+                        this.onGround = true;
+                        this.jumpCount = 0;
+                    } else if (this.vy < 0) {
+                        this.y = platform.y + platform.height;
+                        this.vy = 0;
+                    }
+                }
+            }
+        }
+
+        takeDamage(amount) {
+            if (this.invincible || this.isDead) return;
+            this.health -= amount;
+            this.invincible = true;
+            this.invincibleTimer = CONFIG.GAME.INVINCIBLE_TIME;
+            AudioManager.playHitSound();
+            if (this.health <= 0) {
+                this.die();
+            }
+        }
+
+        die() {
+            this.isDead = true;
+            this.respawnTimer = CONFIG.GAME.RESPAWN_TIME;
+            document.getElementById('deathScreen').style.display = 'flex';
+        }
+
+        respawn() {
+            this.isDead = false;
+            this.health = this.maxHealth;
+            this.invincible = true;
+            this.invincibleTimer = CONFIG.GAME.INVINCIBLE_TIME;
+            this.vy = 0;
+            this.vx = 0;
+            document.getElementById('deathScreen').style.display = 'none';
+            if (Level.currentCheckpoint) {
+                this.x = Level.currentCheckpoint.x;
+                this.y = Level.currentCheckpoint.y;
+            }
+        }
+
+        addScore(amount) {
+            this.score += amount;
+        }
+
+        collectFragment() {
+            this.fragments++;
+            this.score += 100;
+            AudioManager.playCollectSound();
+        }
+
+        getHitbox() {
+            return {
+                x: this.x + 5,
+                y: this.y + 5,
+                width: this.width - 10,
+                height: this.height - 5
+            };
+        }
+
+        draw(ctx, camera) {
+            if (this.isDead) return;
+
+            const drawX = this.x - camera.x;
+            const drawY = this.y - camera.y;
+
+            if (this.invincible && Math.floor(this.invincibleTimer / 5) % 2 === 0) {
+                ctx.globalAlpha = 0.5;
+            }
+
+            ctx.save();
+            
+            if (!this.facingRight) {
+                ctx.translate(drawX + this.width, drawY);
+                ctx.scale(-1, 1);
+                ctx.translate(-drawX, -drawY);
+            }
+
+            ctx.fillStyle = '#8b4513';
+            ctx.fillRect(drawX + 5, drawY + 20, 30, 35);
+            
+            ctx.fillStyle = '#deb887';
+            ctx.beginPath();
+            ctx.arc(drawX + 20, drawY + 15, 15, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#654321';
+            ctx.beginPath();
+            ctx.ellipse(drawX + 20, drawY + 8, 17, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#000';
+            ctx.fillRect(drawX + 14, drawY + 13, 4, 4);
+            ctx.fillRect(drawX + 22, drawY + 13, 4, 4);
+            
+            ctx.fillStyle = '#5c4033';
+            const legOffset = this.onGround ? Math.sin(Date.now() * 0.01 * Math.abs(this.vx)) * 5 : 0;
+            ctx.fillRect(drawX + 8, drawY + 50, 10, 10 + legOffset);
+            ctx.fillRect(drawX + 22, drawY + 50, 10, 10 - legOffset);
+
+            if (this.isAttacking) {
+                ctx.fillStyle = '#c0c0c0';
+                const attackProgress = this.attackFrame / (this.attackWindup + this.attackActive + this.attackRecovery);
+                const swordAngle = -Math.PI / 4 + attackProgress * Math.PI / 2;
+                ctx.save();
+                ctx.translate(drawX + 35, drawY + 30);
+                ctx.rotate(swordAngle);
+                ctx.fillRect(0, -3, 35, 6);
+                ctx.fillStyle = '#ffd700';
+                ctx.fillRect(-5, -5, 8, 10);
+                ctx.restore();
+
+                if (this.isAttackActive()) {
+                    ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+                    const hitbox = this.getAttackHitbox();
+                    ctx.fillRect(hitbox.x - camera.x, hitbox.y - camera.y, hitbox.width, hitbox.height);
+                }
+            }
+
+            ctx.restore();
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    // ==================== 巡逻敌人模块 ====================
+    class PatrolEnemy {
+        constructor(x, y, patrolRange) {
+            this.x = x;
+            this.y = y;
+            this.startX = x;
+            this.vx = CONFIG.ENEMY.PATROL.SPEED;
+            this.vy = 0;
+            this.width = CONFIG.ENEMY.PATROL.WIDTH;
+            this.height = CONFIG.ENEMY.PATROL.HEIGHT;
+            this.patrolRange = patrolRange || CONFIG.ENEMY.PATROL.PATROL_RANGE;
+            this.health = CONFIG.ENEMY.PATROL.MAX_HEALTH;
+            this.maxHealth = CONFIG.ENEMY.PATROL.MAX_HEALTH;
+            this.damage = CONFIG.ENEMY.PATROL.DAMAGE;
+            
+            this.isChasing = false;
+            this.facingRight = true;
+            this.hitStun = 0;
+            this.knockbackX = 0;
+            this.isDead = false;
+        }
+
+        update(player, platforms) {
+            if (this.isDead) return;
+
+            if (this.hitStun > 0) {
+                this.hitStun--;
+                this.x += this.knockbackX;
+                this.knockbackX *= 0.8;
+                return;
+            }
+
+            const distToPlayer = Utils.distance(this.x, this.y, player.x, player.y);
+            this.isChasing = distToPlayer < CONFIG.ENEMY.PATROL.VISION_RANGE && !player.isDead;
+
+            if (this.isChasing) {
+                const direction = player.x > this.x ? 1 : -1;
+                this.vx = direction * CONFIG.ENEMY.PATROL.CHASE_SPEED;
+                this.facingRight = direction > 0;
+            } else {
+                if (this.x > this.startX + this.patrolRange) {
+                    this.vx = -CONFIG.ENEMY.PATROL.SPEED;
+                    this.facingRight = false;
+                } else if (this.x < this.startX - this.patrolRange) {
+                    this.vx = CONFIG.ENEMY.PATROL.SPEED;
+                    this.facingRight = true;
+                }
+            }
+
+            this.vy += CONFIG.GRAVITY;
+            this.x += this.vx;
+            this.y += this.vy;
+
+            for (const platform of platforms) {
+                if (Utils.rectCollision(this, platform)) {
+                    if (this.vy > 0) {
+                        this.y = platform.y - this.height;
+                        this.vy = 0;
+                    }
+                }
+            }
+
+            if (Utils.rectCollision(this.getHitbox(), player.getHitbox())) {
+                player.takeDamage(this.damage);
+            }
+        }
+
+        takeHit(attackHitbox, knockbackDir) {
+            if (this.isDead) return false;
+            
+            if (Utils.rectCollision(attackHitbox, this)) {
+                this.health -= CONFIG.PLAYER.ATTACK_DAMAGE;
+                this.hitStun = CONFIG.ENEMY.PATROL.HIT_STUN;
+                this.knockbackX = knockbackDir * CONFIG.ENEMY.PATROL.KNOCKBACK;
+                AudioManager.playHitSound();
+                
+                if (this.health <= 0) {
+                    this.isDead = true;
+                    return true;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        getHitbox() {
+            return {
+                x: this.x + 5,
+                y: this.y + 5,
+                width: this.width - 10,
+                height: this.height - 10
+            };
+        }
+
+        draw(ctx, camera) {
+            if (this.isDead) return;
+
+            const drawX = this.x - camera.x;
+            const drawY = this.y - camera.y;
+
+            ctx.save();
+            if (!this.facingRight) {
+                ctx.translate(drawX + this.width, drawY);
+                ctx.scale(-1, 1);
+                ctx.translate(-drawX, -drawY);
+            }
+
+            ctx.fillStyle = '#4a0080';
+            ctx.fillRect(drawX + 5, drawY + 20, 35, 30);
+            
+            ctx.fillStyle = '#708090';
+            ctx.beginPath();
+            ctx.arc(drawX + 22, drawY + 15, 14, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = this.hitStun > 0 ? '#ff0000' : '#ff0000';
+            ctx.fillRect(drawX + 15, drawY + 12, 5, 5);
+            ctx.fillRect(drawX + 25, drawY + 12, 5, 5);
+            
+            ctx.fillStyle = '#4a0080';
+            ctx.fillRect(drawX + 8, drawY + 45, 12, 10);
+            ctx.fillRect(drawX + 25, drawY + 45, 12, 10);
+
+            ctx.restore();
+
+            ctx.fillStyle = '#333';
+            ctx.fillRect(drawX, drawY - 10, this.width, 5);
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(drawX, drawY - 10, this.width * (this.health / this.maxHealth), 5);
+        }
+    }
+
+    // ==================== 炮台敌人模块 ====================
+    class TurretEnemy {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.width = CONFIG.ENEMY.TURRET.WIDTH;
+            this.height = CONFIG.ENEMY.TURRET.HEIGHT;
+            this.health = CONFIG.ENEMY.TURRET.MAX_HEALTH;
+            this.maxHealth = CONFIG.ENEMY.TURRET.MAX_HEALTH;
+            this.fireTimer = 0;
+            this.fireRate = CONFIG.ENEMY.TURRET.FIRE_RATE;
+            this.bullets = [];
+            this.isDead = false;
+            this.hitStun = 0;
+        }
+
+        update(player) {
+            if (this.isDead) return;
+
+            if (this.hitStun > 0) {
+                this.hitStun--;
+                return;
+            }
+
+            this.fireTimer++;
+            if (this.fireTimer >= this.fireRate && !player.isDead) {
+                this.fire(player);
+                this.fireTimer = 0;
+            }
+
+            for (let i = this.bullets.length - 1; i >= 0; i--) {
+                const bullet = this.bullets[i];
+                bullet.x += bullet.vx;
+                bullet.y += bullet.vy;
+                
+                if (Utils.rectCollision(bullet, player.getHitbox())) {
+                    player.takeDamage(CONFIG.ENEMY.TURRET.BULLET_DAMAGE);
+                    this.bullets.splice(i, 1);
+                    continue;
+                }
+
+                if (bullet.x < this.x - 500 || bullet.x > this.x + 500 ||
+                    bullet.y < this.y - 300 || bullet.y > this.y + 300) {
+                    this.bullets.splice(i, 1);
+                }
+            }
+        }
+
+        fire(player) {
+            const angle = Math.atan2(player.y + player.height / 2 - (this.y + 10), 
+                                     player.x + player.width / 2 - (this.x + this.width / 2));
+            this.bullets.push({
+                x: this.x + this.width / 2 - 5,
+                y: this.y + 10,
+                width: 10,
+                height: 10,
+                vx: Math.cos(angle) * CONFIG.ENEMY.TURRET.BULLET_SPEED,
+                vy: Math.sin(angle) * CONFIG.ENEMY.TURRET.BULLET_SPEED
+            });
+        }
+
+        takeHit(attackHitbox) {
+            if (this.isDead) return false;
+            
+            if (Utils.rectCollision(attackHitbox, this)) {
+                this.health -= CONFIG.PLAYER.ATTACK_DAMAGE;
+                this.hitStun = 20;
+                AudioManager.playHitSound();
+                
+                if (this.health <= 0) {
+                    this.isDead = true;
+                    return true;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        draw(ctx, camera) {
+            if (this.isDead) return;
+
+            const drawX = this.x - camera.x;
+            const drawY = this.y - camera.y;
+
+            ctx.fillStyle = '#555';
+            ctx.fillRect(drawX, drawY + 30, this.width, 20);
+            
+            ctx.fillStyle = this.hitStun > 0 ? '#888' : '#696969';
+            ctx.beginPath();
+            ctx.arc(drawX + this.width / 2, drawY + 25, 22, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#333';
+            ctx.fillRect(drawX + this.width / 2 - 4, drawY + 5, 8, 20);
+
+            for (const bullet of this.bullets) {
+                ctx.fillStyle = '#ff4500';
+                ctx.beginPath();
+                ctx.arc(bullet.x - camera.x + 5, bullet.y - camera.y + 5, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = 'rgba(255, 69, 0, 0.4)';
+                ctx.beginPath();
+                ctx.arc(bullet.x - camera.x + 5, bullet.y - camera.y + 5, 10, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.fillStyle = '#333';
+            ctx.fillRect(drawX, drawY - 10, this.width, 5);
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(drawX, drawY - 10, this.width * (this.health / this.maxHealth), 5);
+        }
+    }
+
+    // ==================== 收集物模块 ====================
+    class Fragment {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.width = 25;
+            this.height = 25;
+            this.collected = false;
+            this.floatOffset = Math.random() * Math.PI * 2;
+            this.collectAnim = 0;
+        }
+
+        update(player) {
+            if (this.collected) {
+                if (this.collectAnim > 0) {
+                    this.collectAnim--;
+                }
+                return;
+            }
+
+            if (Utils.rectCollision(this, player)) {
+                this.collected = true;
+                this.collectAnim = 30;
+                player.collectFragment();
+            }
+        }
+
+        draw(ctx, camera) {
+            if (this.collected && this.collectAnim <= 0) return;
+
+            const floatY = Math.sin(Date.now() * 0.005 + this.floatOffset) * 5;
+            let drawX = this.x - camera.x;
+            let drawY = this.y - camera.y + floatY;
+            let scale = 1;
+            let alpha = 1;
+
+            if (this.collected) {
+                scale = 1 + (30 - this.collectAnim) * 0.1;
+                alpha = this.collectAnim / 30;
+                drawY -= (30 - this.collectAnim) * 2;
+            }
+
+            ctx.globalAlpha = alpha;
+            ctx.save();
+            ctx.translate(drawX + this.width / 2, drawY + this.height / 2);
+            ctx.scale(scale, scale);
+
+            ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 18, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffd700';
+            ctx.beginPath();
+            ctx.moveTo(0, -12);
+            ctx.lineTo(10, 0);
+            ctx.lineTo(0, 12);
+            ctx.lineTo(-10, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#fff8dc';
+            ctx.beginPath();
+            ctx.moveTo(0, -6);
+            ctx.lineTo(4, 0);
+            ctx.lineTo(0, 6);
+            ctx.lineTo(-4, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    // ==================== 存档点模块 ====================
+    class Checkpoint {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.width = 40;
+            this.height = 60;
+            this.activated = false;
+        }
+
+        update(player) {
+            if (!this.activated && Utils.rectCollision(this, player)) {
+                this.activated = true;
+                Level.currentCheckpoint = { x: this.x, y: this.y - 10 };
+                player.addScore(50);
+            }
+        }
+
+        draw(ctx, camera) {
+            const drawX = this.x - camera.x;
+            const drawY = this.y - camera.y;
+
+            ctx.fillStyle = '#8b7355';
+            ctx.fillRect(drawX + 5, drawY + 40, 30, 20);
+
+            ctx.fillStyle = this.activated ? '#ffd700' : '#a0a0a0';
+            ctx.fillRect(drawX + 15, drawY, 10, 45);
+
+            if (this.activated) {
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.4)';
+                ctx.beginPath();
+                ctx.arc(drawX + 20, drawY + 20, 25 + Math.sin(Date.now() * 0.01) * 5, 0, Math.PI * 2);
+                ctx.fill();
+
+                const flameOffset = Math.sin(Date.now() * 0.02) * 3;
+                ctx.fillStyle = '#ff6600';
+                ctx.beginPath();
+                ctx.moveTo(drawX + 20, drawY - 15 + flameOffset);
+                ctx.lineTo(drawX + 30, drawY + 5);
+                ctx.lineTo(drawX + 10, drawY + 5);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#ffff00';
+                ctx.beginPath();
+                ctx.moveTo(drawX + 20, drawY - 10 + flameOffset);
+                ctx.lineTo(drawX + 25, drawY);
+                ctx.lineTo(drawX + 15, drawY);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            ctx.fillStyle = this.activated ? '#4a3728' : '#555';
+            ctx.beginPath();
+            ctx.arc(drawX + 20, drawY + 50, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // ==================== 终点神器模块 ====================
+    class Artifact {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.width = 60;
+            this.height = 80;
+            this.collected = false;
+        }
+
+        update(player) {
+            if (!this.collected && Utils.rectCollision(this, player)) {
+                this.collected = true;
+                Game.victory();
+            }
+        }
+
+        draw(ctx, camera) {
+            if (this.collected) return;
+
+            const drawX = this.x - camera.x;
+            const drawY = this.y - camera.y;
+            const pulse = Math.sin(Date.now() * 0.005) * 0.2 + 1;
+
+            ctx.fillStyle = 'rgba(255, 215, 0, 0.2)';
+            ctx.beginPath();
+            ctx.arc(drawX + 30, drawY + 40, 50 * pulse, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#6b4423';
+            ctx.fillRect(drawX + 5, drawY + 60, 50, 20);
+
+            ctx.save();
+            ctx.translate(drawX + 30, drawY + 35);
+            ctx.rotate(Date.now() * 0.002);
+
+            ctx.fillStyle = '#ffd700';
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle = (i / 6) * Math.PI * 2;
+                const r = i % 2 === 0 ? 30 : 15;
+                const px = Math.cos(angle) * r;
+                const py = Math.sin(angle) * r;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#fff8dc';
+            ctx.beginPath();
+            ctx.arc(0, 0, 10, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+    }
+
+    // ==================== 关卡模块 ====================
+    const Level = {
+        platforms: [],
+        spikes: [],
+        enemies: [],
+        fragments: [],
+        checkpoints: [],
+        artifact: null,
+        currentCheckpoint: null,
+        levelWidth: 4000,
+
+        init() {
+            this.platforms = [];
+            this.spikes = [];
+            this.enemies = [];
+            this.fragments = [];
+            this.checkpoints = [];
+            this.artifact = null;
+            this.currentCheckpoint = null;
+
+            this.addPlatform(0, 550, 500, 50);
+            this.addPlatform(600, 550, 400, 50);
+            this.addPlatform(1100, 550, 500, 50);
+            this.addPlatform(1700, 550, 300, 50);
+            this.addPlatform(2100, 550, 600, 50);
+            this.addPlatform(2800, 550, 500, 50);
+            this.addPlatform(3400, 550, 600, 50);
+
+            this.addPlatform(200, 430, 150, 25);
+            this.addPlatform(450, 350, 120, 25);
+            this.addPlatform(700, 400, 100, 25);
+            this.addPlatform(900, 320, 150, 25);
+            this.addPlatform(1200, 380, 100, 25);
+            this.addPlatform(1450, 300, 120, 25);
+            this.addPlatform(1750, 400, 100, 25);
+            this.addPlatform(2000, 320, 150, 25);
+            this.addPlatform(2300, 380, 120, 25);
+            this.addPlatform(2550, 280, 100, 25);
+            this.addPlatform(2850, 350, 150, 25);
+            this.addPlatform(3100, 420, 100, 25);
+            this.addPlatform(3350, 340, 120, 25);
+
+            this.addSpikes(520, 530, 60);
+            this.addSpikes(1040, 530, 40);
+            this.addSpikes(1640, 530, 40);
+            this.addSpikes(2040, 530, 40);
+            this.addSpikes(2740, 530, 40);
+            this.addSpikes(3340, 530, 40);
+
+            this.enemies.push(new PatrolEnemy(400, 490, 100));
+            this.enemies.push(new PatrolEnemy(800, 490, 150));
+            this.enemies.push(new PatrolEnemy(1300, 490, 120));
+            this.enemies.push(new PatrolEnemy(2200, 490, 200));
+            this.enemies.push(new PatrolEnemy(2500, 490, 150));
+            this.enemies.push(new PatrolEnemy(3000, 490, 180));
+
+            this.enemies.push(new TurretEnemy(480, 490));
+            this.enemies.push(new TurretEnemy(1000, 270));
+            this.enemies.push(new TurretEnemy(1550, 490));
+            this.enemies.push(new TurretEnemy(2100, 270));
+            this.enemies.push(new TurretEnemy(2700, 230));
+            this.enemies.push(new TurretEnemy(3200, 490));
+
+            this.fragments.push(new Fragment(250, 390));
+            this.fragments.push(new Fragment(500, 310));
+            this.fragments.push(new Fragment(750, 360));
+            this.fragments.push(new Fragment(950, 280));
+            this.fragments.push(new Fragment(1250, 340));
+            this.fragments.push(new Fragment(1500, 260));
+            this.fragments.push(new Fragment(1800, 360));
+            this.fragments.push(new Fragment(2050, 280));
+            this.fragments.push(new Fragment(2350, 340));
+            this.fragments.push(new Fragment(2600, 240));
+            this.fragments.push(new Fragment(2900, 310));
+            this.fragments.push(new Fragment(3150, 380));
+            this.fragments.push(new Fragment(3400, 300));
+
+            this.checkpoints.push(new Checkpoint(550, 490));
+            this.checkpoints.push(new Checkpoint(1350, 490));
+            this.checkpoints.push(new Checkpoint(2250, 490));
+            this.checkpoints.push(new Checkpoint(3050, 490));
+
+            this.artifact = new Artifact(3750, 470);
+
+            this.currentCheckpoint = { x: 50, y: 490 };
+        },
+
+        addPlatform(x, y, width, height) {
+            this.platforms.push({ x, y, width, height, type: 'platform' });
+        },
+
+        addSpikes(x, y, width) {
+            this.spikes.push({ x, y, width, height: 25, type: 'spike' });
+        },
+
+        update(player) {
+            for (const enemy of this.enemies) {
+                enemy.update(player, this.platforms);
+                
+                if (player.isAttackActive() && enemy instanceof PatrolEnemy) {
+                    const hitbox = player.getAttackHitbox();
+                    const knockbackDir = player.facingRight ? 1 : -1;
+                    if (enemy.takeHit(hitbox, knockbackDir)) {
+                        player.addScore(50);
+                    }
+                }
+                if (player.isAttackActive() && enemy instanceof TurretEnemy) {
+                    const hitbox = player.getAttackHitbox();
+                    if (enemy.takeHit(hitbox)) {
+                        player.addScore(75);
+                    }
+                }
+            }
+
+            for (const spike of this.spikes) {
+                if (Utils.rectCollision(spike, player.getHitbox())) {
+                    player.die();
+                }
+            }
+
+            for (const fragment of this.fragments) {
+                fragment.update(player);
+            }
+
+            for (const checkpoint of this.checkpoints) {
+                checkpoint.update(player);
+            }
+
+            if (this.artifact) {
+                this.artifact.update(player);
+            }
+        },
+
+        draw(ctx, camera) {
+            this.drawBackground(ctx, camera);
+
+            for (const platform of this.platforms) {
+                const drawX = platform.x - camera.x;
+                const drawY = platform.y - camera.y;
+                
+                if (drawX + platform.width < 0 || drawX > CONFIG.CANVAS_WIDTH) continue;
+
+                ctx.fillStyle = '#6b5344';
+                ctx.fillRect(drawX, drawY, platform.width, platform.height);
+                
+                ctx.fillStyle = '#5a4535';
+                for (let i = 0; i < platform.width; i += 40) {
+                    ctx.fillRect(drawX + i + 5, drawY + 5, 30, 3);
+                }
+                
+                ctx.fillStyle = '#7a6354';
+                ctx.fillRect(drawX, drawY, platform.width, 5);
+            }
+
+            for (const spike of this.spikes) {
+                const drawX = spike.x - camera.x;
+                const drawY = spike.y - camera.y;
+                
+                ctx.fillStyle = '#808080';
+                for (let i = 0; i < spike.width; i += 20) {
+                    ctx.beginPath();
+                    ctx.moveTo(drawX + i, drawY + spike.height);
+                    ctx.lineTo(drawX + i + 10, drawY);
+                    ctx.lineTo(drawX + i + 20, drawY + spike.height);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
+
+            for (const checkpoint of this.checkpoints) {
+                checkpoint.draw(ctx, camera);
+            }
+
+            for (const fragment of this.fragments) {
+                fragment.draw(ctx, camera);
+            }
+
+            if (this.artifact) {
+                this.artifact.draw(ctx, camera);
+            }
+
+            for (const enemy of this.enemies) {
+                enemy.draw(ctx, camera);
+            }
+        },
+
+        drawBackground(ctx, camera) {
+            const gradient = ctx.createLinearGradient(0, 0, 0, CONFIG.CANVAS_HEIGHT);
+            gradient.addColorStop(0, '#1a1a2e');
+            gradient.addColorStop(0.5, '#2d2d44');
+            gradient.addColorStop(1, '#3d3d5c');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+
+            ctx.fillStyle = '#252540';
+            for (let i = 0; i < 10; i++) {
+                const x = (i * 500 - camera.x * 0.3) % (CONFIG.CANVAS_WIDTH + 500) - 100;
+                ctx.beginPath();
+                ctx.moveTo(x, CONFIG.CANVAS_HEIGHT);
+                ctx.lineTo(x + 100, 300);
+                ctx.lineTo(x + 200, CONFIG.CANVAS_HEIGHT);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            ctx.fillStyle = '#303050';
+            for (let i = 0; i < 15; i++) {
+                const x = (i * 350 - camera.x * 0.5) % (CONFIG.CANVAS_WIDTH + 400) - 150;
+                ctx.fillRect(x, 200, 80, CONFIG.CANVAS_HEIGHT - 200);
+                ctx.fillRect(x + 100, 350, 60, CONFIG.CANVAS_HEIGHT - 350);
+            }
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            for (let i = 0; i < 30; i++) {
+                const x = ((i * 137) % this.levelWidth - camera.x * 0.8 + this.levelWidth) % this.levelWidth;
+                const y = 100 + (i * 47) % 300;
+                ctx.fillRect(x, y, 2, 2);
+            }
+        }
+    };
+
+    // ==================== 相机模块 ====================
+    const Camera = {
+        x: 0,
+        y: 0,
+        
+        follow(target) {
+            const targetX = target.x - CONFIG.CANVAS_WIDTH / 2 + target.width / 2;
+            const targetY = target.y - CONFIG.CANVAS_HEIGHT / 2 + target.height / 2;
+            
+            this.x += (targetX - this.x) * 0.1;
+            this.y += (targetY - this.y) * 0.05;
+            
+            this.x = Utils.clamp(this.x, 0, Level.levelWidth - CONFIG.CANVAS_WIDTH);
+            this.y = Utils.clamp(this.y, 0, 200);
+        }
+    };
+
+    // ==================== UI模块 ====================
+    const UI = {
+        update(player) {
+            document.getElementById('health').textContent = Math.max(0, player.health);
+            document.getElementById('score').textContent = player.score;
+            document.getElementById('fragments').textContent = player.fragments;
+        }
+    };
+
+    // ==================== 游戏主模块 ====================
+    const Game = {
+        canvas: null,
+        ctx: null,
+        player: null,
+        running: false,
+        lastTime: 0,
+        frameCount: 0,
+        fps: 0,
+
+        init() {
+            this.canvas = document.getElementById('gameCanvas');
+            this.ctx = this.canvas.getContext('2d');
+            
+            this.reset();
+            
+            document.getElementById('restartBtn').addEventListener('click', () => {
+                this.reset();
+                document.getElementById('victoryScreen').style.display = 'none';
+            });
+
+            this.running = true;
+            this.gameLoop();
+        },
+
+        reset() {
+            Level.init();
+            this.player = new Player(50, 490);
+            Camera.x = 0;
+            Camera.y = 0;
+        },
+
+        victory() {
+            this.player.addScore(1000);
+            document.getElementById('finalScore').textContent = this.player.score;
+            document.getElementById('finalFragments').textContent = this.player.fragments;
+            document.getElementById('victoryScreen').style.display = 'flex';
+        },
+
+        gameLoop(timestamp = 0) {
+            if (!this.running) return;
+
+            const deltaTime = timestamp - this.lastTime;
+            this.lastTime = timestamp;
+
+            this.frameCount++;
+            if (deltaTime > 0) {
+                this.fps = Math.round(1000 / deltaTime);
+            }
+
+            this.update();
+            this.render();
+
+            requestAnimationFrame((t) => this.gameLoop(t));
+        },
+
+        update() {
+            this.player.update(Level.platforms, Camera);
+            Camera.follow(this.player);
+            Level.update(this.player);
+            UI.update(this.player);
+        },
+
+        render() {
+            this.ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+            
+            Level.draw(this.ctx, Camera);
+            this.player.draw(this.ctx, Camera);
+
+            this.ctx.fillStyle = '#fff';
+            this.ctx.font = '14px Arial';
+            this.ctx.fillText(`FPS: ${this.fps}`, CONFIG.CANVAS_WIDTH - 70, 25);
+        }
+    };
+
+    window.addEventListener('load', () => {
+        Game.init();
+    });
+    </script>
+</body>
+</html>

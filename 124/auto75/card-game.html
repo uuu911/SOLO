@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>卡牌对战游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+
+        /* 敌方区域 */
+        .enemy-area {
+            flex: 0 0 auto;
+            padding: 10px 0;
+        }
+
+        .enemy-hero-section {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 10px;
+        }
+
+        .enemy-hand {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            height: 80px;
+            margin-bottom: 10px;
+        }
+
+        .enemy-battlefield {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            min-height: 120px;
+            padding: 10px;
+            background: rgba(255, 0, 0, 0.1);
+            border-radius: 10px;
+            border: 2px solid rgba(255, 100, 100, 0.3);
+        }
+
+        /* 中间分隔区 */
+        .middle-area {
+            flex: 0 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 15px 0;
+            gap: 20px;
+        }
+
+        .turn-indicator {
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+            color: #ffd700;
+        }
+
+        .end-turn-btn {
+            padding: 12px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            background: linear-gradient(145deg, #ffd700, #ff8c00);
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            color: #1a1a2e;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+        }
+
+        .end-turn-btn:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(255, 215, 0, 0.6);
+        }
+
+        .end-turn-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .hero-power-btn {
+            padding: 10px 20px;
+            font-size: 14px;
+            background: linear-gradient(145deg, #ff4444, #cc0000);
+            border: 2px solid #ff6666;
+            border-radius: 15px;
+            cursor: pointer;
+            color: #fff;
+            transition: all 0.3s ease;
+        }
+
+        .hero-power-btn:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 68, 68, 0.6);
+        }
+
+        .hero-power-btn:disabled {
+            background: #444;
+            border-color: #666;
+            cursor: not-allowed;
+        }
+
+        /* 玩家区域 */
+        .player-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .player-battlefield {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            min-height: 120px;
+            padding: 10px;
+            background: rgba(0, 255, 100, 0.1);
+            border-radius: 10px;
+            border: 2px solid rgba(100, 255, 150, 0.3);
+            margin-bottom: 10px;
+        }
+
+        .player-hero-section {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 10px;
+        }
+
+        .player-hand {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            min-height: 140px;
+            padding: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* 英雄样式 */
+        .hero {
+            width: 100px;
+            height: 120px;
+            background: linear-gradient(145deg, #2d2d44, #1a1a2e);
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .hero.targetable {
+            border-color: #ff0000;
+            box-shadow: 0 0 25px rgba(255, 0, 0, 0.8);
+            animation: pulse 1s infinite;
+        }
+
+        .hero-icon {
+            font-size: 40px;
+            margin-bottom: 5px;
+        }
+
+        .hero-name {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .hero-health {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            width: 30px;
+            height: 30px;
+            background: radial-gradient(circle, #ff4444, #cc0000);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+            border: 2px solid #fff;
+        }
+
+        /* 法力水晶 */
+        .mana-crystal {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .mana-display {
+            display: flex;
+            gap: 3px;
+        }
+
+        .mana-point {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            border: 2px solid #4fc3f7;
+        }
+
+        .mana-point.filled {
+            background: radial-gradient(circle, #4fc3f7, #0288d1);
+            box-shadow: 0 0 8px rgba(79, 195, 247, 0.8);
+        }
+
+        .mana-point.empty {
+            background: #1a1a2e;
+        }
+
+        .mana-text {
+            font-size: 14px;
+            color: #4fc3f7;
+            font-weight: bold;
+        }
+
+        /* 卡牌样式 */
+        .card {
+            width: 100px;
+            height: 140px;
+            background: linear-gradient(145deg, #3d3d5c, #2a2a40);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid #555;
+            overflow: hidden;
+        }
+
+        .card:hover:not(.card-back) {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.4);
+            border-color: #ffd700;
+        }
+
+        .card.selected {
+            transform: translateY(-15px) scale(1.1);
+            box-shadow: 0 0 30px rgba(0, 255, 100, 0.8);
+            border-color: #00ff64;
+        }
+
+        .card.can-attack {
+            border-color: #00ff00;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.6);
+        }
+
+        .card.attacking {
+            border-color: #ff0000;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.8);
+            animation: shake 0.3s ease-in-out;
+        }
+
+        .card.targetable {
+            border-color: #ff0000;
+            box-shadow: 0 0 25px rgba(255, 0, 0, 0.8);
+            animation: pulse 1s infinite;
+        }
+
+        .card.has-taunt {
+            border-color: #8b4513;
+            box-shadow: 0 0 15px rgba(139, 69, 19, 0.8);
+        }
+
+        .card.has-divine-shield .card-name::after {
+            content: '🛡️';
+            margin-left: 3px;
+        }
+
+        .card-cost {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            width: 25px;
+            height: 25px;
+            background: radial-gradient(circle, #4fc3f7, #0288d1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            border: 2px solid #fff;
+            z-index: 1;
+        }
+
+        .card-image {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 35px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%);
+        }
+
+        .card-name {
+            font-size: 10px;
+            font-weight: bold;
+            text-align: center;
+            padding: 3px;
+            background: rgba(0,0,0,0.3);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-stats {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px;
+            background: rgba(0,0,0,0.4);
+        }
+
+        .card-attack {
+            width: 25px;
+            height: 25px;
+            background: radial-gradient(circle, #ffd700, #ff8c00);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            border: 2px solid #fff;
+        }
+
+        .card-health {
+            width: 25px;
+            height: 25px;
+            background: radial-gradient(circle, #ff4444, #cc0000);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            border: 2px solid #fff;
+        }
+
+        .card-keywords {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .keyword {
+            background: rgba(0,0,0,0.7);
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 8px;
+        }
+
+        .keyword.charge { color: #00ff00; }
+        .keyword.battlecry { color: #ffd700; }
+        .keyword.deathrattle { color: #ff69b4; }
+        .keyword.taunt { color: #8b4513; }
+        .keyword.divine-shield { color: #87ceeb; }
+
+        /* 敌方手牌背面 */
+        .card-back {
+            background: linear-gradient(145deg, #8b0000, #4a0000);
+            border: 3px solid #ffd700;
+            cursor: default;
+        }
+
+        .card-back::before {
+            content: '🎴';
+            font-size: 40px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* 战场上的随从 */
+        .minion {
+            width: 90px;
+            height: 110px;
+        }
+
+        .minion .card-cost {
+            display: none;
+        }
+
+        .minion.summon-sickness {
+            opacity: 0.8;
+            filter: grayscale(30%);
+        }
+
+        /* 动画 */
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 15px rgba(255, 0, 0, 0.6); }
+            50% { box-shadow: 0 0 30px rgba(255, 0, 0, 1); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        @keyframes damage-flash {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(2) saturate(0); }
+        }
+
+        .damaged {
+            animation: damage-flash 0.3s ease-in-out;
+        }
+
+        @keyframes summon-animation {
+            0% { transform: scale(0) rotate(180deg); opacity: 0; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        .summoning {
+            animation: summon-animation 0.5s ease-out;
+        }
+
+        @keyframes death-animation {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0) rotate(180deg); opacity: 0; }
+        }
+
+        .dying {
+            animation: death-animation 0.5s ease-in forwards;
+        }
+
+        /* 提示信息 */
+        .game-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px 50px;
+            border-radius: 20px;
+            font-size: 32px;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+            z-index: 1000;
+            border: 3px solid #ffd700;
+            display: none;
+        }
+
+        .game-message.show {
+            display: block;
+            animation: pulse 1s infinite;
+        }
+
+        /* 牌库信息 */
+        .deck-info {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        /* 战斗日志 */
+        .battle-log {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            width: 250px;
+            max-height: 200px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            overflow-y: auto;
+        }
+
+        .battle-log h4 {
+            color: #ffd700;
+            margin-bottom: 5px;
+        }
+
+        .log-entry {
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* 提示气泡 */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 16px;
+            color: #fff;
+            z-index: 1001;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- 敌方区域 -->
+        <div class="enemy-area">
+            <div class="enemy-hand" id="enemy-hand"></div>
+            <div class="enemy-battlefield" id="enemy-battlefield"></div>
+            <div class="enemy-hero-section">
+                <div class="mana-crystal">
+                    <div class="mana-display" id="enemy-mana-display"></div>
+                    <div class="mana-text" id="enemy-mana-text">0/0</div>
+                </div>
+                <div class="hero" id="enemy-hero">
+                    <div class="hero-icon">👹</div>
+                    <div class="hero-name">AI 对手</div>
+                    <div class="hero-health" id="enemy-health">30</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中间区域 -->
+        <div class="middle-area">
+            <div class="turn-indicator" id="turn-indicator">你的回合</div>
+            <button class="hero-power-btn" id="hero-power-btn">🔥 火焰冲击 (2)</button>
+            <button class="end-turn-btn" id="end-turn-btn">结束回合</button>
+        </div>
+
+        <!-- 玩家区域 -->
+        <div class="player-area">
+            <div class="player-battlefield" id="player-battlefield"></div>
+            <div class="player-hero-section">
+                <div class="hero" id="player-hero">
+                    <div class="hero-icon">🧙</div>
+                    <div class="hero-name">你</div>
+                    <div class="hero-health" id="player-health">30</div>
+                </div>
+                <div class="mana-crystal">
+                    <div class="mana-display" id="player-mana-display"></div>
+                    <div class="mana-text" id="player-mana-text">1/1</div>
+                </div>
+            </div>
+            <div class="player-hand" id="player-hand"></div>
+        </div>
+    </div>
+
+    <!-- 游戏消息 -->
+    <div class="game-message" id="game-message"></div>
+
+    <!-- 牌库信息 -->
+    <div class="deck-info" id="deck-info">
+        牌库剩余: <span id="deck-remaining">12</span> 张
+    </div>
+
+    <!-- 战斗日志 -->
+    <div class="battle-log">
+        <h4>战斗日志</h4>
+        <div id="log-content"></div>
+    </div>
+
+    <!-- 提示气泡 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ==================== 卡牌定义模块 ====================
+        const CardDefinitions = {
+            cards: [
+                {
+                    id: 1,
+                    name: '烈焰小鬼',
+                    cost: 1,
+                    attack: 3,
+                    health: 2,
+                    icon: '👿',
+                    keywords: [],
+                    description: '身材超棒的1费随从'
+                },
+                {
+                    id: 2,
+                    name: '银色侍从',
+                    cost: 1,
+                    attack: 1,
+                    health: 1,
+                    icon: '🛡️',
+                    keywords: ['divine-shield'],
+                    description: '圣盾：免疫一次伤害'
+                },
+                {
+                    id: 3,
+                    name: '森林狼',
+                    cost: 1,
+                    attack: 1,
+                    health: 1,
+                    icon: '🐺',
+                    keywords: [],
+                    description: '简单高效的1费随从'
+                },
+                {
+                    id: 4,
+                    name: '血色十字军',
+                    cost: 2,
+                    attack: 2,
+                    health: 2,
+                    icon: '⚔️',
+                    keywords: ['charge'],
+                    description: '冲锋：出场即可攻击'
+                },
+                {
+                    id: 5,
+                    name: '火元素',
+                    cost: 2,
+                    attack: 3,
+                    health: 2,
+                    icon: '🔥',
+                    keywords: ['battlecry'],
+                    battlecryEffect: 'damage',
+                    battlecryValue: 2,
+                    description: '战吼：对敌方英雄造成2点伤害'
+                },
+                {
+                    id: 6,
+                    name: '嘲讽巨人',
+                    cost: 3,
+                    attack: 2,
+                    health: 5,
+                    icon: '🗿',
+                    keywords: ['taunt'],
+                    description: '嘲讽：必须优先攻击'
+                },
+                {
+                    id: 7,
+                    name: '暴怒的狼人',
+                    cost: 3,
+                    attack: 4,
+                    health: 3,
+                    icon: '🐺',
+                    keywords: ['charge'],
+                    description: '冲锋：出场即可攻击'
+                },
+                {
+                    id: 8,
+                    name: '战利品贮藏者',
+                    cost: 2,
+                    attack: 2,
+                    health: 1,
+                    icon: '💎',
+                    keywords: ['deathrattle'],
+                    deathrattleEffect: 'draw',
+                    deathrattleValue: 1,
+                    description: '亡语：抽一张牌'
+                },
+                {
+                    id: 9,
+                    name: '森金持盾卫士',
+                    cost: 4,
+                    attack: 3,
+                    health: 5,
+                    icon: '🛡️',
+                    keywords: ['taunt'],
+                    description: '嘲讽：必须优先攻击'
+                },
+                {
+                    id: 10,
+                    name: '火球术学徒',
+                    cost: 4,
+                    attack: 4,
+                    health: 4,
+                    icon: '🧙',
+                    keywords: ['battlecry'],
+                    battlecryEffect: 'damage_random',
+                    battlecryValue: 3,
+                    description: '战吼：随机对一个敌方目标造成3点伤害'
+                },
+                {
+                    id: 11,
+                    name: '炎魔之王',
+                    cost: 6,
+                    attack: 6,
+                    health: 6,
+                    icon: '👹',
+                    keywords: ['charge'],
+                    description: '冲锋：强大的6费随从'
+                },
+                {
+                    id: 12,
+                    name: '死亡领主',
+                    cost: 5,
+                    attack: 5,
+                    health: 8,
+                    icon: '💀',
+                    keywords: ['taunt', 'deathrattle'],
+                    deathrattleEffect: 'heal_hero',
+                    deathrattleValue: 5,
+                    description: '嘲讽，亡语：为己方英雄恢复5点生命'
+                }
+            ],
+
+            getCardById(id) {
+                return this.cards.find(c => c.id === id);
+            },
+
+            getAllCards() {
+                return [...this.cards];
+            }
+        };
+
+        // ==================== 音效模块 ====================
+        const AudioManager = {
+            audioContext: null,
+
+            init() {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            },
+
+            playTone(frequency, duration, type = 'sine', volume = 0.3) {
+                if (!this.audioContext) this.init();
+                
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+                
+                oscillator.frequency.value = frequency;
+                oscillator.type = type;
+                
+                gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+                
+                oscillator.start(this.audioContext.currentTime);
+                oscillator.stop(this.audioContext.currentTime + duration);
+            },
+
+            playSummon() {
+                this.playTone(440, 0.1, 'sine');
+                setTimeout(() => this.playTone(550, 0.1, 'sine'), 100);
+                setTimeout(() => this.playTone(660, 0.15, 'sine'), 200);
+            },
+
+            playAttack() {
+                this.playTone(150, 0.2, 'sawtooth', 0.2);
+                this.playTone(100, 0.15, 'square', 0.1);
+            },
+
+            playDamage() {
+                this.playTone(200, 0.1, 'square', 0.3);
+            },
+
+            playDeath() {
+                this.playTone(300, 0.1, 'sawtooth');
+                setTimeout(() => this.playTone(200, 0.15, 'sawtooth'), 100);
+                setTimeout(() => this.playTone(100, 0.2, 'sawtooth'), 200);
+            },
+
+            playHeal() {
+                this.playTone(523, 0.1, 'sine');
+                setTimeout(() => this.playTone(659, 0.1, 'sine'), 100);
+                setTimeout(() => this.playTone(784, 0.15, 'sine'), 200);
+            },
+
+            playSpell() {
+                this.playTone(800, 0.1, 'sine');
+                setTimeout(() => this.playTone(1000, 0.1, 'sine'), 80);
+                setTimeout(() => this.playTone(1200, 0.15, 'sine'), 160);
+            },
+
+            playVictory() {
+                const notes = [523, 659, 784, 1047];
+                notes.forEach((note, i) => {
+                    setTimeout(() => this.playTone(note, 0.3, 'sine'), i * 150);
+                });
+            },
+
+            playDefeat() {
+                const notes = [400, 350, 300, 200];
+                notes.forEach((note, i) => {
+                    setTimeout(() => this.playTone(note, 0.3, 'sawtooth'), i * 200);
+                });
+            },
+
+            playDraw() {
+                this.playTone(600, 0.05, 'sine');
+            }
+        };
+
+        // ==================== 游戏状态模块 ====================
+        class GameState {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.playerHealth = 30;
+                this.enemyHealth = 30;
+                this.playerMana = 1;
+                this.playerMaxMana = 1;
+                this.enemyMana = 1;
+                this.enemyMaxMana = 1;
+                this.playerHand = [];
+                this.enemyHand = [];
+                this.playerBattlefield = [];
+                this.enemyBattlefield = [];
+                this.deck = [];
+                this.isPlayerTurn = true;
+                this.heroPowerUsed = false;
+                this.gameOver = false;
+                this.uniqueIdCounter = 0;
+                this.selectedHandCard = null;
+                this.selectedAttacker = null;
+                this.heroPowerMode = false;
+            }
+
+            generateUniqueId() {
+                return ++this.uniqueIdCounter;
+            }
+
+            initializeDeck() {
+                const baseCards = CardDefinitions.getAllCards();
+                this.deck = [];
+                baseCards.forEach(card => {
+                    const cardCopy = { ...card, uniqueId: this.generateUniqueId() };
+                    this.deck.push(cardCopy);
+                });
+                this.shuffleDeck();
+            }
+
+            shuffleDeck() {
+                for (let i = this.deck.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [this.deck[i], this.deck[j]] = [this.deck[j], this.deck[i]];
+                }
+            }
+
+            drawCard(isPlayer) {
+                if (this.deck.length === 0) {
+                    return null;
+                }
+
+                const hand = isPlayer ? this.playerHand : this.enemyHand;
+                
+                if (hand.length >= 10) {
+                    const burnedCard = this.deck.pop();
+                    UI.showToast(`${isPlayer ? '你' : '对手'}爆牌了：${burnedCard.name}!`);
+                    UI.addLog(`${isPlayer ? '你' : '对手'}爆掉了 ${burnedCard.name}`);
+                    return null;
+                }
+
+                const card = this.deck.pop();
+                card.currentHealth = card.health;
+                card.currentAttack = card.attack;
+                card.canAttack = false;
+                card.summonSickness = true;
+                card.hasDivineShield = card.keywords.includes('divine-shield');
+                hand.push(card);
+                
+                if (isPlayer) {
+                    AudioManager.playDraw();
+                }
+                
+                return card;
+            }
+
+            initializeHands() {
+                for (let i = 0; i < 3; i++) {
+                    this.drawCard(true);
+                    this.drawCard(false);
+                }
+            }
+
+            startTurn(isPlayer) {
+                this.isPlayerTurn = isPlayer;
+                this.heroPowerUsed = false;
+                
+                if (isPlayer) {
+                    if (this.playerMaxMana < 10) {
+                        this.playerMaxMana++;
+                    }
+                    this.playerMana = this.playerMaxMana;
+                    
+                    this.playerBattlefield.forEach(minion => {
+                        minion.summonSickness = false;
+                        minion.canAttack = true;
+                    });
+                    
+                    this.drawCard(true);
+                } else {
+                    if (this.enemyMaxMana < 10) {
+                        this.enemyMaxMana++;
+                    }
+                    this.enemyMana = this.enemyMaxMana;
+                    
+                    this.enemyBattlefield.forEach(minion => {
+                        minion.summonSickness = false;
+                        minion.canAttack = true;
+                    });
+                    
+                    this.drawCard(false);
+                }
+
+                this.clearSelection();
+            }
+
+            playCard(cardUniqueId) {
+                const cardIndex = this.playerHand.findIndex(c => c.uniqueId === cardUniqueId);
+                if (cardIndex === -1) return false;
+
+                const card = this.playerHand[cardIndex];
+                
+                if (card.cost > this.playerMana) {
+                    UI.showToast('法力不足！');
+                    return false;
+                }
+
+                if (this.playerBattlefield.length >= 7) {
+                    UI.showToast('战场已满！');
+                    return false;
+                }
+
+                this.playerMana -= card.cost;
+                this.playerHand.splice(cardIndex, 1);
+                
+                card.canAttack = card.keywords.includes('charge');
+                card.summonSickness = !card.keywords.includes('charge');
+                card.hasDivineShield = card.keywords.includes('divine-shield');
+                card.playedThisTurn = true;
+                
+                this.playerBattlefield.push(card);
+                
+                AudioManager.playSummon();
+                UI.addLog(`你召唤了 ${card.name}`);
+                
+                this.triggerBattlecry(card, true);
+                
+                return true;
+            }
+
+            triggerBattlecry(card, isPlayer) {
+                if (!card.keywords.includes('battlecry')) return;
+
+                switch (card.battlecryEffect) {
+                    case 'damage':
+                        if (isPlayer) {
+                            this.enemyHealth -= card.battlecryValue;
+                            UI.addLog(`${card.name} 的战吼对敌方英雄造成 ${card.battlecryValue} 点伤害`);
+                            AudioManager.playSpell();
+                        } else {
+                            this.playerHealth -= card.battlecryValue;
+                            UI.addLog(`${card.name} 的战吼对你造成 ${card.battlecryValue} 点伤害`);
+                            AudioManager.playSpell();
+                        }
+                        break;
+                    case 'damage_random':
+                        const targets = isPlayer ? 
+                            [...this.enemyBattlefield, { isHero: true }] : 
+                            [...this.playerBattlefield, { isHero: true }];
+                        if (targets.length > 0) {
+                            const target = targets[Math.floor(Math.random() * targets.length)];
+                            if (target.isHero) {
+                                if (isPlayer) {
+                                    this.enemyHealth -= card.battlecryValue;
+                                } else {
+                                    this.playerHealth -= card.battlecryValue;
+                                }
+                                UI.addLog(`${card.name} 的战吼对敌方英雄造成 ${card.battlecryValue} 点伤害`);
+                            } else {
+                                this.dealDamageToMinion(target, card.battlecryValue, !isPlayer);
+                            }
+                            AudioManager.playSpell();
+                        }
+                        break;
+                }
+                
+                this.checkGameOver();
+            }
+
+            triggerDeathrattle(card, isPlayer) {
+                if (!card.keywords.includes('deathrattle')) return;
+
+                switch (card.deathrattleEffect) {
+                    case 'draw':
+                        this.drawCard(isPlayer);
+                        UI.addLog(`${card.name} 的亡语：${isPlayer ? '你' : '对手'}抽了一张牌`);
+                        break;
+                    case 'heal_hero':
+                        if (isPlayer) {
+                            this.playerHealth = Math.min(30, this.playerHealth + card.deathrattleValue);
+                            UI.addLog(`${card.name} 的亡语为你恢复了 ${card.deathrattleValue} 点生命`);
+                        } else {
+                            this.enemyHealth = Math.min(30, this.enemyHealth + card.deathrattleValue);
+                            UI.addLog(`${card.name} 的亡语为敌方英雄恢复了 ${card.deathrattleValue} 点生命`);
+                        }
+                        AudioManager.playHeal();
+                        break;
+                }
+            }
+
+            dealDamageToMinion(minion, damage, isEnemy) {
+                if (minion.hasDivineShield && damage > 0) {
+                    minion.hasDivineShield = false;
+                    UI.addLog(`${minion.name} 的圣盾抵挡了伤害！`);
+                    AudioManager.playDamage();
+                    return;
+                }
+
+                minion.currentHealth -= damage;
+                AudioManager.playDamage();
+                
+                if (minion.currentHealth <= 0) {
+                    this.removeMinion(minion, isEnemy);
+                }
+            }
+
+            removeMinion(minion, isEnemy) {
+                const battlefield = isEnemy ? this.enemyBattlefield : this.playerBattlefield;
+                const index = battlefield.findIndex(m => m.uniqueId === minion.uniqueId);
+                
+                if (index !== -1) {
+                    AudioManager.playDeath();
+                    UI.addLog(`${minion.name} 死亡了`);
+                    this.triggerDeathrattle(minion, !isEnemy);
+                    battlefield.splice(index, 1);
+                }
+            }
+
+            attack(attackerId, targetId, targetIsHero) {
+                const attacker = this.playerBattlefield.find(m => m.uniqueId === attackerId);
+                if (!attacker || !attacker.canAttack) return false;
+
+                const hasTauntMinions = this.enemyBattlefield.some(m => m.keywords.includes('taunt'));
+                
+                if (targetIsHero && hasTauntMinions) {
+                    UI.showToast('必须先攻击具有嘲讽的随从！');
+                    return false;
+                }
+
+                if (!targetIsHero) {
+                    const target = this.enemyBattlefield.find(m => m.uniqueId === targetId);
+                    if (hasTauntMinions && !target.keywords.includes('taunt')) {
+                        UI.showToast('必须先攻击具有嘲讽的随从！');
+                        return false;
+                    }
+                }
+
+                attacker.canAttack = false;
+                AudioManager.playAttack();
+
+                if (targetIsHero) {
+                    this.enemyHealth -= attacker.currentAttack;
+                    UI.addLog(`${attacker.name} 对敌方英雄造成了 ${attacker.currentAttack} 点伤害`);
+                } else {
+                    const target = this.enemyBattlefield.find(m => m.uniqueId === targetId);
+                    if (target) {
+                        UI.addLog(`${attacker.name} 攻击了 ${target.name}`);
+                        
+                        this.dealDamageToMinion(target, attacker.currentAttack, true);
+                        
+                        if (this.playerBattlefield.includes(attacker)) {
+                            this.dealDamageToMinion(attacker, target.currentAttack, false);
+                        }
+                    }
+                }
+
+                this.clearSelection();
+                this.checkGameOver();
+                return true;
+            }
+
+            useHeroPower(targetId, targetIsHero) {
+                if (this.heroPowerUsed || this.playerMana < 2) return false;
+
+                const hasTauntMinions = this.enemyBattlefield.some(m => m.keywords.includes('taunt'));
+                
+                if (targetIsHero && hasTauntMinions) {
+                    UI.showToast('必须先攻击具有嘲讽的随从！');
+                    return false;
+                }
+
+                if (!targetIsHero) {
+                    const target = this.enemyBattlefield.find(m => m.uniqueId === targetId);
+                    if (hasTauntMinions && !target.keywords.includes('taunt')) {
+                        UI.showToast('必须先攻击具有嘲讽的随从！');
+                        return false;
+                    }
+                }
+
+                this.playerMana -= 2;
+                this.heroPowerUsed = true;
+                AudioManager.playSpell();
+
+                if (targetIsHero) {
+                    this.enemyHealth -= 1;
+                    UI.addLog('你的英雄技能对敌方英雄造成了 1 点伤害');
+                } else {
+                    const target = this.enemyBattlefield.find(m => m.uniqueId === targetId);
+                    if (target) {
+                        UI.addLog(`你的英雄技能对 ${target.name} 造成了 1 点伤害`);
+                        this.dealDamageToMinion(target, 1, true);
+                    }
+                }
+
+                this.heroPowerMode = false;
+                this.clearSelection();
+                this.checkGameOver();
+                return true;
+            }
+
+            clearSelection() {
+                this.selectedHandCard = null;
+                this.selectedAttacker = null;
+                this.heroPowerMode = false;
+            }
+
+            checkGameOver() {
+                if (this.playerHealth <= 0) {
+                    this.gameOver = true;
+                    UI.showGameMessage('你输了！', false);
+                    AudioManager.playDefeat();
+                } else if (this.enemyHealth <= 0) {
+                    this.gameOver = true;
+                    UI.showGameMessage('你赢了！', true);
+                    AudioManager.playVictory();
+                }
+            }
+
+            hasTauntMinions(isEnemy) {
+                const battlefield = isEnemy ? this.enemyBattlefield : this.playerBattlefield;
+                return battlefield.some(m => m.keywords.includes('taunt'));
+            }
+        }
+
+        // ==================== AI控制模块 ====================
+        class AIController {
+            constructor(gameState) {
+                this.gameState = gameState;
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            async executeTurn() {
+                await this.delay(500);
+                
+                const playableCards = [...this.gameState.enemyHand]
+                    .filter(card => card.cost <= this.gameState.enemyMana)
+                    .sort((a, b) => b.cost - a.cost);
+
+                for (const card of playableCards) {
+                    if (this.gameState.enemyBattlefield.length >= 7) break;
+                    if (card.cost > this.gameState.enemyMana) continue;
+
+                    await this.delay(600);
+                    this.aiPlayCard(card);
+                    UI.render();
+                }
+
+                await this.delay(500);
+
+                if (!this.gameState.heroPowerUsed && this.gameState.enemyMana >= 2) {
+                    await this.delay(600);
+                    this.aiUseHeroPower();
+                    UI.render();
+                }
+
+                await this.delay(500);
+
+                const attackers = this.gameState.enemyBattlefield.filter(m => m.canAttack);
+                for (const attacker of attackers) {
+                    await this.delay(700);
+                    this.aiAttack(attacker);
+                    UI.render();
+                    
+                    if (this.gameState.gameOver) break;
+                }
+            }
+
+            aiPlayCard(card) {
+                const cardIndex = this.gameState.enemyHand.findIndex(c => c.uniqueId === card.uniqueId);
+                if (cardIndex === -1) return;
+
+                this.gameState.enemyMana -= card.cost;
+                this.gameState.enemyHand.splice(cardIndex, 1);
+
+                card.canAttack = card.keywords.includes('charge');
+                card.summonSickness = !card.keywords.includes('charge');
+                card.hasDivineShield = card.keywords.includes('divine-shield');
+                card.playedThisTurn = true;
+
+                this.gameState.enemyBattlefield.push(card);
+
+                AudioManager.playSummon();
+                UI.addLog(`对手召唤了 ${card.name}`);
+                this.gameState.triggerBattlecry(card, false);
+            }
+
+            aiUseHeroPower() {
+                let target = null;
+                
+                const playerMinions = [...this.gameState.playerBattlefield];
+                playerMinions.sort((a, b) => a.currentHealth - b.currentHealth);
+                
+                const tauntMinions = playerMinions.filter(m => m.keywords.includes('taunt'));
+                
+                if (tauntMinions.length > 0) {
+                    target = tauntMinions[0];
+                } else if (playerMinions.length > 0 && Math.random() > 0.5) {
+                    target = playerMinions[0];
+                }
+
+                this.gameState.enemyMana -= 2;
+                this.gameState.heroPowerUsed = true;
+                AudioManager.playSpell();
+
+                if (target) {
+                    UI.addLog(`对手的英雄技能对 ${target.name} 造成了 1 点伤害`);
+                    this.gameState.dealDamageToMinion(target, 1, false);
+                } else {
+                    this.gameState.playerHealth -= 1;
+                    UI.addLog('对手的英雄技能对你造成了 1 点伤害');
+                }
+
+                this.gameState.checkGameOver();
+            }
+
+            aiAttack(attacker) {
+                if (!attacker.canAttack) return;
+
+                attacker.canAttack = false;
+                AudioManager.playAttack();
+
+                const playerTauntMinions = this.gameState.playerBattlefield.filter(m => m.keywords.includes('taunt'));
+                
+                let target;
+                
+                if (playerTauntMinions.length > 0) {
+                    target = playerTauntMinions[Math.floor(Math.random() * playerTauntMinions.length)];
+                } else if (this.gameState.playerBattlefield.length > 0 && Math.random() > 0.3) {
+                    target = this.gameState.playerBattlefield[Math.floor(Math.random() * this.gameState.playerBattlefield.length)];
+                }
+
+                if (target) {
+                    UI.addLog(`${attacker.name} 攻击了 ${target.name}`);
+                    
+                    this.gameState.dealDamageToMinion(target, attacker.currentAttack, false);
+                    
+                    if (this.gameState.enemyBattlefield.includes(attacker)) {
+                        this.gameState.dealDamageToMinion(attacker, target.currentAttack, true);
+                    }
+                } else {
+                    this.gameState.playerHealth -= attacker.currentAttack;
+                    UI.addLog(`${attacker.name} 对你造成了 ${attacker.currentAttack} 点伤害`);
+                }
+
+                this.gameState.checkGameOver();
+            }
+        }
+
+        // ==================== UI渲染模块 ====================
+        const UI = {
+            gameState: null,
+            aiController: null,
+
+            init(gameState, aiController) {
+                this.gameState = gameState;
+                this.aiController = aiController;
+                this.bindEvents();
+            },
+
+            bindEvents() {
+                document.getElementById('end-turn-btn').addEventListener('click', () => {
+                    if (!this.gameState.isPlayerTurn || this.gameState.gameOver) return;
+                    this.endPlayerTurn();
+                });
+
+                document.getElementById('hero-power-btn').addEventListener('click', () => {
+                    if (!this.gameState.isPlayerTurn || this.gameState.gameOver) return;
+                    if (this.gameState.heroPowerUsed || this.gameState.playerMana < 2) {
+                        this.showToast('英雄技能无法使用！');
+                        return;
+                    }
+                    this.gameState.heroPowerMode = true;
+                    this.gameState.clearSelection();
+                    this.showToast('选择一个目标使用英雄技能');
+                    this.render();
+                });
+
+                document.getElementById('player-hero').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                });
+
+                document.getElementById('enemy-hero').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (!this.gameState.isPlayerTurn || this.gameState.gameOver) return;
+                    
+                    if (this.gameState.selectedAttacker) {
+                        this.gameState.attack(this.gameState.selectedAttacker, null, true);
+                    } else if (this.gameState.heroPowerMode) {
+                        this.gameState.useHeroPower(null, true);
+                    }
+                    this.render();
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!e.target.closest('.card') && !e.target.closest('.hero') && 
+                        !e.target.closest('button')) {
+                        this.gameState.clearSelection();
+                        this.render();
+                    }
+                });
+            },
+
+            render() {
+                this.renderHealth();
+                this.renderMana();
+                this.renderHands();
+                this.renderBattlefields();
+                this.renderButtons();
+                this.renderTurnIndicator();
+                this.renderDeckInfo();
+            },
+
+            renderHealth() {
+                document.getElementById('player-health').textContent = Math.max(0, this.gameState.playerHealth);
+                document.getElementById('enemy-health').textContent = Math.max(0, this.gameState.enemyHealth);
+            },
+
+            renderMana() {
+                const playerManaDisplay = document.getElementById('player-mana-display');
+                const enemyManaDisplay = document.getElementById('enemy-mana-display');
+                
+                playerManaDisplay.innerHTML = '';
+                enemyManaDisplay.innerHTML = '';
+
+                for (let i = 0; i < this.gameState.playerMaxMana; i++) {
+                    const point = document.createElement('div');
+                    point.className = `mana-point ${i < this.gameState.playerMana ? 'filled' : 'empty'}`;
+                    playerManaDisplay.appendChild(point);
+                }
+
+                for (let i = 0; i < this.gameState.enemyMaxMana; i++) {
+                    const point = document.createElement('div');
+                    point.className = `mana-point ${i < this.gameState.enemyMana ? 'filled' : 'empty'}`;
+                    enemyManaDisplay.appendChild(point);
+                }
+
+                document.getElementById('player-mana-text').textContent = 
+                    `${this.gameState.playerMana}/${this.gameState.playerMaxMana}`;
+                document.getElementById('enemy-mana-text').textContent = 
+                    `${this.gameState.enemyMana}/${this.gameState.enemyMaxMana}`;
+            },
+
+            renderHands() {
+                this.renderPlayerHand();
+                this.renderEnemyHand();
+            },
+
+            renderPlayerHand() {
+                const handContainer = document.getElementById('player-hand');
+                handContainer.innerHTML = '';
+
+                this.gameState.playerHand.forEach(card => {
+                    const cardEl = this.createCardElement(card, true, false);
+                    
+                    if (this.gameState.selectedHandCard === card.uniqueId) {
+                        cardEl.classList.add('selected');
+                    }
+
+                    cardEl.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (!this.gameState.isPlayerTurn || this.gameState.gameOver) return;
+                        
+                        if (card.cost <= this.gameState.playerMana && 
+                            this.gameState.playerBattlefield.length < 7) {
+                            this.gameState.playCard(card.uniqueId);
+                            this.render();
+                        } else if (card.cost > this.gameState.playerMana) {
+                            this.showToast('法力不足！');
+                        } else {
+                            this.showToast('战场已满！');
+                        }
+                    });
+
+                    handContainer.appendChild(cardEl);
+                });
+            },
+
+            renderEnemyHand() {
+                const handContainer = document.getElementById('enemy-hand');
+                handContainer.innerHTML = '';
+
+                this.gameState.enemyHand.forEach(() => {
+                    const cardEl = document.createElement('div');
+                    cardEl.className = 'card card-back';
+                    cardEl.style.width = '60px';
+                    cardEl.style.height = '80px';
+                    handContainer.appendChild(cardEl);
+                });
+            },
+
+            renderBattlefields() {
+                this.renderPlayerBattlefield();
+                this.renderEnemyBattlefield();
+            },
+
+            renderPlayerBattlefield() {
+                const battlefieldContainer = document.getElementById('player-battlefield');
+                battlefieldContainer.innerHTML = '';
+
+                this.gameState.playerBattlefield.forEach(minion => {
+                    const cardEl = this.createCardElement(minion, true, true);
+                    
+                    if (minion.canAttack && this.gameState.isPlayerTurn) {
+                        cardEl.classList.add('can-attack');
+                    }
+                    
+                    if (this.gameState.selectedAttacker === minion.uniqueId) {
+                        cardEl.classList.add('attacking');
+                    }
+
+                    if (minion.summonSickness && !minion.canAttack) {
+                        cardEl.classList.add('summon-sickness');
+                    }
+
+                    cardEl.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (!this.gameState.isPlayerTurn || this.gameState.gameOver) return;
+                        
+                        if (minion.canAttack) {
+                            this.gameState.selectedAttacker = minion.uniqueId;
+                            this.gameState.heroPowerMode = false;
+                            this.showToast('选择一个攻击目标');
+                            this.render();
+                        } else if (minion.summonSickness) {
+                            this.showToast('该随从本回合无法攻击（召唤失调）');
+                        }
+                    });
+
+                    battlefieldContainer.appendChild(cardEl);
+                });
+            },
+
+            renderEnemyBattlefield() {
+                const battlefieldContainer = document.getElementById('enemy-battlefield');
+                battlefieldContainer.innerHTML = '';
+
+                this.gameState.enemyBattlefield.forEach(minion => {
+                    const cardEl = this.createCardElement(minion, false, true);
+                    
+                    if (this.gameState.selectedAttacker || this.gameState.heroPowerMode) {
+                        const hasTaunt = this.gameState.enemyBattlefield.some(m => m.keywords.includes('taunt'));
+                        if (!hasTaunt || minion.keywords.includes('taunt')) {
+                            cardEl.classList.add('targetable');
+                        }
+                    }
+
+                    cardEl.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (!this.gameState.isPlayerTurn || this.gameState.gameOver) return;
+                        
+                        if (this.gameState.selectedAttacker) {
+                            this.gameState.attack(this.gameState.selectedAttacker, minion.uniqueId, false);
+                        } else if (this.gameState.heroPowerMode) {
+                            this.gameState.useHeroPower(minion.uniqueId, false);
+                        }
+                        this.render();
+                    });
+
+                    battlefieldContainer.appendChild(cardEl);
+                });
+
+                if (this.gameState.selectedAttacker || this.gameState.heroPowerMode) {
+                    const hasTaunt = this.gameState.enemyBattlefield.some(m => m.keywords.includes('taunt'));
+                    if (!hasTaunt) {
+                        document.getElementById('enemy-hero').classList.add('targetable');
+                    } else {
+                        document.getElementById('enemy-hero').classList.remove('targetable');
+                    }
+                } else {
+                    document.getElementById('enemy-hero').classList.remove('targetable');
+                }
+            },
+
+            createCardElement(card, isPlayer, isBattlefield) {
+                const cardEl = document.createElement('div');
+                cardEl.className = `card ${isBattlefield ? 'minion' : ''}`;
+                
+                if (card.keywords.includes('taunt')) {
+                    cardEl.classList.add('has-taunt');
+                }
+                
+                if (card.hasDivineShield) {
+                    cardEl.classList.add('has-divine-shield');
+                }
+
+                const costHtml = isBattlefield ? '' : `<div class="card-cost">${card.cost}</div>`;
+
+                const keywordsHtml = card.keywords.length > 0 ? 
+                    `<div class="card-keywords">${card.keywords.map(k => 
+                        `<span class="keyword ${k}">${this.getKeywordName(k)}</span>`
+                    ).join('')}</div>` : '';
+
+                cardEl.innerHTML = `
+                    ${costHtml}
+                    ${keywordsHtml}
+                    <div class="card-image">${card.icon}</div>
+                    <div class="card-name">${card.name}</div>
+                    <div class="card-stats">
+                        <div class="card-attack">${card.currentAttack || card.attack}</div>
+                        <div class="card-health">${card.currentHealth || card.health}</div>
+                    </div>
+                `;
+
+                return cardEl;
+            },
+
+            getKeywordName(keyword) {
+                const names = {
+                    'charge': '冲锋',
+                    'battlecry': '战吼',
+                    'deathrattle': '亡语',
+                    'taunt': '嘲讽',
+                    'divine-shield': '圣盾'
+                };
+                return names[keyword] || keyword;
+            },
+
+            renderButtons() {
+                const endTurnBtn = document.getElementById('end-turn-btn');
+                const heroPowerBtn = document.getElementById('hero-power-btn');
+
+                endTurnBtn.disabled = !this.gameState.isPlayerTurn || this.gameState.gameOver;
+                heroPowerBtn.disabled = !this.gameState.isPlayerTurn || this.gameState.gameOver || 
+                    this.gameState.heroPowerUsed || this.gameState.playerMana < 2;
+            },
+
+            renderTurnIndicator() {
+                const indicator = document.getElementById('turn-indicator');
+                indicator.textContent = this.gameState.isPlayerTurn ? '你的回合' : '对手回合';
+                indicator.style.color = this.gameState.isPlayerTurn ? '#00ff64' : '#ff6666';
+            },
+
+            renderDeckInfo() {
+                document.getElementById('deck-remaining').textContent = this.gameState.deck.length;
+            },
+
+            async endPlayerTurn() {
+                this.gameState.isPlayerTurn = false;
+                this.gameState.clearSelection();
+                this.render();
+
+                await this.aiController.delay(500);
+
+                this.gameState.startTurn(false);
+                this.render();
+
+                await this.aiController.executeTurn();
+
+                if (!this.gameState.gameOver) {
+                    await this.aiController.delay(500);
+                    this.gameState.startTurn(true);
+                    this.addLog('--- 你的回合 ---');
+                    this.render();
+                }
+            },
+
+            showToast(message) {
+                const toast = document.getElementById('toast');
+                toast.textContent = message;
+                toast.classList.add('show');
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 2000);
+            },
+
+            showGameMessage(message, isVictory) {
+                const msgEl = document.getElementById('game-message');
+                msgEl.textContent = message;
+                msgEl.classList.add('show');
+            },
+
+            addLog(message) {
+                const logContent = document.getElementById('log-content');
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                entry.textContent = message;
+                logContent.insertBefore(entry, logContent.firstChild);
+                
+                while (logContent.children.length > 20) {
+                    logContent.removeChild(logContent.lastChild);
+                }
+            }
+        };
+
+        // ==================== 游戏初始化 ====================
+        function initGame() {
+            const gameState = new GameState();
+            const aiController = new AIController(gameState);
+            
+            UI.init(gameState, aiController);
+            
+            gameState.initializeDeck();
+            gameState.initializeHands();
+            gameState.startTurn(true);
+            
+            UI.addLog('--- 游戏开始 ---');
+            UI.addLog('--- 你的回合 ---');
+            UI.render();
+            
+            AudioManager.init();
+        }
+
+        document.addEventListener('DOMContentLoaded', initGame);
+    </script>
+</body>
+</html>

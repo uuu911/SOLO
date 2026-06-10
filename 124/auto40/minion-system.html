@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOBA 小兵波次系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+        }
+        #gameCanvas {
+            border: 3px solid #e94560;
+            border-radius: 12px;
+            box-shadow: 0 0 40px rgba(233, 69, 96, 0.4), 0 0 80px rgba(233, 69, 96, 0.2);
+            background: #1a1a2e;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #startBtn {
+            background: linear-gradient(45deg, #e94560, #ff6b6b);
+            color: white;
+        }
+        #pauseBtn {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+            color: white;
+        }
+        #resetBtn {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+        }
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 25px rgba(0,0,0,0.3);
+        }
+        button:active {
+            transform: translateY(-1px);
+        }
+        .stats {
+            margin-top: 15px;
+            color: #ecf0f1;
+            font-size: 14px;
+            text-align: center;
+            background: rgba(0,0,0,0.3);
+            padding: 15px 25px;
+            border-radius: 8px;
+        }
+        .stats span {
+            margin: 0 15px;
+        }
+        h1 {
+            color: #e94560;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-shadow: 0 0 20px rgba(233, 69, 96, 0.6);
+            letter-spacing: 3px;
+        }
+    </style>
+</head>
+<body>
+    <h1>⚔️ MOBA 小兵波次系统 ⚔️</h1>
+    <canvas id="gameCanvas" width="1200" height="800"></canvas>
+    <div class="controls">
+        <button id="startBtn">开始游戏</button>
+        <button id="pauseBtn">暂停</button>
+        <button id="resetBtn">重置</button>
+    </div>
+    <div class="stats" id="stats">
+        <span>🎮 游戏时间: <span id="gameTime">00:00</span></span>
+        <span>🌊 当前波次: <span id="waveNum">0</span></span>
+        <span>💰 蓝方金币: <span id="blueGold">0</span></span>
+        <span>💰 红方金币: <span id="redGold">0</span></span>
+        <span>👾 存活小兵: <span id="minionCount">0</span></span>
+    </div>
+
+    <script>
+    // ============================================
+    // 配置模块 - Config
+    // ============================================
+    const Config = (function() {
+        'use strict';
+
+        const MINION_TYPES = {
+            MELEE: 'melee',
+            RANGED: 'ranged',
+            SIEGE: 'siege'
+        };
+
+        const TEAMS = {
+            BLUE: 'blue',
+            RED: 'red'
+        };
+
+        const LANES = {
+            TOP: 'top',
+            MID: 'mid',
+            BOT: 'bot'
+        };
+
+        const MINION_STATS = {
+            [MINION_TYPES.MELEE]: {
+                maxHealth: 500,
+                attack: 30,
+                armor: 10,
+                moveSpeed: 250,
+                attackInterval: 1.0,
+                gold: 25,
+                size: 14,
+                color: { blue: '#3498db', red: '#e74c3c' }
+            },
+            [MINION_TYPES.RANGED]: {
+                maxHealth: 350,
+                attack: 40,
+                armor: 5,
+                moveSpeed: 250,
+                attackInterval: 1.2,
+                gold: 20,
+                size: 11,
+                color: { blue: '#2ecc71', red: '#e67e22' }
+            },
+            [MINION_TYPES.SIEGE]: {
+                maxHealth: 1200,
+                attack: 80,
+                armor: 30,
+                moveSpeed: 200,
+                attackInterval: 2.0,
+                gold: 60,
+                size: 20,
+                color: { blue: '#9b59b6', red: '#f1c40f' }
+            }
+        };
+
+        const SPAWN_CONFIG = {
+            waveInterval: 30,
+            firstWaveTime: 0,
+            maxMelee: 8,
+            maxRanged: 6,
+            maxSiege: 2,
+            baseMelee: 3,
+            baseRanged: 1,
+            meleePerWave: 0,
+            rangedPerWaves: 2,
+            siegePerWaves: 3,
+            firstSiegeWave: 3
+        };
+
+        const GROWTH_CONFIG = {
+            startMinute: 2,
+            intervalSeconds: 30,
+            healthPercent: 0.03,
+            attackPercent: 0.02
+        };
+
+        const GAME_CONFIG = {
+            canvasWidth: 1200,
+            canvasHeight: 800,
+            waypointRadius: 25,
+            collisionRadius: 10,
+            attackRange: 60,
+            goldAllocationRadius: 150
+        };
+
+        function generateLanePaths() {
+            const w = GAME_CONFIG.canvasWidth;
+            const h = GAME_CONFIG.canvasHeight;
+
+            const topLaneBlue = [
+                { x: 80, y: 720 }, { x: 150, y: 650 }, { x: 300, y: 550 },
+                { x: 500, y: 450 }, { x: 700, y: 350 }, { x: 900, y: 250 },
+                { x: 1050, y: 150 }, { x: 1120, y: 80 }
+            ];
+
+            const topLaneRed = [
+                { x: 1120, y: 80 }, { x: 1050, y: 150 }, { x: 900, y: 250 },
+                { x: 700, y: 350 }, { x: 500, y: 450 }, { x: 300, y: 550 },
+                { x: 150, y: 650 }, { x: 80, y: 720 }
+            ];
+
+            const midLaneBlue = [
+                { x: 120, y: 680 }, { x: 250, y: 580 }, { x: 400, y: 480 },
+                { x: 550, y: 400 }, { x: 650, y: 400 }, { x: 800, y: 320 },
+                { x: 950, y: 220 }, { x: 1080, y: 120 }
+            ];
+
+            const midLaneRed = [
+                { x: 1080, y: 120 }, { x: 950, y: 220 }, { x: 800, y: 320 },
+                { x: 650, y: 400 }, { x: 550, y: 400 }, { x: 400, y: 480 },
+                { x: 250, y: 580 }, { x: 120, y: 680 }
+            ];
+
+            const botLaneBlue = [
+                { x: 180, y: 750 }, { x: 280, y: 680 }, { x: 400, y: 600 },
+                { x: 550, y: 520 }, { x: 700, y: 480 }, { x: 850, y: 420 },
+                { x: 1000, y: 350 }, { x: 1100, y: 200 }
+            ];
+
+            const botLaneRed = [
+                { x: 1100, y: 200 }, { x: 1000, y: 350 }, { x: 850, y: 420 },
+                { x: 700, y: 480 }, { x: 550, y: 520 }, { x: 400, y: 600 },
+                { x: 280, y: 680 }, { x: 180, y: 750 }
+            ];
+
+            return {
+                [LANES.TOP]: { [TEAMS.BLUE]: topLaneBlue, [TEAMS.RED]: topLaneRed },
+                [LANES.MID]: { [TEAMS.BLUE]: midLaneBlue, [TEAMS.RED]: midLaneRed },
+                [LANES.BOT]: { [TEAMS.BLUE]: botLaneBlue, [TEAMS.RED]: botLaneRed }
+            };
+        }
+
+        return {
+            MINION_TYPES,
+            TEAMS,
+            LANES,
+            MINION_STATS,
+            SPAWN_CONFIG,
+            GROWTH_CONFIG,
+            GAME_CONFIG,
+            generateLanePaths
+        };
+    })();
+
+    // ============================================
+    // 接口定义 - Interfaces (文档化契约)
+    // ============================================
+
+    /**
+     * 小兵接口
+     * @interface IMinion
+     * @property {string} id - 唯一标识符
+     * @property {string} team - 所属队伍
+     * @property {string} type - 小兵类型
+     * @property {string} lane - 所属兵线
+     * @property {number} health - 当前生命值
+     * @property {number} maxHealth - 最大生命值
+     * @property {number} attack - 攻击力
+     * @property {number} armor - 护甲
+     * @property {number} moveSpeed - 移动速度(像素/秒)
+     * @property {number} attackInterval - 攻击间隔(秒)
+     * @property {number} gold - 击杀金币
+     * @property {number} x - X坐标
+     * @property {number} y - Y坐标
+     * @property {number} waypointIndex - 当前路径点索引
+     */
+
+    /**
+     * 小兵生成器接口
+     * @interface IMinionSpawner
+     * @method spawnWave - 生成一波小兵
+     * @method update - 更新生成器状态
+     */
+
+    /**
+     * 成长策略接口
+     * @interface IGrowthStrategy
+     * @method calculateGrowthMultiplier - 计算属性成长倍率
+     */
+
+    // ============================================
+    // 成长策略模块 - GrowthStrategy
+    // ============================================
+    const GrowthStrategy = (function(Config) {
+        'use strict';
+
+        class DefaultGrowthStrategy {
+            constructor() {
+                this.config = Config.GROWTH_CONFIG;
+            }
+
+            calculateGrowthMultiplier(gameTime) {
+                const startSeconds = this.config.startMinute * 60;
+                if (gameTime < startSeconds) {
+                    return { healthMultiplier: 1, attackMultiplier: 1 };
+                }
+
+                const elapsedSinceStart = gameTime - startSeconds;
+                const intervals = Math.floor(elapsedSinceStart / this.config.intervalSeconds);
+
+                return {
+                    healthMultiplier: 1 + intervals * this.config.healthPercent,
+                    attackMultiplier: 1 + intervals * this.config.attackPercent
+                };
+            }
+
+            applyGrowth(minion, gameTime) {
+                const multipliers = this.calculateGrowthMultiplier(gameTime);
+                const baseStats = Config.MINION_STATS[minion.type];
+
+                minion.maxHealth = Math.floor(baseStats.maxHealth * multipliers.healthMultiplier);
+                minion.attack = Math.floor(baseStats.attack * multipliers.attackMultiplier);
+
+                if (minion.health > minion.maxHealth) {
+                    minion.health = minion.maxHealth;
+                }
+            }
+        }
+
+        return { DefaultGrowthStrategy };
+    })(Config);
+
+    // ============================================
+    // 小兵模块 - Minion
+    // ============================================
+    const Minion = (function(Config) {
+        'use strict';
+
+        let minionIdCounter = 0;
+
+        class MinionBase {
+            constructor(type, team, lane, x, y) {
+                this.id = `minion_${++minionIdCounter}`;
+                this.type = type;
+                this.team = team;
+                this.lane = lane;
+                this.x = x;
+                this.y = y;
+
+                const stats = Config.MINION_STATS[type];
+                this.maxHealth = stats.maxHealth;
+                this.health = stats.maxHealth;
+                this.attack = stats.attack;
+                this.armor = stats.armor;
+                this.moveSpeed = stats.moveSpeed;
+                this.attackInterval = stats.attackInterval;
+                this.gold = stats.gold;
+                this.size = stats.size;
+
+                this.waypointIndex = 0;
+                this.target = null;
+                this.attackCooldown = 0;
+                this.isAttacking = false;
+                this.attackAnimationTime = 0;
+                this.lastAttacker = null;
+                this.dead = false;
+            }
+
+            takeDamage(damage, attacker) {
+                const actualDamage = Math.max(1, damage - this.armor * 0.5);
+                this.health -= actualDamage;
+                this.lastAttacker = attacker;
+
+                if (this.health <= 0) {
+                    this.health = 0;
+                    this.dead = true;
+                }
+
+                return actualDamage;
+            }
+
+            getPosition() {
+                return { x: this.x, y: this.y };
+            }
+
+            distanceTo(other) {
+                const dx = other.x - this.x;
+                const dy = other.y - this.y;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+
+            distanceToPoint(x, y) {
+                const dx = x - this.x;
+                const dy = y - this.y;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+        }
+
+        class MeleeMinion extends MinionBase {
+            constructor(team, lane, x, y) {
+                super(Config.MINION_TYPES.MELEE, team, lane, x, y);
+            }
+        }
+
+        class RangedMinion extends MinionBase {
+            constructor(team, lane, x, y) {
+                super(Config.MINION_TYPES.RANGED, team, lane, x, y);
+            }
+        }
+
+        class SiegeMinion extends MinionBase {
+            constructor(team, lane, x, y) {
+                super(Config.MINION_TYPES.SIEGE, team, lane, x, y);
+            }
+        }
+
+        function createMinion(type, team, lane, x, y) {
+            switch (type) {
+                case Config.MINION_TYPES.MELEE:
+                    return new MeleeMinion(team, lane, x, y);
+                case Config.MINION_TYPES.RANGED:
+                    return new RangedMinion(team, lane, x, y);
+                case Config.MINION_TYPES.SIEGE:
+                    return new SiegeMinion(team, lane, x, y);
+                default:
+                    throw new Error(`Unknown minion type: ${type}`);
+            }
+        }
+
+        return { createMinion, MinionBase };
+    })(Config);
+
+    // ============================================
+    // 金币分配模块 - GoldSystem
+    // ============================================
+    const GoldSystem = (function(Config) {
+        'use strict';
+
+        class GoldAllocator {
+            constructor() {
+                this.blueTeamGold = 0;
+                this.redTeamGold = 0;
+                this.virtualHeroes = {
+                    [Config.TEAMS.BLUE]: { x: 600, y: 700, name: 'BlueHero' },
+                    [Config.TEAMS.RED]: { x: 600, y: 100, name: 'RedHero' }
+                };
+            }
+
+            allocateGold(victim, killer, allMinions) {
+                const gold = victim.gold;
+
+                if (killer && killer.type) {
+                    if (killer.team === Config.TEAMS.BLUE) {
+                        this.blueTeamGold += gold;
+                    } else {
+                        this.redTeamGold += gold;
+                    }
+                    return { amount: gold, recipient: killer };
+                } else {
+                    const allyTeam = victim.team === Config.TEAMS.BLUE ? Config.TEAMS.RED : Config.TEAMS.BLUE;
+                    const hero = this.virtualHeroes[allyTeam];
+
+                    const distance = victim.distanceToPoint(hero.x, hero.y);
+                    if (distance <= Config.GAME_CONFIG.goldAllocationRadius) {
+                        if (allyTeam === Config.TEAMS.BLUE) {
+                            this.blueTeamGold += gold;
+                        } else {
+                            this.redTeamGold += gold;
+                        }
+                        return { amount: gold, recipient: 'virtual_hero', team: allyTeam };
+                    }
+
+                    if (allyTeam === Config.TEAMS.BLUE) {
+                        this.blueTeamGold += Math.floor(gold * 0.7);
+                    } else {
+                        this.redTeamGold += Math.floor(gold * 0.7);
+                    }
+                    return { amount: Math.floor(gold * 0.7), recipient: 'team_share', team: allyTeam };
+                }
+            }
+
+            getTeamGold(team) {
+                return team === Config.TEAMS.BLUE ? this.blueTeamGold : this.redTeamGold;
+            }
+
+            reset() {
+                this.blueTeamGold = 0;
+                this.redTeamGold = 0;
+            }
+        }
+
+        return { GoldAllocator };
+    })(Config);
+
+    // ============================================
+    // AI 模块 - AI
+    // ============================================
+    const AI = (function(Config) {
+        'use strict';
+
+        class MinionAI {
+            constructor(paths) {
+                this.paths = paths;
+                this.attackRange = Config.GAME_CONFIG.attackRange;
+                this.waypointRadius = Config.GAME_CONFIG.waypointRadius;
+            }
+
+            findTarget(minion, allMinions) {
+                const enemies = allMinions.filter(m =>
+                    m.team !== minion.team &&
+                    m.lane === minion.lane &&
+                    !m.dead &&
+                    minion.distanceTo(m) <= this.attackRange * 1.5
+                );
+
+                if (enemies.length === 0) return null;
+
+                return enemies.sort((a, b) => {
+                    const scoreA = this.calculateThreatScore(minion, a);
+                    const scoreB = this.calculateThreatScore(minion, b);
+                    return scoreB - scoreA;
+                })[0];
+            }
+
+            calculateThreatScore(minion, enemy) {
+                let score = 0;
+                const distance = minion.distanceTo(enemy);
+
+                score += Math.max(0, 100 - distance);
+                score += (1 - enemy.health / enemy.maxHealth) * 50;
+
+                if (enemy.type === Config.MINION_TYPES.SIEGE) {
+                    score += 30;
+                } else if (enemy.type === Config.MINION_TYPES.RANGED) {
+                    score += 15;
+                }
+
+                if (distance < 40) {
+                    score += 25;
+                }
+
+                return score;
+            }
+
+            updateMovement(minion, allMinions, deltaTime) {
+                if (minion.dead) return;
+
+                if (minion.target && !minion.target.dead) {
+                    const dist = minion.distanceTo(minion.target);
+                    if (dist <= this.attackRange) {
+                        return;
+                    }
+                }
+
+                const path = this.paths[minion.lane][minion.team];
+                if (minion.waypointIndex >= path.length) {
+                    return;
+                }
+
+                const targetWaypoint = path[minion.waypointIndex];
+                const distToWaypoint = minion.distanceToPoint(targetWaypoint.x, targetWaypoint.y);
+
+                if (distToWaypoint <= this.waypointRadius) {
+                    minion.waypointIndex++;
+                    return;
+                }
+
+                const blocking = allMinions.filter(m =>
+                    m.id !== minion.id &&
+                    m.team === minion.team &&
+                    m.lane === minion.lane &&
+                    !m.dead &&
+                    this.isBlocking(minion, m, targetWaypoint)
+                );
+
+                if (blocking.length > 0) {
+                    return;
+                }
+
+                const dx = targetWaypoint.x - minion.x;
+                const dy = targetWaypoint.y - minion.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist > 0) {
+                    const moveAmount = minion.moveSpeed * deltaTime;
+                    minion.x += (dx / dist) * moveAmount;
+                    minion.y += (dy / dist) * moveAmount;
+                }
+
+                this.resolveCollisions(minion, allMinions);
+            }
+
+            isBlocking(minion, other, targetWaypoint) {
+                const dist = minion.distanceTo(other);
+                if (dist > Config.GAME_CONFIG.collisionRadius * 3) return false;
+
+                const toTarget = {
+                    x: targetWaypoint.x - minion.x,
+                    y: targetWaypoint.y - minion.y
+                };
+                const toOther = {
+                    x: other.x - minion.x,
+                    y: other.y - minion.y
+                };
+
+                const dot = toTarget.x * toOther.x + toTarget.y * toOther.y;
+                const magTarget = Math.sqrt(toTarget.x * toTarget.x + toTarget.y * toTarget.y);
+                const magOther = Math.sqrt(toOther.x * toOther.x + toOther.y * toOther.y);
+
+                if (magTarget === 0 || magOther === 0) return false;
+
+                const cosAngle = dot / (magTarget * magOther);
+                return cosAngle > 0.7 && dist < Config.GAME_CONFIG.collisionRadius * 2;
+            }
+
+            resolveCollisions(minion, allMinions) {
+                allMinions.forEach(other => {
+                    if (other.id === minion.id || other.dead) return;
+
+                    const dist = minion.distanceTo(other);
+                    const minDist = minion.size + other.size + 5;
+
+                    if (dist < minDist && dist > 0) {
+                        const overlap = minDist - dist;
+                        const dx = other.x - minion.x;
+                        const dy = other.y - minion.y;
+
+                        const pushX = (dx / dist) * overlap * 0.3;
+                        const pushY = (dy / dist) * overlap * 0.3;
+
+                        minion.x -= pushX;
+                        minion.y -= pushY;
+                        other.x += pushX;
+                        other.y += pushY;
+                    }
+                });
+            }
+
+            updateCombat(minion, allMinions, deltaTime) {
+                if (minion.dead) return;
+
+                minion.attackCooldown = Math.max(0, minion.attackCooldown - deltaTime);
+                minion.attackAnimationTime = Math.max(0, minion.attackAnimationTime - deltaTime);
+
+                if (!minion.target || minion.target.dead || minion.distanceTo(minion.target) > this.attackRange * 1.5) {
+                    minion.target = this.findTarget(minion, allMinions);
+                }
+
+                if (minion.target && !minion.target.dead) {
+                    const dist = minion.distanceTo(minion.target);
+
+                    if (dist <= this.attackRange) {
+                        if (minion.attackCooldown <= 0) {
+                            this.performAttack(minion, minion.target);
+                            minion.attackCooldown = minion.attackInterval;
+                            minion.attackAnimationTime = 0.3;
+                        }
+                    }
+                }
+            }
+
+            performAttack(attacker, target) {
+                target.takeDamage(attacker.attack, attacker);
+            }
+        }
+
+        return { MinionAI };
+    })(Config);
+
+    // ============================================
+    // 生成器模块 - Spawner
+    // ============================================
+    const Spawner = (function(Config, Minion) {
+        'use strict';
+
+        class WaveSpawner {
+            constructor(paths, growthStrategy) {
+                this.paths = paths;
+                this.growthStrategy = growthStrategy;
+                this.config = Config.SPAWN_CONFIG;
+                this.currentWave = 0;
+                this.timeSinceLastWave = 0;
+                this.nextWaveTime = this.config.firstWaveTime;
+                this.minions = [];
+            }
+
+            update(gameTime, deltaTime) {
+                this.timeSinceLastWave += deltaTime;
+
+                if (gameTime >= this.nextWaveTime) {
+                    this.currentWave++;
+                    this.spawnWave(gameTime);
+                    this.nextWaveTime = gameTime + this.config.waveInterval;
+                    this.timeSinceLastWave = 0;
+                }
+
+                this.minions.forEach(minion => {
+                    this.growthStrategy.applyGrowth(minion, gameTime);
+                });
+            }
+
+            spawnWave(gameTime) {
+                const waveConfig = this.calculateWaveComposition();
+
+                [Config.LANES.TOP, Config.LANES.MID, Config.LANES.BOT].forEach(lane => {
+                    [Config.TEAMS.BLUE, Config.TEAMS.RED].forEach(team => {
+                        const path = this.paths[lane][team];
+                        const spawnX = path[0].x;
+                        const spawnY = path[0].y;
+
+                        for (let i = 0; i < waveConfig.melee; i++) {
+                            const offsetY = (i - waveConfig.melee / 2) * 25;
+                            this.createAndAddMinion(Config.MINION_TYPES.MELEE, team, lane,
+                                spawnX + (Math.random() - 0.5) * 20,
+                                spawnY + offsetY,
+                                gameTime
+                            );
+                        }
+
+                        for (let i = 0; i < waveConfig.ranged; i++) {
+                            const offsetY = (i - waveConfig.ranged / 2) * 20;
+                            this.createAndAddMinion(Config.MINION_TYPES.RANGED, team, lane,
+                                spawnX + (Math.random() - 0.5) * 20,
+                                spawnY + offsetY + 40,
+                                gameTime
+                            );
+                        }
+
+                        for (let i = 0; i < waveConfig.siege; i++) {
+                            this.createAndAddMinion(Config.MINION_TYPES.SIEGE, team, lane,
+                                spawnX + (Math.random() - 0.5) * 10,
+                                spawnY + 80,
+                                gameTime
+                            );
+                        }
+                    });
+                });
+            }
+
+            calculateWaveComposition() {
+                const wave = this.currentWave;
+
+                let melee = this.config.baseMelee;
+                let ranged = this.config.baseRanged + Math.floor((wave - 1) / this.config.rangedPerWaves);
+                let siege = wave >= this.config.firstSiegeWave ?
+                    Math.floor((wave - this.config.firstSiegeWave + 1) / this.config.siegePerWaves) + 1 : 0;
+
+                melee = Math.min(melee, this.config.maxMelee);
+                ranged = Math.min(ranged, this.config.maxRanged);
+                siege = Math.min(siege, this.config.maxSiege);
+
+                return { melee, ranged, siege };
+            }
+
+            createAndAddMinion(type, team, lane, x, y, gameTime) {
+                const minion = Minion.createMinion(type, team, lane, x, y);
+                this.growthStrategy.applyGrowth(minion, gameTime);
+                this.minions.push(minion);
+                return minion;
+            }
+
+            getMinions() {
+                return this.minions;
+            }
+
+            removeDeadMinions() {
+                const dead = this.minions.filter(m => m.dead);
+                this.minions = this.minions.filter(m => !m.dead);
+                return dead;
+            }
+
+            reset() {
+                this.currentWave = 0;
+                this.timeSinceLastWave = 0;
+                this.nextWaveTime = this.config.firstWaveTime;
+                this.minions = [];
+            }
+        }
+
+        return { WaveSpawner };
+    })(Config, Minion);
+
+    // ============================================
+    // 渲染模块 - Renderer
+    // ============================================
+    const Renderer = (function(Config) {
+        'use strict';
+
+        class CanvasRenderer {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.width = canvas.width;
+                this.height = canvas.height;
+            }
+
+            clear() {
+                this.ctx.fillStyle = '#1a1a2e';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+            }
+
+            drawMap(paths) {
+                this.drawRiver();
+                this.drawLanes(paths);
+                this.drawBases();
+            }
+
+            drawRiver() {
+                this.ctx.save();
+                this.ctx.globalAlpha = 0.3;
+
+                const gradient = this.ctx.createLinearGradient(0, this.height / 2 - 50, 0, this.height / 2 + 50);
+                gradient.addColorStop(0, 'rgba(52, 152, 219, 0)');
+                gradient.addColorStop(0.5, 'rgba(52, 152, 219, 0.5)');
+                gradient.addColorStop(1, 'rgba(52, 152, 219, 0)');
+
+                this.ctx.fillStyle = gradient;
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, this.height / 2 - 60);
+                this.ctx.quadraticCurveTo(this.width / 2, this.height / 2 - 20, this.width, this.height / 2 - 40);
+                this.ctx.lineTo(this.width, this.height / 2 + 40);
+                this.ctx.quadraticCurveTo(this.width / 2, this.height / 2 + 20, 0, this.height / 2 + 60);
+                this.ctx.closePath();
+                this.ctx.fill();
+
+                this.ctx.restore();
+            }
+
+            drawLanes(paths) {
+                const laneColors = {
+                    [Config.LANES.TOP]: { stroke: '#e74c3c', fill: 'rgba(231, 76, 60, 0.1)' },
+                    [Config.LANES.MID]: { stroke: '#f1c40f', fill: 'rgba(241, 196, 15, 0.1)' },
+                    [Config.LANES.BOT]: { stroke: '#3498db', fill: 'rgba(52, 152, 219, 0.1)' }
+                };
+
+                Object.keys(Config.LANES).forEach(lane => {
+                    const colors = laneColors[lane];
+
+                    [Config.TEAMS.BLUE, Config.TEAMS.RED].forEach(team => {
+                        const path = paths[lane][team];
+                        this.ctx.strokeStyle = colors.stroke;
+                        this.ctx.lineWidth = 4;
+                        this.ctx.globalAlpha = 0.4;
+                        this.ctx.setLineDash([10, 5]);
+
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(path[0].x, path[0].y);
+                        for (let i = 1; i < path.length; i++) {
+                            this.ctx.lineTo(path[i].x, path[i].y);
+                        }
+                        this.ctx.stroke();
+                        this.ctx.setLineDash([]);
+                        this.ctx.globalAlpha = 1;
+                    });
+
+                    const path = paths[lane][Config.TEAMS.BLUE];
+                    path.forEach((point, index) => {
+                        this.ctx.beginPath();
+                        this.ctx.arc(point.x, point.y, Config.GAME_CONFIG.waypointRadius, 0, Math.PI * 2);
+                        this.ctx.fillStyle = colors.fill;
+                        this.ctx.fill();
+                        this.ctx.strokeStyle = colors.stroke;
+                        this.ctx.lineWidth = 2;
+                        this.ctx.globalAlpha = 0.6;
+                        this.ctx.stroke();
+                        this.ctx.globalAlpha = 1;
+                    });
+                });
+            }
+
+            drawBases() {
+                this.ctx.fillStyle = '#3498db';
+                this.ctx.globalAlpha = 0.8;
+                this.ctx.beginPath();
+                this.ctx.arc(100, 720, 40, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#2980b9';
+                this.ctx.lineWidth = 4;
+                this.ctx.stroke();
+
+                this.ctx.fillStyle = '#fff';
+                this.ctx.font = 'bold 20px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                this.ctx.fillText('蓝', 100, 720);
+
+                this.ctx.fillStyle = '#e74c3c';
+                this.ctx.globalAlpha = 0.8;
+                this.ctx.beginPath();
+                this.ctx.arc(1100, 80, 40, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#c0392b';
+                this.ctx.lineWidth = 4;
+                this.ctx.stroke();
+
+                this.ctx.fillStyle = '#fff';
+                this.ctx.fillText('红', 1100, 80);
+                this.ctx.globalAlpha = 1;
+            }
+
+            drawMinions(minions) {
+                minions.forEach(minion => {
+                    if (minion.dead) return;
+
+                    const stats = Config.MINION_STATS[minion.type];
+                    const color = stats.color[minion.team];
+
+                    if (minion.attackAnimationTime > 0) {
+                        this.ctx.save();
+                        this.ctx.globalAlpha = 0.5;
+                        this.ctx.beginPath();
+                        this.ctx.arc(minion.x, minion.y, minion.size + 10, 0, Math.PI * 2);
+                        this.ctx.fillStyle = '#fff';
+                        this.ctx.fill();
+                        this.ctx.restore();
+                    }
+
+                    if (minion.type === Config.MINION_TYPES.SIEGE) {
+                        this.drawSiegeMinion(minion, color);
+                    } else if (minion.type === Config.MINION_TYPES.RANGED) {
+                        this.drawRangedMinion(minion, color);
+                    } else {
+                        this.drawMeleeMinion(minion, color);
+                    }
+
+                    this.drawHealthBar(minion);
+
+                    if (minion.target && !minion.target.dead && minion.attackAnimationTime > 0.15) {
+                        this.ctx.strokeStyle = color;
+                        this.ctx.lineWidth = 2;
+                        this.ctx.globalAlpha = 0.8;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(minion.x, minion.y);
+                        this.ctx.lineTo(minion.target.x, minion.target.y);
+                        this.ctx.stroke();
+                        this.ctx.globalAlpha = 1;
+                    }
+                });
+            }
+
+            drawMeleeMinion(minion, color) {
+                this.ctx.beginPath();
+                this.ctx.arc(minion.x, minion.y, minion.size, 0, Math.PI * 2);
+                this.ctx.fillStyle = color;
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+            }
+
+            drawRangedMinion(minion, color) {
+                this.ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2 - Math.PI / 2;
+                    const x = minion.x + Math.cos(angle) * minion.size;
+                    const y = minion.y + Math.sin(angle) * minion.size;
+                    if (i === 0) this.ctx.moveTo(x, y);
+                    else this.ctx.lineTo(x, y);
+                }
+                this.ctx.closePath();
+                this.ctx.fillStyle = color;
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+            }
+
+            drawSiegeMinion(minion, color) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(minion.x, minion.y - minion.size);
+                this.ctx.lineTo(minion.x + minion.size, minion.y);
+                this.ctx.lineTo(minion.x, minion.y + minion.size);
+                this.ctx.lineTo(minion.x - minion.size, minion.y);
+                this.ctx.closePath();
+                this.ctx.fillStyle = color;
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 3;
+                this.ctx.stroke();
+
+                this.ctx.beginPath();
+                this.ctx.arc(minion.x, minion.y, minion.size * 0.4, 0, Math.PI * 2);
+                this.ctx.fillStyle = '#fff';
+                this.ctx.fill();
+            }
+
+            drawHealthBar(minion) {
+                const barWidth = minion.size * 2;
+                const barHeight = 4;
+                const x = minion.x - barWidth / 2;
+                const y = minion.y - minion.size - 10;
+
+                this.ctx.fillStyle = '#333';
+                this.ctx.fillRect(x, y, barWidth, barHeight);
+
+                const healthPercent = minion.health / minion.maxHealth;
+                const healthColor = healthPercent > 0.6 ? '#2ecc71' :
+                                   healthPercent > 0.3 ? '#f1c40f' : '#e74c3c';
+                this.ctx.fillStyle = healthColor;
+                this.ctx.fillRect(x, y, barWidth * healthPercent, barHeight);
+
+                this.ctx.strokeStyle = '#000';
+                this.ctx.lineWidth = 1;
+                this.ctx.strokeRect(x, y, barWidth, barHeight);
+            }
+
+            drawUI(gameTime, waveNum) {
+                const minutes = Math.floor(gameTime / 60);
+                const seconds = Math.floor(gameTime % 60);
+                const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                this.ctx.fillRect(0, 0, this.width, 50);
+
+                this.ctx.fillStyle = '#fff';
+                this.ctx.font = 'bold 24px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`⏱️ ${timeStr}`, 30, 35);
+
+                this.ctx.textAlign = 'right';
+                this.ctx.fillText(`🌊 波次 ${waveNum}`, this.width - 30, 35);
+
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('MOBA 小兵系统', this.width / 2, 35);
+            }
+
+            drawGoldAllocation(x, y, amount) {
+                this.ctx.fillStyle = '#f1c40f';
+                this.ctx.font = 'bold 14px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(`+${amount}`, x, y);
+            }
+        }
+
+        return { CanvasRenderer };
+    })(Config);
+
+    // ============================================
+    // 游戏主循环 - Game
+    // ============================================
+    const Game = (function(Config, GrowthStrategy, Spawner, AI, GoldSystem, Renderer) {
+        'use strict';
+
+        class GameEngine {
+            constructor(canvasId) {
+                this.canvas = document.getElementById(canvasId);
+                this.renderer = new Renderer.CanvasRenderer(this.canvas);
+                this.paths = Config.generateLanePaths();
+                this.growthStrategy = new GrowthStrategy.DefaultGrowthStrategy();
+                this.spawner = new Spawner.WaveSpawner(this.paths, this.growthStrategy);
+                this.ai = new AI.MinionAI(this.paths);
+                this.goldSystem = new GoldSystem.GoldAllocator();
+
+                this.gameTime = 0;
+                this.lastTime = 0;
+                this.isRunning = false;
+                this.isPaused = false;
+                this.animationId = null;
+
+                this.setupUI();
+            }
+
+            setupUI() {
+                document.getElementById('startBtn').addEventListener('click', () => this.start());
+                document.getElementById('pauseBtn').addEventListener('click', () => this.togglePause());
+                document.getElementById('resetBtn').addEventListener('click', () => this.reset());
+            }
+
+            start() {
+                if (!this.isRunning) {
+                    this.isRunning = true;
+                    this.isPaused = false;
+                    this.lastTime = performance.now();
+                    this.gameLoop();
+                }
+            }
+
+            togglePause() {
+                this.isPaused = !this.isPaused;
+                if (!this.isPaused && this.isRunning) {
+                    this.lastTime = performance.now();
+                    this.gameLoop();
+                }
+            }
+
+            reset() {
+                this.isRunning = false;
+                this.isPaused = false;
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                }
+                this.gameTime = 0;
+                this.spawner.reset();
+                this.goldSystem.reset();
+                this.updateStats();
+                this.render();
+            }
+
+            gameLoop() {
+                if (!this.isRunning || this.isPaused) return;
+
+                const currentTime = performance.now();
+                const deltaTime = (currentTime - this.lastTime) / 1000;
+                this.lastTime = currentTime;
+
+                this.update(deltaTime);
+                this.render();
+                this.updateStats();
+
+                this.animationId = requestAnimationFrame(() => this.gameLoop());
+            }
+
+            update(deltaTime) {
+                this.gameTime += deltaTime;
+
+                this.spawner.update(this.gameTime, deltaTime);
+
+                const minions = this.spawner.getMinions();
+
+                minions.forEach(minion => {
+                    this.ai.updateCombat(minion, minions, deltaTime);
+                });
+
+                minions.forEach(minion => {
+                    this.ai.updateMovement(minion, minions, deltaTime);
+                });
+
+                const deadMinions = this.spawner.removeDeadMinions();
+                deadMinions.forEach(dead => {
+                    this.goldSystem.allocateGold(dead, dead.lastAttacker, minions);
+                });
+            }
+
+            render() {
+                this.renderer.clear();
+                this.renderer.drawMap(this.paths);
+                this.renderer.drawMinions(this.spawner.getMinions());
+                this.renderer.drawUI(this.gameTime, this.spawner.currentWave);
+            }
+
+            updateStats() {
+                const minutes = Math.floor(this.gameTime / 60);
+                const seconds = Math.floor(this.gameTime % 60);
+                document.getElementById('gameTime').textContent =
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                document.getElementById('waveNum').textContent = this.spawner.currentWave;
+                document.getElementById('blueGold').textContent = this.goldSystem.blueTeamGold;
+                document.getElementById('redGold').textContent = this.goldSystem.redTeamGold;
+                document.getElementById('minionCount').textContent =
+                    this.spawner.getMinions().filter(m => !m.dead).length;
+            }
+        }
+
+        return { GameEngine };
+    })(Config, GrowthStrategy, Spawner, AI, GoldSystem, Renderer);
+
+    // ============================================
+    // 初始化游戏
+    // ============================================
+    document.addEventListener('DOMContentLoaded', () => {
+        const game = new Game.GameEngine('gameCanvas');
+        game.render();
+        game.updateStats();
+
+        console.log('%c⚔️ MOBA 小兵波次系统已加载', 'color: #e94560; font-size: 18px; font-weight: bold;');
+        console.log('%c点击"开始游戏"按钮开始演示', 'color: #3498db; font-size: 14px;');
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>激光反射解谜 - Laser Puzzle</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(255, 0, 100, 0.5);
+            background: linear-gradient(90deg, #ff006e, #8338ec, #3a86ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .level-info {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            font-size: 1rem;
+        }
+
+        .level-info span {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 5px 15px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        #gameCanvas {
+            border-radius: 15px;
+            box-shadow: 0 0 40px rgba(255, 0, 100, 0.3), 0 0 80px rgba(131, 56, 236, 0.2);
+            background: #0a0a1a;
+            cursor: pointer;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #ff006e, #8338ec);
+            color: white;
+            box-shadow: 0 4px 15px rgba(255, 0, 110, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 0, 110, 0.6);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .level-select {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 100;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .level-select.active {
+            display: flex;
+        }
+
+        .level-select h2 {
+            font-size: 2rem;
+            margin-bottom: 30px;
+            background: linear-gradient(90deg, #ff006e, #3a86ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .level-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            max-width: 300px;
+        }
+
+        .level-btn {
+            width: 80px;
+            height: 80px;
+            font-size: 1.5rem;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .level-btn.locked {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        .level-btn .stars {
+            font-size: 0.7rem;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 0 60px rgba(255, 0, 100, 0.3);
+            animation: popIn 0.4s ease;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-content h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: #ff006e;
+        }
+
+        .modal-stats {
+            margin: 20px 0;
+            font-size: 1.1rem;
+        }
+
+        .modal-stats p {
+            margin: 10px 0;
+        }
+
+        .stars-display {
+            font-size: 2.5rem;
+            margin: 20px 0;
+            letter-spacing: 10px;
+        }
+
+        .star {
+            color: #444;
+            transition: color 0.3s ease;
+        }
+
+        .star.active {
+            color: #ffd700;
+            text-shadow: 0 0 20px #ffd700;
+            animation: starPop 0.5s ease;
+        }
+
+        @keyframes starPop {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1); }
+        }
+
+        .instructions {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .instructions h3 {
+            margin-bottom: 10px;
+            color: #8338ec;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 15px;
+            font-size: 0.85rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .btn {
+                padding: 10px 18px;
+                font-size: 0.9rem;
+            }
+
+            .level-info {
+                font-size: 0.9rem;
+                gap: 10px;
+            }
+
+            .modal-content {
+                padding: 25px;
+            }
+
+            .modal-content h2 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🔦 激光反射解谜</h1>
+        
+        <div class="level-info">
+            <span>关卡: <strong id="currentLevel">1</strong></span>
+            <span>步数: <strong id="stepCount">0</strong></span>
+            <span>目标: <strong id="targetCount">0/0</strong></span>
+        </div>
+
+        <div class="canvas-wrapper">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-box" style="background: #ff006e;"></div>
+                <span>发射器</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box" style="background: #3a86ff;"></div>
+                <span>目标</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box" style="background: #ffd700;"></div>
+                <span>镜子</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box" style="background: #444;"></div>
+                <span>障碍物</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-secondary" id="undoBtn" disabled>↶ 撤销</button>
+            <button class="btn btn-secondary" id="resetBtn">↻ 重置</button>
+            <button class="btn btn-primary" id="levelSelectBtn">📋 选关</button>
+        </div>
+
+        <div class="instructions">
+            <h3>游戏说明</h3>
+            <p>• 点击空格子放置 / 镜子</p>
+            <p>• 点击已有镜子切换角度或移除</p>
+            <p>• 让激光照射所有目标即可通关</p>
+        </div>
+    </div>
+
+    <div class="level-select" id="levelSelect">
+        <h2>选择关卡</h2>
+        <div class="level-buttons" id="levelButtons"></div>
+        <button class="btn btn-secondary" style="margin-top: 20px;" id="closeLevelSelect">返回游戏</button>
+    </div>
+
+    <div class="modal" id="winModal">
+        <div class="modal-content">
+            <h2>🎉 恭喜通关！</h2>
+            <div class="modal-stats">
+                <p>关卡: <strong id="winLevel">1</strong></p>
+                <p>你的步数: <strong id="winSteps">0</strong></p>
+                <p>最优步数: <strong id="winBest">0</strong></p>
+            </div>
+            <div class="stars-display" id="starsDisplay">
+                <span class="star">★</span>
+                <span class="star">★</span>
+                <span class="star">★</span>
+            </div>
+            <div class="controls">
+                <button class="btn btn-secondary" id="replayBtn">重玩</button>
+                <button class="btn btn-primary" id="nextLevelBtn">下一关</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ==================== GameModel - 游戏数据模型 ====================
+    const GameModel = (function() {
+        const DIRECTIONS = {
+            UP: { dx: 0, dy: -1, name: 'up' },
+            DOWN: { dx: 0, dy: 1, name: 'down' },
+            LEFT: { dx: -1, dy: 0, name: 'left' },
+            RIGHT: { dx: 1, dy: 0, name: 'right' }
+        };
+
+        const MIRROR_REFLECTIONS = {
+            '/': {
+                'up': 'right',
+                'down': 'left',
+                'left': 'down',
+                'right': 'up'
+            },
+            '\\': {
+                'up': 'left',
+                'down': 'right',
+                'left': 'up',
+                'right': 'down'
+            }
+        };
+
+        const LEVELS = [
+            {
+                id: 1,
+                name: "入门",
+                gridSize: 6,
+                bestSteps: 2,
+                emitters: [
+                    { x: 0, y: 2, direction: 'right' }
+                ],
+                targets: [
+                    { x: 5, y: 2 }
+                ],
+                obstacles: [],
+                mirrors: []
+            },
+            {
+                id: 2,
+                name: "转折",
+                gridSize: 6,
+                bestSteps: 3,
+                emitters: [
+                    { x: 0, y: 0, direction: 'right' }
+                ],
+                targets: [
+                    { x: 0, y: 5 }
+                ],
+                obstacles: [
+                    { x: 3, y: 0 }, { x: 3, y: 1 }, { x: 3, y: 2 }
+                ],
+                mirrors: []
+            },
+            {
+                id: 3,
+                name: "双目标",
+                gridSize: 6,
+                bestSteps: 4,
+                emitters: [
+                    { x: 0, y: 2, direction: 'right' }
+                ],
+                targets: [
+                    { x: 5, y: 0 },
+                    { x: 5, y: 5 }
+                ],
+                obstacles: [
+                    { x: 3, y: 2 }
+                ],
+                mirrors: []
+            }
+        ];
+
+        class Model {
+            constructor() {
+                this.levels = LEVELS;
+                this.currentLevelIndex = 0;
+                this.unlockedLevels = this.loadProgress();
+                this.levelStars = this.loadStars();
+                this.grid = [];
+                this.gridSize = 6;
+                this.emitters = [];
+                this.targets = [];
+                this.obstacles = [];
+                this.mirrors = [];
+                this.laserPath = [];
+                this.activatedTargets = new Set();
+                this.stepCount = 0;
+                this.history = [];
+                this.maxReflections = 100;
+            }
+
+            loadProgress() {
+                const saved = localStorage.getItem('laserPuzzle_unlocked');
+                return saved ? JSON.parse(saved) : [1];
+            }
+
+            saveProgress() {
+                localStorage.setItem('laserPuzzle_unlocked', JSON.stringify(this.unlockedLevels));
+            }
+
+            loadStars() {
+                const saved = localStorage.getItem('laserPuzzle_stars');
+                return saved ? JSON.parse(saved) : {};
+            }
+
+            saveStars() {
+                localStorage.setItem('laserPuzzle_stars', JSON.stringify(this.levelStars));
+            }
+
+            loadLevel(levelIndex) {
+                const level = this.levels[levelIndex];
+                this.currentLevelIndex = levelIndex;
+                this.gridSize = level.gridSize;
+                this.emitters = JSON.parse(JSON.stringify(level.emitters));
+                this.targets = JSON.parse(JSON.stringify(level.targets));
+                this.obstacles = JSON.parse(JSON.stringify(level.obstacles));
+                this.mirrors = JSON.parse(JSON.stringify(level.mirrors));
+                this.stepCount = 0;
+                this.history = [];
+                this.activatedTargets = new Set();
+                this.initGrid();
+                this.calculateLaserPath();
+            }
+
+            initGrid() {
+                this.grid = [];
+                for (let y = 0; y < this.gridSize; y++) {
+                    this.grid[y] = [];
+                    for (let x = 0; x < this.gridSize; x++) {
+                        this.grid[y][x] = { type: 'empty', mirror: null };
+                    }
+                }
+
+                this.emitters.forEach(e => {
+                    this.grid[e.y][e.x] = { type: 'emitter', direction: e.direction };
+                });
+
+                this.targets.forEach(t => {
+                    this.grid[t.y][t.x] = { type: 'target' };
+                });
+
+                this.obstacles.forEach(o => {
+                    this.grid[o.y][o.x] = { type: 'obstacle' };
+                });
+
+                this.mirrors.forEach(m => {
+                    this.grid[m.y][m.x] = { type: 'mirror', mirror: m.type };
+                });
+            }
+
+            handleCellClick(x, y) {
+                if (x < 0 || x >= this.gridSize || y < 0 || y >= this.gridSize) return false;
+                
+                const cell = this.grid[y][x];
+                if (cell.type === 'emitter' || cell.type === 'obstacle' || cell.type === 'target') {
+                    return false;
+                }
+
+                this.saveState();
+
+                if (cell.type === 'empty' || cell.mirror === null) {
+                    this.grid[y][x] = { type: 'mirror', mirror: '/' };
+                    this.stepCount++;
+                } else if (cell.mirror === '/') {
+                    this.grid[y][x] = { type: 'mirror', mirror: '\\' };
+                    this.stepCount++;
+                } else {
+                    this.grid[y][x] = { type: 'empty', mirror: null };
+                    this.stepCount++;
+                }
+
+                this.calculateLaserPath();
+                return true;
+            }
+
+            saveState() {
+                this.history.push({
+                    grid: JSON.parse(JSON.stringify(this.grid)),
+                    stepCount: this.stepCount
+                });
+            }
+
+            undo() {
+                if (this.history.length === 0) return false;
+                
+                const state = this.history.pop();
+                this.grid = state.grid;
+                this.stepCount = state.stepCount;
+                this.calculateLaserPath();
+                return true;
+            }
+
+            canUndo() {
+                return this.history.length > 0;
+            }
+
+            reset() {
+                this.loadLevel(this.currentLevelIndex);
+            }
+
+            calculateLaserPath() {
+                this.laserPath = [];
+                this.activatedTargets = new Set();
+
+                this.emitters.forEach(emitter => {
+                    let x = emitter.x;
+                    let y = emitter.y;
+                    let direction = DIRECTIONS[emitter.direction.toUpperCase()];
+                    let reflections = 0;
+                    const path = [];
+                    const visited = new Set();
+
+                    path.push({ x, y, direction: direction.name });
+
+                    while (reflections < this.maxReflections) {
+                        const nextX = x + direction.dx;
+                        const nextY = y + direction.dy;
+
+                        if (nextX < 0 || nextX >= this.gridSize || nextY < 0 || nextY >= this.gridSize) {
+                            break;
+                        }
+
+                        const nextCell = this.grid[nextY][nextX];
+                        const posKey = `${nextX},${nextY},${direction.name}`;
+
+                        if (visited.has(posKey)) {
+                            break;
+                        }
+                        visited.add(posKey);
+
+                        path.push({ x: nextX, y: nextY, direction: direction.name });
+
+                        if (nextCell.type === 'target') {
+                            this.activatedTargets.add(`${nextX},${nextY}`);
+                        }
+
+                        if (nextCell.type === 'obstacle') {
+                            break;
+                        }
+
+                        if (nextCell.type === 'mirror' && nextCell.mirror) {
+                            const newDirName = MIRROR_REFLECTIONS[nextCell.mirror][direction.name];
+                            direction = DIRECTIONS[newDirName.toUpperCase()];
+                            reflections++;
+                        }
+
+                        x = nextX;
+                        y = nextY;
+                    }
+
+                    this.laserPath.push(path);
+                });
+            }
+
+            checkWin() {
+                return this.activatedTargets.size === this.targets.length;
+            }
+
+            calculateStars() {
+                const level = this.levels[this.currentLevelIndex];
+                const best = level.bestSteps;
+                
+                if (this.stepCount <= best) return 3;
+                if (this.stepCount <= best + 2) return 2;
+                return 1;
+            }
+
+            unlockNextLevel() {
+                const nextLevel = this.currentLevelIndex + 2;
+                if (!this.unlockedLevels.includes(nextLevel) && nextLevel <= this.levels.length) {
+                    this.unlockedLevels.push(nextLevel);
+                    this.saveProgress();
+                }
+
+                const stars = this.calculateStars();
+                const levelId = this.currentLevelIndex + 1;
+                if (!this.levelStars[levelId] || this.levelStars[levelId] < stars) {
+                    this.levelStars[levelId] = stars;
+                    this.saveStars();
+                }
+            }
+        }
+
+        return { Model, DIRECTIONS };
+    })();
+
+    // ==================== GameRenderer - Canvas渲染器 ====================
+    const GameRenderer = (function() {
+        const COLORS = {
+            background: '#0a0a1a',
+            grid: '#1a1a3a',
+            gridLine: '#2a2a4a',
+            emitter: '#ff006e',
+            emitterGlow: 'rgba(255, 0, 110, 0.5)',
+            target: '#3a86ff',
+            targetActivated: '#00ff88',
+            targetGlow: 'rgba(58, 134, 255, 0.5)',
+            targetActivatedGlow: 'rgba(0, 255, 136, 0.5)',
+            obstacle: '#444455',
+            mirror: '#ffd700',
+            mirrorGlow: 'rgba(255, 215, 0, 0.4)',
+            laser: '#ff006e',
+            laserGlow: 'rgba(255, 0, 110, 0.6)'
+        };
+
+        class Renderer {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.cellSize = 0;
+                this.gridSize = 6;
+                this.padding = 20;
+                this.animationTime = 0;
+                this.hitAnimation = {};
+                this.setupCanvas();
+                window.addEventListener('resize', () => this.setupCanvas());
+            }
+
+            setupCanvas() {
+                const container = this.canvas.parentElement;
+                const maxWidth = Math.min(container.clientWidth - 40, 500);
+                const dpr = window.devicePixelRatio || 1;
+                
+                this.canvas.width = maxWidth * dpr;
+                this.canvas.height = maxWidth * dpr;
+                this.canvas.style.width = maxWidth + 'px';
+                this.canvas.style.height = maxWidth + 'px';
+                
+                this.ctx.scale(dpr, dpr);
+                this.cellSize = (maxWidth - this.padding * 2) / this.gridSize;
+            }
+
+            setGridSize(size) {
+                this.gridSize = size;
+                this.setupCanvas();
+            }
+
+            clear() {
+                this.ctx.fillStyle = COLORS.background;
+                this.ctx.fillRect(0, 0, this.canvas.width / (window.devicePixelRatio || 1), this.canvas.height / (window.devicePixelRatio || 1));
+            }
+
+            drawGrid() {
+                const ctx = this.ctx;
+                const cs = this.cellSize;
+                const pad = this.padding;
+
+                ctx.strokeStyle = COLORS.gridLine;
+                ctx.lineWidth = 1;
+
+                for (let i = 0; i <= this.gridSize; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(pad + i * cs, pad);
+                    ctx.lineTo(pad + i * cs, pad + this.gridSize * cs);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(pad, pad + i * cs);
+                    ctx.lineTo(pad + this.gridSize * cs, pad + i * cs);
+                    ctx.stroke();
+                }
+
+                for (let y = 0; y < this.gridSize; y++) {
+                    for (let x = 0; x < this.gridSize; x++) {
+                        ctx.fillStyle = COLORS.grid;
+                        ctx.fillRect(pad + x * cs + 1, pad + y * cs + 1, cs - 2, cs - 2);
+                    }
+                }
+            }
+
+            drawEmitter(x, y, direction) {
+                const ctx = this.ctx;
+                const cs = this.cellSize;
+                const pad = this.padding;
+                const cx = pad + x * cs + cs / 2;
+                const cy = pad + y * cs + cs / 2;
+                const size = cs * 0.35;
+
+                ctx.save();
+                ctx.shadowColor = COLORS.emitterGlow;
+                ctx.shadowBlur = 20 + Math.sin(this.animationTime * 3) * 5;
+
+                ctx.fillStyle = COLORS.emitter;
+                ctx.beginPath();
+                ctx.arc(cx, cy, size, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.translate(cx, cy);
+                const angles = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
+                ctx.rotate(angles[direction]);
+
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.moveTo(size * 0.8, 0);
+                ctx.lineTo(-size * 0.3, -size * 0.4);
+                ctx.lineTo(-size * 0.3, size * 0.4);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            drawTarget(x, y, activated) {
+                const ctx = this.ctx;
+                const cs = this.cellSize;
+                const pad = this.padding;
+                const cx = pad + x * cs + cs / 2;
+                const cy = pad + y * cs + cs / 2;
+                const size = cs * 0.3;
+
+                const key = `${x},${y}`;
+                let animProgress = this.hitAnimation[key] || 0;
+                if (activated && animProgress < 1) {
+                    this.hitAnimation[key] = Math.min(1, animProgress + 0.1);
+                } else if (!activated) {
+                    this.hitAnimation[key] = 0;
+                }
+
+                ctx.save();
+                const color = activated ? COLORS.targetActivated : COLORS.target;
+                const glow = activated ? COLORS.targetActivatedGlow : COLORS.targetGlow;
+                
+                ctx.shadowColor = glow;
+                ctx.shadowBlur = activated ? 25 + animProgress * 10 : 15;
+
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(cx, cy, size + animProgress * 5, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, size * 0.5, 0, Math.PI * 2);
+                ctx.stroke();
+
+                if (activated) {
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, size * 0.25, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+
+            drawObstacle(x, y) {
+                const ctx = this.ctx;
+                const cs = this.cellSize;
+                const pad = this.padding;
+                const margin = cs * 0.1;
+
+                ctx.fillStyle = COLORS.obstacle;
+                ctx.fillRect(
+                    pad + x * cs + margin,
+                    pad + y * cs + margin,
+                    cs - margin * 2,
+                    cs - margin * 2
+                );
+
+                ctx.strokeStyle = '#555';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(
+                    pad + x * cs + margin,
+                    pad + y * cs + margin,
+                    cs - margin * 2,
+                    cs - margin * 2
+                );
+            }
+
+            drawMirror(x, y, type) {
+                const ctx = this.ctx;
+                const cs = this.cellSize;
+                const pad = this.padding;
+                const cx = pad + x * cs + cs / 2;
+                const cy = pad + y * cs + cs / 2;
+                const length = cs * 0.6;
+
+                ctx.save();
+                ctx.shadowColor = COLORS.mirrorGlow;
+                ctx.shadowBlur = 10;
+
+                ctx.strokeStyle = COLORS.mirror;
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+
+                ctx.beginPath();
+                if (type === '/') {
+                    ctx.moveTo(cx - length / 2, cy + length / 2);
+                    ctx.lineTo(cx + length / 2, cy - length / 2);
+                } else {
+                    ctx.moveTo(cx - length / 2, cy - length / 2);
+                    ctx.lineTo(cx + length / 2, cy + length / 2);
+                }
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                if (type === '/') {
+                    ctx.moveTo(cx - length / 4, cy + length / 4);
+                    ctx.lineTo(cx, cy);
+                } else {
+                    ctx.moveTo(cx - length / 4, cy - length / 4);
+                    ctx.lineTo(cx, cy);
+                }
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            drawLaserPath(paths) {
+                const ctx = this.ctx;
+                const cs = this.cellSize;
+                const pad = this.padding;
+
+                paths.forEach(path => {
+                    if (path.length < 2) return;
+
+                    ctx.save();
+                    ctx.strokeStyle = COLORS.laser;
+                    ctx.lineWidth = 3;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.shadowColor = COLORS.laserGlow;
+                    ctx.shadowBlur = 15;
+
+                    ctx.beginPath();
+                    const start = path[0];
+                    ctx.moveTo(
+                        pad + start.x * cs + cs / 2,
+                        pad + start.y * cs + cs / 2
+                    );
+
+                    for (let i = 1; i < path.length; i++) {
+                        const point = path[i];
+                        ctx.lineTo(
+                            pad + point.x * cs + cs / 2,
+                            pad + point.y * cs + cs / 2
+                        );
+                    }
+                    ctx.stroke();
+
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                    ctx.lineWidth = 1;
+                    ctx.shadowBlur = 0;
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        pad + start.x * cs + cs / 2,
+                        pad + start.y * cs + cs / 2
+                    );
+                    for (let i = 1; i < path.length; i++) {
+                        const point = path[i];
+                        ctx.lineTo(
+                            pad + point.x * cs + cs / 2,
+                            pad + point.y * cs + cs / 2
+                        );
+                    }
+                    ctx.stroke();
+
+                    ctx.restore();
+                });
+            }
+
+            render(model) {
+                this.animationTime += 0.016;
+                this.clear();
+                this.drawGrid();
+
+                for (let y = 0; y < model.gridSize; y++) {
+                    for (let x = 0; x < model.gridSize; x++) {
+                        const cell = model.grid[y][x];
+                        
+                        if (cell.type === 'emitter') {
+                            this.drawEmitter(x, y, cell.direction);
+                        } else if (cell.type === 'target') {
+                            const activated = model.activatedTargets.has(`${x},${y}`);
+                            this.drawTarget(x, y, activated);
+                        } else if (cell.type === 'obstacle') {
+                            this.drawObstacle(x, y);
+                        } else if (cell.type === 'mirror' && cell.mirror) {
+                            this.drawMirror(x, y, cell.mirror);
+                        }
+                    }
+                }
+
+                this.drawLaserPath(model.laserPath);
+            }
+
+            getGridPosition(clientX, clientY) {
+                const rect = this.canvas.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 1;
+                const x = (clientX - rect.left) - this.padding;
+                const y = (clientY - rect.top) - this.padding;
+                
+                const gridX = Math.floor(x / this.cellSize);
+                const gridY = Math.floor(y / this.cellSize);
+                
+                return { x: gridX, y: gridY };
+            }
+        }
+
+        return { Renderer };
+    })();
+
+    // ==================== GameController - 游戏控制器 ====================
+    const GameController = (function() {
+        class Controller {
+            constructor(model, renderer) {
+                this.model = model;
+                this.renderer = renderer;
+                this.isAnimating = false;
+                this.setupEventListeners();
+            }
+
+            init() {
+                this.model.loadLevel(0);
+                this.renderer.setGridSize(this.model.gridSize);
+                this.updateUI();
+                this.updateLevelButtons();
+                this.animate();
+            }
+
+            setupEventListeners() {
+                const canvas = this.renderer.canvas;
+
+                canvas.addEventListener('click', (e) => this.handleInput(e.clientX, e.clientY));
+                canvas.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    const touch = e.changedTouches[0];
+                    this.handleInput(touch.clientX, touch.clientY);
+                });
+
+                document.getElementById('undoBtn').addEventListener('click', () => this.undo());
+                document.getElementById('resetBtn').addEventListener('click', () => this.reset());
+                document.getElementById('levelSelectBtn').addEventListener('click', () => this.showLevelSelect());
+                document.getElementById('closeLevelSelect').addEventListener('click', () => this.hideLevelSelect());
+                document.getElementById('replayBtn').addEventListener('click', () => this.replay());
+                document.getElementById('nextLevelBtn').addEventListener('click', () => this.nextLevel());
+            }
+
+            handleInput(clientX, clientY) {
+                const pos = this.renderer.getGridPosition(clientX, clientY);
+                
+                if (this.model.handleCellClick(pos.x, pos.y)) {
+                    this.updateUI();
+                    
+                    if (this.model.checkWin()) {
+                        setTimeout(() => this.showWinModal(), 300);
+                    }
+                }
+            }
+
+            undo() {
+                if (this.model.undo()) {
+                    this.updateUI();
+                }
+            }
+
+            reset() {
+                this.model.reset();
+                this.updateUI();
+            }
+
+            loadLevel(levelIndex) {
+                this.model.loadLevel(levelIndex);
+                this.renderer.setGridSize(this.model.gridSize);
+                this.updateUI();
+                this.hideLevelSelect();
+            }
+
+            showLevelSelect() {
+                this.updateLevelButtons();
+                document.getElementById('levelSelect').classList.add('active');
+            }
+
+            hideLevelSelect() {
+                document.getElementById('levelSelect').classList.remove('active');
+            }
+
+            updateLevelButtons() {
+                const container = document.getElementById('levelButtons');
+                container.innerHTML = '';
+
+                this.model.levels.forEach((level, index) => {
+                    const btn = document.createElement('button');
+                    const levelNum = index + 1;
+                    const isUnlocked = this.model.unlockedLevels.includes(levelNum);
+                    const stars = this.model.levelStars[levelNum] || 0;
+
+                    btn.className = `btn level-btn ${isUnlocked ? 'btn-primary' : 'locked'}`;
+                    btn.innerHTML = `
+                        <span>${isUnlocked ? levelNum : '🔒'}</span>
+                        <span class="stars">${isUnlocked ? '★'.repeat(stars) + '☆'.repeat(3 - stars) : ''}</span>
+                    `;
+
+                    if (isUnlocked) {
+                        btn.addEventListener('click', () => this.loadLevel(index));
+                    }
+
+                    container.appendChild(btn);
+                });
+            }
+
+            showWinModal() {
+                this.model.unlockNextLevel();
+                
+                const stars = this.model.calculateStars();
+                const starsDisplay = document.getElementById('starsDisplay');
+                const starElements = starsDisplay.querySelectorAll('.star');
+                
+                starElements.forEach((star, i) => {
+                    star.classList.remove('active');
+                    if (i < stars) {
+                        setTimeout(() => star.classList.add('active'), i * 200);
+                    }
+                });
+
+                document.getElementById('winLevel').textContent = this.model.currentLevelIndex + 1;
+                document.getElementById('winSteps').textContent = this.model.stepCount;
+                document.getElementById('winBest').textContent = this.model.levels[this.model.currentLevelIndex].bestSteps;
+
+                const nextBtn = document.getElementById('nextLevelBtn');
+                nextBtn.style.display = this.model.currentLevelIndex < this.model.levels.length - 1 ? 'block' : 'none';
+
+                document.getElementById('winModal').classList.add('active');
+            }
+
+            hideWinModal() {
+                document.getElementById('winModal').classList.remove('active');
+            }
+
+            replay() {
+                this.hideWinModal();
+                this.reset();
+            }
+
+            nextLevel() {
+                this.hideWinModal();
+                if (this.model.currentLevelIndex < this.model.levels.length - 1) {
+                    this.loadLevel(this.model.currentLevelIndex + 1);
+                }
+            }
+
+            updateUI() {
+                document.getElementById('currentLevel').textContent = this.model.currentLevelIndex + 1;
+                document.getElementById('stepCount').textContent = this.model.stepCount;
+                document.getElementById('targetCount').textContent = 
+                    `${this.model.activatedTargets.size}/${this.model.targets.length}`;
+                document.getElementById('undoBtn').disabled = !this.model.canUndo();
+            }
+
+            animate() {
+                this.renderer.render(this.model);
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        return { Controller };
+    })();
+
+    // ==================== 初始化游戏 ====================
+    document.addEventListener('DOMContentLoaded', () => {
+        const canvas = document.getElementById('gameCanvas');
+        const model = new GameModel.Model();
+        const renderer = new GameRenderer.Renderer(canvas);
+        const controller = new GameController.Controller(model, renderer);
+        
+        controller.init();
+    });
+    </script>
+</body>
+</html>

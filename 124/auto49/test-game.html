@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游戏测试 - 光线反射解谜</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #64ffda;
+        }
+        .test-info {
+            background: rgba(100, 255, 218, 0.1);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .open-btn {
+            background: linear-gradient(135deg, #64ffda 0%, #4fc3f7 100%);
+            color: #0d1117;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .open-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(100, 255, 218, 0.4);
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .feature {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid #64ffda;
+        }
+        .feature h3 {
+            margin: 0 0 10px 0;
+            color: #64ffda;
+        }
+        .feature p {
+            margin: 0;
+            color: #aaa;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 光线反射解谜游戏</h1>
+        
+        <div class="test-info">
+            <h2>✅ 游戏已创建完成！</h2>
+            <p>游戏文件位于: <code>light-puzzle.html</code></p>
+            <p>点击下方按钮打开游戏开始测试。</p>
+        </div>
+
+        <button class="open-btn" onclick="window.open('light-puzzle.html', '_blank')">
+            🚀 打开游戏
+        </button>
+
+        <div class="features">
+            <div class="feature">
+                <h3>📦 模块化架构</h3>
+                <p>PuzzleCore 纯逻辑模块 + UIRenderer 渲染模块，通过观察者模式通信</p>
+            </div>
+            <div class="feature">
+                <h3>🎯 6个关卡</h3>
+                <p>难度递增，每个关卡都有预设的最优步数</p>
+            </div>
+            <div class="feature">
+                <h3>✨ 动画效果</h3>
+                <p>镜子旋转平滑动画，0.2秒 ease-out 缓动</p>
+            </div>
+            <div class="feature">
+                <h3>🔄 撤销功能</h3>
+                <p>可回退到任意历史步骤，步数同步恢复</p>
+            </div>
+            <div class="feature">
+                <h3>💾 进度保存</h3>
+                <p>localStorage 保存关卡进度和最佳记录</p>
+            </div>
+            <div class="feature">
+                <h3>⏱️ 计时统计</h3>
+                <p>实时计时，通关后显示步数、用时和评价</p>
+            </div>
+            <div class="feature">
+                <h3>🔦 光线追踪</h3>
+                <p>严格的光学反射逻辑，带方向指示箭头</p>
+            </div>
+            <div class="feature">
+                <h3>⚠️ 迷失检测</h3>
+                <p>超过最大反射次数后提示光线迷失</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

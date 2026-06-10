@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>即时战略游戏</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #1a1a2e; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+        #gameCanvas {
+            display: block;
+            cursor: crosshair;
+        }
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 35px;
+            background: rgba(0, 0, 0, 0.75);
+            color: #ffd700;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            font-size: 14px;
+            font-weight: bold;
+            border-bottom: 2px solid #4a4a6a;
+        }
+        #infoBar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 10px 15px;
+            font-size: 12px;
+            border-top: 2px solid #4a4a6a;
+            overflow-y: auto;
+        }
+        #productionPanel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 40, 0.95);
+            border: 2px solid #6a6a9a;
+            border-radius: 8px;
+            padding: 20px;
+            display: none;
+            z-index: 100;
+            min-width: 250px;
+        }
+        #productionPanel h3 {
+            color: #ffd700;
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 16px;
+        }
+        .btn {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            background: linear-gradient(180deg, #3a3a5a 0%, #2a2a4a 100%);
+            border: 1px solid #5a5a8a;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background: linear-gradient(180deg, #4a4a7a 0%, #3a3a6a 100%);
+            border-color: #7a7aaa;
+        }
+        .btn:disabled {
+            background: #2a2a3a;
+            color: #666;
+            cursor: not-allowed;
+        }
+        #closePanel {
+            background: linear-gradient(180deg, #8a3a3a 0%, #6a2a2a 100%);
+            border-color: #aa5a5a;
+        }
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            color: #ff4444;
+            font-weight: bold;
+            text-shadow: 3px 3px 6px #000;
+            display: none;
+            z-index: 200;
+        }
+        .unitInfo {
+            display: inline-block;
+            background: rgba(60, 60, 90, 0.8);
+            border: 1px solid #7070a0;
+            border-radius: 4px;
+            padding: 6px 10px;
+            margin: 2px 4px 2px 0;
+        }
+        .healthBar {
+            width: 50px;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .healthFill {
+            height: 100%;
+            background: linear-gradient(90deg, #44ff44, #88ff88);
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="hud">
+            <span>💰 资源: <span id="resourceDisplay">200</span></span>
+            <span style="margin-left: 30px;">🏠 基地生命: <span id="baseHealthDisplay">1000</span>/1000</span>
+            <span style="margin-left: 30px;">👾 敌方单位: <span id="enemyCountDisplay">0</span>/6</span>
+        </div>
+        <div id="infoBar">
+            <div id="selectedInfo">未选中单位</div>
+        </div>
+        <div id="productionPanel">
+            <h3>🏭 生产面板</h3>
+            <button class="btn" id="produceInfantry">生产步兵 (50资源)</button>
+            <button class="btn" id="produceTank">生产坦克 (100资源)</button>
+            <button class="btn" id="closePanel">关闭</button>
+        </div>
+        <div id="gameOver">GAME OVER</div>
+    </div>
+
+    <script>
+    // ============================================
+    // 接口定义 (Interface Definition)
+    // ============================================
+    /**
+     * @interface IUnit
+     * @description 单位接口定义 - 所有战斗单位必须实现以下方法
+     */
+    /*
+    interface IUnit {
+        moveTo(targetX: number, targetY: number): void;
+        attack(targetUnit: IUnit): void;
+        takeDamage(amount: number): void;
+        update(deltaTime: number): void;
+        render(ctx: CanvasRenderingContext2D): void;
+        isAlive(): boolean;
+    }
+    */
+
+    // ============================================
+    // 游戏状态管理 (Game State Manager)
+    // ============================================
+    const GameState = {
+        resources: 200,
+        selectedUnits: [],
+        playerUnits: [],
+        enemyUnits: [],
+        resourcePoints: [],
+        playerBase: null,
+        enemyBase: null,
+        gameOver: false,
+        lastAITime: 0,
+        aiInterval: 20000,
+        
+        init() {
+            this.resources = 200;
+            this.selectedUnits = [];
+            this.playerUnits = [];
+            this.enemyUnits = [];
+            this.resourcePoints = [];
+            this.gameOver = false;
+            this.lastAITime = 0;
+        }
+    };
+
+    // ============================================
+    // 碰撞处理模块 (Collision Handler)
+    // ============================================
+    const CollisionHandler = {
+        checkCollision(unit1, unit2) {
+            const dx = unit1.x - unit2.x;
+            const dy = unit1.y - unit2.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = unit1.radius + unit2.radius;
+            return { colliding: distance < minDistance, distance, dx, dy };
+        },
+
+        separateUnits(unit1, unit2) {
+            const result = this.checkCollision(unit1, unit2);
+            if (result.colliding && result.distance > 0) {
+                const overlap = (unit1.radius + unit2.radius - result.distance) / 2;
+                const nx = result.dx / result.distance;
+                const ny = result.dy / result.distance;
+                
+                unit1.x += nx * overlap * 0.5;
+                unit1.y += ny * overlap * 0.5;
+                unit2.x -= nx * overlap * 0.5;
+                unit2.y -= ny * overlap * 0.5;
+            }
+        },
+
+        handleAllCollisions(units) {
+            for (let i = 0; i < units.length; i++) {
+                for (let j = i + 1; j < units.length; j++) {
+                    this.separateUnits(units[i], units[j]);
+                }
+            }
+        },
+
+        findEmptyPosition(centerX, centerY, radius, existingUnits, maxRadius = 50) {
+            for (let attempt = 0; attempt < 50; attempt++) {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 35 + Math.random() * maxRadius;
+                const x = centerX + Math.cos(angle) * distance;
+                const y = centerY + Math.sin(angle) * distance;
+                
+                let valid = true;
+                for (const unit of existingUnits) {
+                    const dx = x - unit.x;
+                    const dy = y - unit.y;
+                    if (Math.sqrt(dx * dx + dy * dy) < radius + unit.radius + 5) {
+                        valid = false;
+                        break;
+                    }
+                }
+                
+                const canvas = document.getElementById('gameCanvas');
+                if (x < radius + 10 || x > canvas.width - radius - 10 ||
+                    y < 45 + radius || y > canvas.height - 90 - radius) {
+                    valid = false;
+                }
+                
+                if (valid) return { x, y };
+            }
+            return { x: centerX + 50, y: centerY };
+        }
+    };
+
+    // ============================================
+    // 基础单位类 (Base Unit Class)
+    // ============================================
+    class BaseUnit {
+        constructor(x, y, team) {
+            this.x = x;
+            this.y = y;
+            this.team = team;
+            this.targetX = x;
+            this.targetY = y;
+            this.attackTarget = null;
+            this.attackCooldown = 0;
+            this.isSelected = false;
+            this.state = 'idle';
+        }
+
+        moveTo(targetX, targetY) {
+            this.targetX = Math.max(20, Math.min(780, targetX));
+            this.targetY = Math.max(45, Math.min(510, targetY));
+            this.attackTarget = null;
+            this.state = 'moving';
+        }
+
+        attack(targetUnit) {
+            this.attackTarget = targetUnit;
+            this.state = 'attacking';
+        }
+
+        takeDamage(amount) {
+            this.health -= amount;
+            if (this.health <= 0) {
+                this.health = 0;
+            }
+        }
+
+        isAlive() {
+            return this.health > 0;
+        }
+
+        _updateMovement(deltaTime) {
+            const dx = this.targetX - this.x;
+            const dy = this.targetY - this.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance > 2) {
+                const moveDistance = this.speed * deltaTime;
+                if (moveDistance >= distance) {
+                    this.x = this.targetX;
+                    this.y = this.targetY;
+                } else {
+                    this.x += (dx / distance) * moveDistance;
+                    this.y += (dy / distance) * moveDistance;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        _updateAttack(deltaTime) {
+            if (!this.attackTarget || !this.attackTarget.isAlive()) {
+                this.attackTarget = null;
+                this.state = 'idle';
+                return;
+            }
+
+            const dx = this.attackTarget.x - this.x;
+            const dy = this.attackTarget.y - this.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance <= this.attackRange) {
+                this.attackCooldown -= deltaTime;
+                if (this.attackCooldown <= 0) {
+                    this.attackTarget.takeDamage(this.attackDamage);
+                    this.attackCooldown = this.attackInterval;
+                }
+            } else {
+                this.moveTo(this.attackTarget.x, this.attackTarget.y);
+            }
+        }
+
+        _renderHealthBar(ctx, yOffset = -20) {
+            const barWidth = 24;
+            const barHeight = 4;
+            const x = this.x - barWidth / 2;
+            const y = this.y + yOffset;
+            
+            ctx.fillStyle = '#333';
+            ctx.fillRect(x, y, barWidth, barHeight);
+            
+            const healthPercent = this.health / this.maxHealth;
+            ctx.fillStyle = healthPercent > 0.5 ? '#44ff44' : healthPercent > 0.25 ? '#ffaa00' : '#ff4444';
+            ctx.fillRect(x, y, barWidth * healthPercent, barHeight);
+        }
+
+        _renderSelection(ctx) {
+            if (this.isSelected) {
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius + 4, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+    }
+
+    // ============================================
+    // 步兵实现 (Infantry Implementation)
+    // ============================================
+    class Infantry extends BaseUnit {
+        constructor(x, y, team) {
+            super(x, y, team);
+            this.health = 80;
+            this.maxHealth = 80;
+            this.attackDamage = 10;
+            this.speed = 90;
+            this.attackRange = 30;
+            this.attackInterval = 1;
+            this.radius = 10;
+            this.color = team === 'player' ? '#4488ff' : '#ff4444';
+            this.type = '步兵';
+        }
+
+        update(deltaTime) {
+            if (!this.isAlive()) return;
+
+            if (this.state === 'attacking') {
+                this._updateAttack(deltaTime);
+            } else if (this.state === 'moving') {
+                this._updateMovement(deltaTime);
+            }
+        }
+
+        render(ctx) {
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('步', this.x, this.y + 4);
+
+            this._renderHealthBar(ctx);
+            this._renderSelection(ctx);
+        }
+    }
+
+    // ============================================
+    // 坦克实现 (Tank Implementation)
+    // ============================================
+    class Tank extends BaseUnit {
+        constructor(x, y, team) {
+            super(x, y, team);
+            this.health = 150;
+            this.maxHealth = 150;
+            this.attackDamage = 20;
+            this.speed = 65;
+            this.attackRange = 50;
+            this.attackInterval = 1.5;
+            this.radius = 14;
+            this.color = team === 'player' ? '#4488ff' : '#ff4444';
+            this.type = '坦克';
+        }
+
+        update(deltaTime) {
+            if (!this.isAlive()) return;
+
+            if (this.state === 'attacking') {
+                this._updateAttack(deltaTime);
+            } else if (this.state === 'moving') {
+                this._updateMovement(deltaTime);
+            }
+        }
+
+        render(ctx) {
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x - this.radius, this.y - this.radius * 0.7, 
+                        this.radius * 2, this.radius * 1.4);
+            
+            ctx.fillStyle = this.team === 'player' ? '#2266cc' : '#cc2222';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(this.x - this.radius, this.y - this.radius * 0.7, 
+                          this.radius * 2, this.radius * 1.4);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('坦', this.x, this.y + 4);
+
+            this._renderHealthBar(ctx, -24);
+            this._renderSelection(ctx);
+        }
+    }
+
+    // ============================================
+    // 建筑类 (Building Class)
+    // ============================================
+    class Building {
+        constructor(x, y, width, height, team) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.team = team;
+            this.health = 1000;
+            this.maxHealth = 1000;
+            this.color = team === 'player' ? '#888888' : '#aa3333';
+        }
+
+        takeDamage(amount) {
+            this.health -= amount;
+            if (this.health <= 0) {
+                this.health = 0;
+                if (this.team === 'player') {
+                    GameState.gameOver = true;
+                    document.getElementById('gameOver').style.display = 'block';
+                }
+            }
+        }
+
+        isAlive() {
+            return this.health > 0;
+        }
+
+        isPointInside(px, py) {
+            return px >= this.x && px <= this.x + this.width &&
+                   py >= this.y && py <= this.y + this.height;
+        }
+
+        render(ctx) {
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(this.team === 'player' ? '🏠 我方基地' : '🏴 敌方基地', 
+                        this.x + this.width / 2, this.y + this.height / 2 + 5);
+
+            const barWidth = this.width - 10;
+            const barHeight = 6;
+            const healthPercent = this.health / this.maxHealth;
+            
+            ctx.fillStyle = '#333';
+            ctx.fillRect(this.x + 5, this.y - 12, barWidth, barHeight);
+            ctx.fillStyle = healthPercent > 0.5 ? '#44ff44' : healthPercent > 0.25 ? '#ffaa00' : '#ff4444';
+            ctx.fillRect(this.x + 5, this.y - 12, barWidth * healthPercent, barHeight);
+        }
+    }
+
+    // ============================================
+    // 资源点类 (Resource Point Class)
+    // ============================================
+    class ResourcePoint {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.radius = 12;
+        }
+
+        render(ctx) {
+            const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+            gradient.addColorStop(0, '#ffff44');
+            gradient.addColorStop(0.7, '#ffcc00');
+            gradient.addColorStop(1, '#aa8800');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = '#885500';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('💎', this.x, this.y + 4);
+        }
+    }
+
+    // ============================================
+    // AI逻辑模块 (AI Logic Module)
+    // ============================================
+    const AIHandler = {
+        update(currentTime) {
+            if (GameState.gameOver) return;
+
+            if (currentTime - GameState.lastAITime >= GameState.aiInterval) {
+                this.produceUnit();
+                GameState.lastAITime = currentTime;
+            }
+
+            this.updateUnitBehaviors();
+        },
+
+        produceUnit() {
+            if (GameState.enemyUnits.length >= 6) return;
+
+            const isTank = Math.random() > 0.5;
+            const base = GameState.enemyBase;
+            const allUnits = [...GameState.playerUnits, ...GameState.enemyUnits];
+            
+            const pos = CollisionHandler.findEmptyPosition(
+                base.x + base.width / 2,
+                base.y + base.height / 2,
+                isTank ? 14 : 10,
+                allUnits,
+                60
+            );
+
+            const unit = isTank 
+                ? new Tank(pos.x, pos.y, 'enemy')
+                : new Infantry(pos.x, pos.y, 'enemy');
+            
+            GameState.enemyUnits.push(unit);
+        },
+
+        updateUnitBehaviors() {
+            const playerBase = GameState.playerBase;
+            
+            for (const unit of GameState.enemyUnits) {
+                if (!unit.isAlive()) continue;
+
+                let nearestTarget = null;
+                let nearestDistance = Infinity;
+
+                for (const playerUnit of GameState.playerUnits) {
+                    if (!playerUnit.isAlive()) continue;
+                    const dx = playerUnit.x - unit.x;
+                    const dy = playerUnit.y - unit.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist < nearestDistance) {
+                        nearestDistance = dist;
+                        nearestTarget = playerUnit;
+                    }
+                }
+
+                for (const rp of GameState.resourcePoints) {
+                    for (const playerUnit of GameState.playerUnits) {
+                        if (!playerUnit.isAlive()) continue;
+                        const dx = playerUnit.x - rp.x;
+                        const dy = playerUnit.y - rp.y;
+                        const distToRP = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distToRP < 50) {
+                            const dx2 = playerUnit.x - unit.x;
+                            const dy2 = playerUnit.y - unit.y;
+                            const distToUnit = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+                            
+                            if (distToUnit < nearestDistance) {
+                                nearestDistance = distToUnit;
+                                nearestTarget = playerUnit;
+                            }
+                        }
+                    }
+                }
+
+                if (nearestTarget && nearestDistance < 180) {
+                    unit.attack(nearestTarget);
+                } else if (playerBase && playerBase.isAlive()) {
+                    if (!unit.attackTarget || unit.state !== 'attacking') {
+                        unit.moveTo(playerBase.x + playerBase.width / 2, 
+                                   playerBase.y + playerBase.height / 2);
+                        
+                        const dx = playerBase.x + playerBase.width / 2 - unit.x;
+                        const dy = playerBase.y + playerBase.height / 2 - unit.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < unit.attackRange + 30) {
+                            unit.attackTarget = playerBase;
+                            unit.state = 'attacking';
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    // ============================================
+    // 渲染与HUD模块 (Render & HUD Module)
+    // ============================================
+    const Renderer = {
+        canvas: null,
+        ctx: null,
+
+        init() {
+            this.canvas = document.getElementById('gameCanvas');
+            this.ctx = this.canvas.getContext('2d');
+        },
+
+        clear() {
+            this.ctx.fillStyle = '#1a4d1a';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            this.ctx.strokeStyle = '#2a5d2a';
+            this.ctx.lineWidth = 1;
+            for (let x = 0; x < this.canvas.width; x += 40) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(x, 0);
+                this.ctx.lineTo(x, this.canvas.height);
+                this.ctx.stroke();
+            }
+            for (let y = 0; y < this.canvas.height; y += 40) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, y);
+                this.ctx.lineTo(this.canvas.width, y);
+                this.ctx.stroke();
+            }
+        },
+
+        updateHUD() {
+            document.getElementById('resourceDisplay').textContent = GameState.resources;
+            document.getElementById('baseHealthDisplay').textContent = 
+                GameState.playerBase ? GameState.playerBase.health : 0;
+            document.getElementById('enemyCountDisplay').textContent = GameState.enemyUnits.length;
+            
+            const produceInfantryBtn = document.getElementById('produceInfantry');
+            const produceTankBtn = document.getElementById('produceTank');
+            produceInfantryBtn.disabled = GameState.resources < 50;
+            produceTankBtn.disabled = GameState.resources < 100;
+        },
+
+        updateSelectedInfo() {
+            const container = document.getElementById('selectedInfo');
+            
+            if (GameState.selectedUnits.length === 0) {
+                container.innerHTML = '未选中单位';
+                return;
+            }
+
+            let html = '';
+            for (const unit of GameState.selectedUnits) {
+                const healthPercent = Math.round((unit.health / unit.maxHealth) * 100);
+                html += `
+                    <div class="unitInfo">
+                        <div><strong>${unit.type}</strong> | 攻击: ${unit.attackDamage}</div>
+                        <div class="healthBar">
+                            <div class="healthFill" style="width: ${healthPercent}%"></div>
+                        </div>
+                        <div>HP: ${unit.health}/${unit.maxHealth}</div>
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+        }
+    };
+
+    // ============================================
+    // 输入处理模块 (Input Handler Module)
+    // ============================================
+    const InputHandler = {
+        isDragging: false,
+        dragStartX: 0,
+        dragStartY: 0,
+        dragEndX: 0,
+        dragEndY: 0,
+
+        init() {
+            const canvas = Renderer.canvas;
+            
+            canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
+            canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+            canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
+            canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            document.getElementById('produceInfantry').addEventListener('click', () => this.produceUnit('infantry'));
+            document.getElementById('produceTank').addEventListener('click', () => this.produceUnit('tank'));
+            document.getElementById('closePanel').addEventListener('click', () => this.closeProductionPanel());
+        },
+
+        getMousePos(e) {
+            const rect = Renderer.canvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        },
+
+        onMouseDown(e) {
+            if (GameState.gameOver) return;
+            
+            const pos = this.getMousePos(e);
+            
+            if (e.button === 0) {
+                if (GameState.playerBase && GameState.playerBase.isPointInside(pos.x, pos.y)) {
+                    this.openProductionPanel();
+                    return;
+                }
+
+                this.isDragging = true;
+                this.dragStartX = pos.x;
+                this.dragStartY = pos.y;
+                this.dragEndX = pos.x;
+                this.dragEndY = pos.y;
+            } else if (e.button === 2) {
+                this.handleRightClick(pos);
+            }
+        },
+
+        onMouseMove(e) {
+            if (!this.isDragging) return;
+            
+            const pos = this.getMousePos(e);
+            this.dragEndX = Math.max(0, Math.min(800, pos.x));
+            this.dragEndY = Math.max(0, Math.min(600, pos.y));
+        },
+
+        onMouseUp(e) {
+            if (e.button !== 0 || !this.isDragging) return;
+            
+            this.isDragging = false;
+            
+            const minX = Math.min(this.dragStartX, this.dragEndX);
+            const maxX = Math.max(this.dragStartX, this.dragEndX);
+            const minY = Math.min(this.dragStartY, this.dragEndY);
+            const maxY = Math.max(this.dragStartY, this.dragEndY);
+
+            if (maxX - minX < 5 && maxY - minY < 5) {
+                const pos = this.getMousePos(e);
+                this.selectSingleUnit(pos.x, pos.y);
+            } else {
+                this.selectUnitsInRect(minX, minY, maxX, maxY);
+            }
+
+            Renderer.updateSelectedInfo();
+        },
+
+        selectSingleUnit(x, y) {
+            for (const unit of GameState.playerUnits) {
+                unit.isSelected = false;
+            }
+            GameState.selectedUnits = [];
+
+            for (const unit of GameState.playerUnits) {
+                if (!unit.isAlive()) continue;
+                const dx = x - unit.x;
+                const dy = y - unit.y;
+                if (Math.sqrt(dx * dx + dy * dy) <= unit.radius + 5) {
+                    unit.isSelected = true;
+                    GameState.selectedUnits = [unit];
+                    break;
+                }
+            }
+        },
+
+        selectUnitsInRect(minX, minY, maxX, maxY) {
+            for (const unit of GameState.playerUnits) {
+                unit.isSelected = false;
+            }
+            GameState.selectedUnits = [];
+
+            for (const unit of GameState.playerUnits) {
+                if (!unit.isAlive()) continue;
+                if (unit.x >= minX && unit.x <= maxX && 
+                    unit.y >= minY && unit.y <= maxY) {
+                    if (GameState.selectedUnits.length < 12) {
+                        unit.isSelected = true;
+                        GameState.selectedUnits.push(unit);
+                    }
+                }
+            }
+        },
+
+        handleRightClick(pos) {
+            if (GameState.selectedUnits.length === 0) return;
+
+            let targetEnemy = null;
+            for (const unit of GameState.enemyUnits) {
+                if (!unit.isAlive()) continue;
+                const dx = pos.x - unit.x;
+                const dy = pos.y - unit.y;
+                if (Math.sqrt(dx * dx + dy * dy) <= unit.radius + 5) {
+                    targetEnemy = unit;
+                    break;
+                }
+            }
+
+            if (GameState.playerBase && GameState.playerBase.isPointInside(pos.x, pos.y)) {
+                targetEnemy = GameState.playerBase;
+            }
+
+            for (const unit of GameState.selectedUnits) {
+                if (!unit.isAlive()) continue;
+                
+                if (targetEnemy) {
+                    unit.attack(targetEnemy);
+                } else {
+                    const offset = (GameState.selectedUnits.indexOf(unit) - GameState.selectedUnits.length / 2) * 20;
+                    unit.moveTo(pos.x + offset * 0.3, pos.y + offset * 0.3);
+                }
+            }
+        },
+
+        openProductionPanel() {
+            document.getElementById('productionPanel').style.display = 'block';
+        },
+
+        closeProductionPanel() {
+            document.getElementById('productionPanel').style.display = 'none';
+        },
+
+        produceUnit(type) {
+            const cost = type === 'infantry' ? 50 : 100;
+            if (GameState.resources < cost) return;
+
+            const base = GameState.playerBase;
+            if (!base) return;
+
+            const radius = type === 'infantry' ? 10 : 14;
+            const allUnits = [...GameState.playerUnits, ...GameState.enemyUnits];
+            const pos = CollisionHandler.findEmptyPosition(
+                base.x + base.width / 2,
+                base.y + base.height / 2,
+                radius,
+                allUnits,
+                60
+            );
+
+            const unit = type === 'infantry'
+                ? new Infantry(pos.x, pos.y, 'player')
+                : new Tank(pos.x, pos.y, 'player');
+
+            GameState.resources -= cost;
+            GameState.playerUnits.push(unit);
+            Renderer.updateHUD();
+        },
+
+        renderSelectionBox(ctx) {
+            if (!this.isDragging) return;
+
+            const minX = Math.min(this.dragStartX, this.dragEndX);
+            const minY = Math.min(this.dragStartY, this.dragEndY);
+            const width = Math.abs(this.dragEndX - this.dragStartX);
+            const height = Math.abs(this.dragEndY - this.dragStartY);
+
+            ctx.fillStyle = 'rgba(68, 68, 255, 0.2)';
+            ctx.fillRect(minX, minY, width, height);
+            
+            ctx.strokeStyle = 'rgba(68, 68, 255, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(minX, minY, width, height);
+        }
+    };
+
+    // ============================================
+    // 游戏主循环 (Game Main Loop)
+    // ============================================
+    const Game = {
+        lastTime: 0,
+
+        init() {
+            GameState.init();
+            Renderer.init();
+            InputHandler.init();
+
+            GameState.playerBase = new Building(80, 520, 60, 60, 'player');
+            GameState.enemyBase = new Building(700, 80, 60, 60, 'enemy');
+
+            for (let i = 0; i < 3; i++) {
+                let x, y;
+                do {
+                    x = 150 + Math.random() * 500;
+                    y = 100 + Math.random() * 350;
+                } while (
+                    (Math.abs(x - 110) < 80 && Math.abs(y - 550) < 80) ||
+                    (Math.abs(x - 730) < 80 && Math.abs(y - 110) < 80)
+                );
+                GameState.resourcePoints.push(new ResourcePoint(x, y));
+            }
+
+            const startPos1 = CollisionHandler.findEmptyPosition(110, 550, 10, [], 40);
+            GameState.playerUnits.push(new Infantry(startPos1.x + 20, startPos1.y, 'player'));
+            GameState.playerUnits.push(new Infantry(startPos1.x - 20, startPos1.y, 'player'));
+            
+            const startPos2 = CollisionHandler.findEmptyPosition(110, 550, 14, GameState.playerUnits, 50);
+            GameState.playerUnits.push(new Tank(startPos2.x, startPos2.y - 30, 'player'));
+
+            this.lastTime = performance.now();
+            this.gameLoop();
+        },
+
+        gameLoop() {
+            const currentTime = performance.now();
+            const deltaTime = (currentTime - this.lastTime) / 1000;
+            this.lastTime = currentTime;
+
+            if (!GameState.gameOver) {
+                this.update(deltaTime, currentTime);
+            }
+            this.render();
+
+            requestAnimationFrame(() => this.gameLoop());
+        },
+
+        update(deltaTime, currentTime) {
+            AIHandler.update(currentTime);
+
+            const allUnits = [...GameState.playerUnits, ...GameState.enemyUnits];
+            
+            for (const unit of allUnits) {
+                unit.update(deltaTime);
+            }
+
+            CollisionHandler.handleAllCollisions(allUnits);
+
+            GameState.playerUnits = GameState.playerUnits.filter(u => u.isAlive());
+            GameState.enemyUnits = GameState.enemyUnits.filter(u => u.isAlive());
+            GameState.selectedUnits = GameState.selectedUnits.filter(u => u.isAlive());
+
+            for (const unit of GameState.enemyUnits) {
+                if (unit.attackTarget === GameState.playerBase && unit.state === 'attacking') {
+                    const dx = GameState.playerBase.x + 30 - unit.x;
+                    const dy = GameState.playerBase.y + 30 - unit.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist <= unit.attackRange + 30) {
+                        unit.attackCooldown -= deltaTime;
+                        if (unit.attackCooldown <= 0) {
+                            GameState.playerBase.takeDamage(unit.attackDamage);
+                            unit.attackCooldown = unit.attackInterval;
+                        }
+                    }
+                }
+            }
+
+            Renderer.updateHUD();
+        },
+
+        render() {
+            Renderer.clear();
+
+            for (const rp of GameState.resourcePoints) {
+                rp.render(Renderer.ctx);
+            }
+
+            if (GameState.playerBase) GameState.playerBase.render(Renderer.ctx);
+            if (GameState.enemyBase) GameState.enemyBase.render(Renderer.ctx);
+
+            const allUnits = [...GameState.playerUnits, ...GameState.enemyUnits];
+            allUnits.sort((a, b) => a.y - b.y);
+            
+            for (const unit of allUnits) {
+                unit.render(Renderer.ctx);
+            }
+
+            InputHandler.renderSelectionBox(Renderer.ctx);
+        }
+    };
+
+    // ============================================
+    // 游戏启动
+    // ============================================
+    window.addEventListener('load', () => {
+        Game.init();
+    });
+    </script>
+</body>
+</html>

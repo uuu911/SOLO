@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>量子护盾与能量分配系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 50%, #0a1a2a 100%);
+            min-height: 100vh;
+            color: #00ffff;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            text-shadow: 0 0 20px #00ffff, 0 0 40px #0088ff;
+            margin-bottom: 30px;
+            letter-spacing: 3px;
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 20px;
+        }
+        
+        .shield-visualization {
+            background: rgba(0, 20, 40, 0.5);
+            border: 2px solid #00ffff;
+            border-radius: 20px;
+            padding: 30px;
+            position: relative;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.2), inset 0 0 60px rgba(0, 136, 255, 0.1);
+        }
+        
+        .ship-center {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 0 auto;
+        }
+        
+        .shield-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 4px solid;
+            transition: all 0.3s ease;
+        }
+        
+        .shield-ring.phase {
+            width: 280px;
+            height: 280px;
+            top: 10px;
+            left: 10px;
+            border-color: #ff00ff;
+            box-shadow: 0 0 20px #ff00ff, inset 0 0 40px rgba(255, 0, 255, 0.3);
+        }
+        
+        .shield-ring.hardlight {
+            width: 240px;
+            height: 240px;
+            top: 30px;
+            left: 30px;
+            border-color: #00ffff;
+            box-shadow: 0 0 20px #00ffff, inset 0 0 40px rgba(0, 255, 255, 0.3);
+        }
+        
+        .shield-ring.singularity {
+            width: 200px;
+            height: 200px;
+            top: 50px;
+            left: 50px;
+            border-color: #ffff00;
+            box-shadow: 0 0 20px #ffff00, inset 0 0 40px rgba(255, 255, 0, 0.3);
+        }
+        
+        .ship-core {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            top: 100px;
+            left: 100px;
+            background: radial-gradient(circle, #ffffff 0%, #00ffff 30%, #0044aa 70%, transparent 100%);
+            border-radius: 50%;
+            box-shadow: 0 0 30px #00ffff, 0 0 60px #0088ff;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.9; }
+        }
+        
+        .shield-label {
+            position: absolute;
+            font-size: 12px;
+            font-weight: bold;
+            text-shadow: 0 0 10px currentColor;
+            white-space: nowrap;
+        }
+        
+        .control-panel {
+            background: rgba(0, 20, 40, 0.5);
+            border: 2px solid #00ffff;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
+        }
+        
+        .panel-section {
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+        }
+        
+        .panel-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        h3 {
+            color: #00ffff;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            text-shadow: 0 0 10px #00ffff;
+        }
+        
+        .slider-container {
+            margin-bottom: 15px;
+        }
+        
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #001133, #003366);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00ffff;
+            cursor: pointer;
+            box-shadow: 0 0 15px #00ffff;
+            transition: all 0.2s;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 25px #00ffff;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #003366 0%, #001133 100%);
+            border: 2px solid #00ffff;
+            color: #00ffff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s;
+            text-shadow: 0 0 10px #00ffff;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+        .btn:hover {
+            background: linear-gradient(135deg, #004488 0%, #002255 100%);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+            transform: translateY(-2px);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn.danger {
+            border-color: #ff4444;
+            color: #ff4444;
+            text-shadow: 0 0 10px #ff4444;
+        }
+        
+        .btn.danger:hover {
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.4);
+        }
+        
+        .btn.overload {
+            border-color: #ffaa00;
+            color: #ffaa00;
+            text-shadow: 0 0 10px #ffaa00;
+        }
+        
+        .btn.overload:hover {
+            box-shadow: 0 0 20px rgba(255, 170, 0, 0.4);
+        }
+        
+        .btn.overload.active {
+            background: linear-gradient(135deg, #ff6600 0%, #cc4400 100%);
+            animation: overloadPulse 0.5s ease-in-out infinite;
+        }
+        
+        @keyframes overloadPulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(255, 170, 0, 0.6); }
+            50% { box-shadow: 0 0 40px rgba(255, 170, 0, 0.9); }
+        }
+        
+        select {
+            width: 100%;
+            padding: 12px;
+            background: #001133;
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            color: #00ffff;
+            font-size: 1em;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        .status-bar {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+        
+        .status-label {
+            width: 120px;
+            flex-shrink: 0;
+        }
+        
+        .status-value {
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .progress-bar {
+            flex: 1;
+            height: 12px;
+            background: #001133;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-left: 10px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.1s linear;
+        }
+        
+        .progress-fill.phase {
+            background: linear-gradient(90deg, #ff00ff, #ff66ff);
+            box-shadow: 0 0 10px #ff00ff;
+        }
+        
+        .progress-fill.hardlight {
+            background: linear-gradient(90deg, #00ffff, #66ffff);
+            box-shadow: 0 0 10px #00ffff;
+        }
+        
+        .progress-fill.singularity {
+            background: linear-gradient(90deg, #ffff00, #ffff66);
+            box-shadow: 0 0 10px #ffff00;
+        }
+        
+        .progress-fill.energy {
+            background: linear-gradient(90deg, #00ff00, #66ff66);
+            box-shadow: 0 0 10px #00ff00;
+        }
+        
+        .progress-fill.heat {
+            background: linear-gradient(90deg, #ff4400, #ff6600);
+            box-shadow: 0 0 10px #ff4400;
+        }
+        
+        .progress-fill.hull {
+            background: linear-gradient(90deg, #888888, #aaaaaa);
+            box-shadow: 0 0 10px #888888;
+        }
+        
+        .damage-flash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255, 0, 0, 0.5) 0%, transparent 70%);
+            pointer-events: none;
+            opacity: 0;
+            z-index: 1000;
+        }
+        
+        .damage-flash.active {
+            animation: damageFlash 0.3s ease-out;
+        }
+        
+        @keyframes damageFlash {
+            0% { opacity: 0.8; }
+            100% { opacity: 0; }
+        }
+        
+        .collapse-flash {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            top: 50px;
+            left: 50px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #ffff00 0%, #ff8800 50%, transparent 100%);
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .collapse-flash.active {
+            animation: collapseFlash 0.5s ease-out forwards;
+        }
+        
+        @keyframes collapseFlash {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(2); }
+        }
+        
+        .log-container {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #00ffff;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+        
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+        }
+        
+        .log-entry.damage {
+            color: #ff6666;
+        }
+        
+        .log-entry.energy {
+            color: #66ff66;
+        }
+        
+        .log-entry.warning {
+            color: #ffff66;
+        }
+        
+        .log-entry.system {
+            color: #66ffff;
+        }
+        
+        .heat-warning {
+            animation: heatWarning 0.5s ease-in-out infinite;
+        }
+        
+        @keyframes heatWarning {
+            0%, 100% { color: #ff4400; }
+            50% { color: #ffaa00; }
+        }
+        
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .toggle-switch label {
+            flex: 1;
+        }
+        
+        .toggle {
+            position: relative;
+            width: 50px;
+            height: 26px;
+            background: #001133;
+            border-radius: 13px;
+            cursor: pointer;
+            border: 2px solid #00ffff;
+            transition: all 0.3s;
+        }
+        
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            background: #00ffff;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s;
+        }
+        
+        .toggle.active {
+            background: #004466;
+        }
+        
+        .toggle.active::after {
+            left: 26px;
+        }
+        
+        .toggle.overload-toggle {
+            border-color: #ffaa00;
+        }
+        
+        .toggle.overload-toggle.active {
+            background: #664400;
+        }
+        
+        .toggle.overload-toggle::after {
+            background: #ffaa00;
+        }
+    </style>
+</head>
+<body>
+    <div class="damage-flash" id="damageFlash"></div>
+    <div class="container">
+        <h1>⚡ 量子护盾与能量分配系统 ⚡</h1>
+        
+        <div class="main-grid">
+            <div class="shield-visualization">
+                <div class="ship-center" id="shipCenter">
+                    <div class="shield-ring phase" id="phaseRing"></div>
+                    <div class="shield-ring hardlight" id="hardlightRing"></div>
+                    <div class="shield-ring singularity" id="singularityRing"></div>
+                    <div class="collapse-flash" id="collapseFlash"></div>
+                    <div class="ship-core"></div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-around; margin-top: 30px;">
+                    <div style="text-align: center;">
+                        <div style="color: #ff00ff; font-weight: bold;">相位护盾</div>
+                        <div id="phaseStrength">100.00%</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="color: #00ffff; font-weight: bold;">硬光护盾</div>
+                        <div id="hardlightStrength">100.00%</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="color: #ffff00; font-weight: bold;">奇点护盾</div>
+                        <div id="singularityStrength">100.00%</div>
+                    </div>
+                </div>
+                
+                <div class="log-container" id="logContainer"></div>
+            </div>
+            
+            <div class="control-panel">
+                <div class="panel-section">
+                    <h3>🛡️ 护盾状态</h3>
+                    <div class="status-bar">
+                        <span class="status-label">船体结构:</span>
+                        <span class="status-value" id="hullValue">100.00%</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill hull" id="hullBar" style="width: 100%;"></div>
+                        </div>
+                    </div>
+                    <div class="status-bar">
+                        <span class="status-label">相位护盾:</span>
+                        <span class="status-value" id="phaseValue">100.00%</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill phase" id="phaseBar" style="width: 100%;"></div>
+                        </div>
+                    </div>
+                    <div class="status-bar">
+                        <span class="status-label">硬光护盾:</span>
+                        <span class="status-value" id="hardlightValue">100.00%</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill hardlight" id="hardlightBar" style="width: 100%;"></div>
+                        </div>
+                    </div>
+                    <div class="status-bar">
+                        <span class="status-label">奇点护盾:</span>
+                        <span class="status-value" id="singularityValue">100.00%</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill singularity" id="singularityBar" style="width: 100%;"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="panel-section">
+                    <h3>⚡ 能量系统</h3>
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>护盾总能量预算</span>
+                            <span id="energyBudgetValue">100%</span>
+                        </div>
+                        <input type="range" id="energyBudget" min="0" max="100" value="100">
+                    </div>
+                    <div class="status-bar">
+                        <span class="status-label">能量池:</span>
+                        <span class="status-value" id="energyPoolValue">1000.00</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill energy" id="energyPoolBar" style="width: 100%;"></div>
+                        </div>
+                    </div>
+                    <div class="status-bar">
+                        <span class="status-label">废热:</span>
+                        <span class="status-value" id="heatValue">0.00</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill heat" id="heatBar" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    <button class="btn" id="ventHeatBtn">手动散热</button>
+                </div>
+                
+                <div class="panel-section">
+                    <h3>🔥 过载模式</h3>
+                    <div class="toggle-switch">
+                        <label>相位护盾过载</label>
+                        <div class="toggle overload-toggle" id="phaseOverloadToggle"></div>
+                    </div>
+                    <div class="toggle-switch">
+                        <label>硬光护盾过载</label>
+                        <div class="toggle overload-toggle" id="hardlightOverloadToggle"></div>
+                    </div>
+                    <div class="toggle-switch">
+                        <label>奇点护盾过载</label>
+                        <div class="toggle overload-toggle" id="singularityOverloadToggle"></div>
+                    </div>
+                    <button class="btn overload" id="autoOverloadBtn">自动触发检测</button>
+                </div>
+                
+                <div class="panel-section">
+                    <h3>⚔️ 战斗控制</h3>
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>攻击伤害</span>
+                            <span id="damageValue">50</span>
+                        </div>
+                        <input type="range" id="damageSlider" min="10" max="200" value="50">
+                    </div>
+                    <select id="damageType">
+                        <option value="energy">能量武器</option>
+                        <option value="kinetic">动能武器</option>
+                        <option value="projectile">实弹武器</option>
+                    </select>
+                    <button class="btn danger" id="attackBtn" style="margin-top: 15px;">触发攻击</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- 接口定义区 -->
+<script>
+window.IQuantumShield = {
+    
+    absorbDamage: function(amount, damageType) {
+        throw new Error('absorbDamage must be implemented');
+    },
+    
+    getCurrentStrength: function() {
+        throw new Error('getCurrentStrength must be implemented');
+    },
+    
+    update: function(deltaTime, shipEnergyFlow) {
+        throw new Error('update must be implemented');
+    },
+    
+    typeName: 'IQuantumShield'
+};
+
+window.DAMAGE_TYPES = {
+    ENERGY: 'energy',
+    KINETIC: 'kinetic',
+    PROJECTILE: 'projectile'
+};
+
+window.enforceInterface = function(obj, interfaceDef) {
+    for (let key in interfaceDef) {
+        if (typeof interfaceDef.hasOwnProperty(key)) {
+            if (typeof obj[key] !== typeof interfaceDef[key]) {
+                throw new Error(`Interface violation: ${key} is missing or wrong type');
+            }
+        }
+    }
+}
+</script>
+
+<!-- PhaseShield实现 -->
+<script>
+class PhaseShield {
+    constructor(energyRouter) {
+        this.typeName = 'PhaseShield';
+        this.energyRouter = energyRouter;
+        this.maxStrength = 100;
+        this.currentStrength = 100;
+        this.energyLossRate = 0.05;
+        this.overloaded = false;
+        this.overloadMultiplier = 1;
+        this.energyResistance = 0.9;
+        this.kineticResistance = 0.4;
+        this.projectileResistance = 0.6;
+    }
+    
+    absorbDamage(amount, damageType) {
+        let effectiveAmount = amount;
+        let resistance;
+        
+        if (this.overloaded) {
+            resistance = this._getOverloadedResistance(damageType);
+        } else {
+            switch (damageType) {
+                case 'energy':
+                    resistance = this.energyResistance;
+                    break;
+                case 'kinetic':
+                    resistance = this.kineticResistance;
+                    break;
+                case 'projectile':
+                    resistance = this.projectileResistance;
+                    break;
+                default:
+                    resistance = 0.5;
+            }
+        }
+        
+        let absorbed = effectiveAmount * resistance;
+        let penetration = effectiveAmount - absorbed;
+        
+        let strengthCost = absorbed * 0.5;
+        
+        if (this.currentStrength >= strengthCost) {
+            this.currentStrength -= strengthCost;
+        } else {
+            let actualAbsorbed = this.currentStrength / 0.5;
+            penetration = effectiveAmount - actualAbsorbed;
+            this.currentStrength = 0;
+        }
+        
+        this.currentStrength = Math.max(0, this.currentStrength);
+        
+        return parseFloat(penetration.toFixed(2));
+    }
+    
+    _getOverloadedResistance(damageType) {
+        switch (damageType) {
+            case 'energy':
+                return 0.98;
+            case 'kinetic':
+                return 0.7;
+            case 'projectile':
+                return 0.85;
+            default:
+                return 0.7;
+        }
+    }
+    
+    getCurrentStrength() {
+        return parseFloat(this.currentStrength.toFixed(2));
+    }
+    
+    update(deltaTime, shipEnergyFlow) {
+        let energyNeeded = 5 * deltaTime;
+        if (this.overloaded) {
+            energyNeeded *= 2.5;
+        }
+        
+        let received = this.energyRouter.requestEnergy(this, energyNeeded);
+        let effectiveEnergy = received * (1 - this.energyLossRate);
+        
+        if (this.overloaded) {
+            this.currentStrength += effectiveEnergy * 0.8;
+            this.overloadMultiplier = 1 + (Math.sin(Date.now() / 200) * 0.3);
+        } else {
+            this.currentStrength += effectiveEnergy * 0.5;
+            this.overloadMultiplier = 1;
+        }
+        
+        this.currentStrength = Math.min(this.maxStrength, this.currentStrength);
+        
+        if (this.overloaded && this.currentStrength > this.maxStrength * 0.5) {
+            let fluctuation = (Math.sin(Date.now() / 150) * 0.1);
+            this.currentStrength += fluctuation;
+        }
+    }
+    
+    setOverload(state) {
+        this.overloaded = state;
+    }
+}
+</script>
+
+<!-- HardLightShield实现 -->
+<script>
+class HardLightShield {
+    constructor(energyRouter) {
+        this.typeName = 'HardLightShield';
+        this.energyRouter = energyRouter;
+        this.maxStrength = 100;
+        this.currentStrength = 100;
+        this.energyLossRate = 0.12;
+        this.overloaded = false;
+        this.baseResistance = 0.7;
+        this.photonLeakThreshold = 0.2;
+        this.leakRate = 0;
+    }
+    
+    absorbDamage(amount, damageType) {
+        let effectiveAmount = amount;
+        let resistance;
+        
+        if (this.overloaded) {
+            resistance = 0.92;
+        } else {
+            resistance = this.baseResistance;
+        }
+        
+        let strengthRatio = this.currentStrength / this.maxStrength;
+        if (strengthRatio < 0.5) {
+            resistance *= (0.5 + strengthRatio);
+        }
+        
+        let absorbed = effectiveAmount * resistance;
+        let penetration = effectiveAmount - absorbed;
+        
+        let strengthCost = absorbed * 0.7;
+        
+        if (this.currentStrength >= strengthCost) {
+            this.currentStrength -= strengthCost;
+        } else {
+            let actualAbsorbed = this.currentStrength / 0.7;
+            penetration = effectiveAmount - actualAbsorbed;
+            this.currentStrength = 0;
+        }
+        
+        this.currentStrength = Math.max(0, this.currentStrength);
+        
+        return parseFloat(penetration.toFixed(2));
+    }
+    
+    getCurrentStrength() {
+        return parseFloat(this.currentStrength.toFixed(2));
+    }
+    
+    update(deltaTime, shipEnergyFlow) {
+        let energyNeeded = 8 * deltaTime;
+        if (this.overloaded) {
+            energyNeeded *= 2.2;
+        }
+        
+        let received = this.energyRouter.requestEnergy(this, energyNeeded);
+        let effectiveEnergy = received * (1 - this.energyLossRate);
+        
+        if (this.overloaded) {
+            this.currentStrength += effectiveEnergy * 1.2;
+        } else {
+            this.currentStrength += effectiveEnergy * 0.6;
+        }
+        
+        let strengthRatio = this.currentStrength / this.maxStrength;
+        if (strengthRatio < this.photonLeakThreshold && this.currentStrength > 0) {
+            this.leakRate = (this.photonLeakThreshold - strengthRatio) * 10 * deltaTime;
+            this.currentStrength -= this.leakRate;
+        } else {
+            this.leakRate = 0;
+        }
+        
+        this.currentStrength = Math.min(this.maxStrength, Math.max(0, this.currentStrength));
+    }
+    
+    setOverload(state) {
+        this.overloaded = state;
+    }
+    
+    hasPhotonLeak() {
+        return this.currentStrength / this.maxStrength < this.photonLeakThreshold;
+    }
+}
+</script>
+
+<!-- SingularityShield实现 -->
+<script>
+class SingularityShield {
+    constructor(energyRouter) {
+        this.typeName = 'SingularityShield';
+        this.energyRouter = energyRouter;
+        this.maxStrength = 100;
+        this.currentStrength = 100;
+        this.energyLossRate = 0.25;
+        this.overloaded = false;
+        this.minStableEnergy = 15;
+        this.collapsed = false;
+        this.collapseDamageMultiplier = 0.5;
+    }
+    
+    absorbDamage(amount, damageType) {
+        if (this.collapsed) return amount;
+        
+        let effectiveAmount = amount;
+        let resistance;
+        
+        if (this.overloaded) {
+            resistance = damageType === 'projectile' ? 0.99 : 0.7;
+        } else {
+            resistance = damageType === 'projectile' ? 0.95 : 0.5;
+        }
+        
+        let absorbed = effectiveAmount * resistance;
+        let penetration = effectiveAmount - absorbed;
+        
+        let strengthCost = absorbed * 0.3;
+        
+        if (this.currentStrength >= strengthCost) {
+            this.currentStrength -= strengthCost;
+        } else {
+            let actualAbsorbed = this.currentStrength / 0.3;
+            penetration = effectiveAmount - actualAbsorbed;
+            this.currentStrength = 0;
+        }
+        
+        this.currentStrength = Math.max(0, this.currentStrength);
+        
+        return parseFloat(penetration.toFixed(2));
+    }
+    
+    getCurrentStrength() {
+        return this.collapsed ? 0 : parseFloat(this.currentStrength.toFixed(2));
+    }
+    
+    update(deltaTime, shipEnergyFlow) {
+        if (this.collapsed) return;
+        
+        let energyNeeded = this.minStableEnergy * deltaTime;
+        if (this.overloaded) {
+            energyNeeded *= 3;
+        }
+        
+        let received = this.energyRouter.requestEnergy(this, energyNeeded);
+        let effectiveEnergy = received * (1 - this.energyLossRate);
+        
+        let minRequired = this.minStableEnergy * deltaTime * (1 - this.energyLossRate);
+        if (effectiveEnergy < minRequired * 0.5) {
+            this.collapse();
+            return;
+        }
+        
+        if (this.overloaded) {
+            this.currentStrength += effectiveEnergy * 0.5;
+            this.currentStrength += (Math.sin(Date.now() / 100) * 2);
+        } else {
+            this.currentStrength += effectiveEnergy * 0.3;
+        }
+        
+        this.currentStrength = Math.min(this.maxStrength, this.currentStrength);
+    }
+    
+    setOverload(state) {
+        if (this.collapsed) return;
+        this.overloaded = state;
+    }
+    
+    collapse() {
+        if (this.collapsed) return;
+        
+        this.collapsed = true;
+        let damage = this.currentStrength * this.collapseDamageMultiplier;
+        
+        const event = new CustomEvent('singularityCollapse', {
+            detail: { damage: damage }
+        });
+        document.dispatchEvent(event);
+    }
+    
+    reset() {
+        this.collapsed = false;
+        this.currentStrength = 50;
+        this.overloaded = false;
+    }
+    
+    isCollapsed() {
+        return this.collapsed;
+    }
+}
+</script>
+
+<!-- EnergyRouter实现 -->
+<script>
+class EnergyRouter {
+    constructor() {
+        this.energyPool = 1000;
+        this.maxEnergyPool = 1000;
+        this.energyBudget = 1.0;
+        this.energyProduction = 50;
+        this.wasteHeat = 0;
+        this.maxWasteHeat = 100;
+        this.heatThreshold = 80;
+        this.heatPenalty = 0;
+        this.priorities = {
+            'SingularityShield': 3,
+            'HardLightShield': 2,
+            'PhaseShield': 1
+        };
+        this.pendingRequests = [];
+        this.heatDissipationRate = 2;
+        this.energyLossRates = {
+            'PhaseShield': 0.05,
+            'HardLightShield': 0.12,
+            'SingularityShield': 0.25
+        };
+    }
+    
+    requestEnergy(shield, amount) {
+        this.pendingRequests.push({
+            shield: shield,
+            amount: amount,
+            priority: this.priorities[shield.typeName] || 1
+        });
+        return 0;
+    }
+    
+    processRequests(deltaTime) {
+        let availableEnergy = this.energyProduction * this.energyBudget * deltaTime;
+        
+        if (this.wasteHeat > this.heatThreshold) {
+            let penalty = (this.wasteHeat - this.heatThreshold) / 20;
+            availableEnergy *= (1 - penalty * 0.01);
+        }
+        
+        this.pendingRequests.sort((a, b) => b.priority - a.priority);
+        
+        let totalAllocated = 0;
+        let results = new Map();
+        
+        for (let request of this.pendingRequests) {
+            if (availableEnergy <= 0) break;
+            
+            let allocation = Math.min(request.amount, availableEnergy);
+            let lossRate = this.energyLossRates[request.shield.typeName] || 0;
+            let lostEnergy = allocation * lossRate;
+            
+            this.wasteHeat += lostEnergy * 0.5;
+            
+            totalAllocated += allocation;
+            availableEnergy -= allocation;
+            
+            results.set(request.shield, allocation);
+        }
+        
+        this.pendingRequests = [];
+        
+        this.energyPool = Math.min(this.maxEnergyPool, this.energyPool + availableEnergy);
+        
+        this.wasteHeat = Math.max(0, this.wasteHeat - this.heatDissipationRate * deltaTime);
+        
+        return results;
+    }
+    
+    update(deltaTime) {
+        let baseProduction = 50;
+        if (this.wasteHeat > this.heatThreshold) {
+            let overheat = (this.wasteHeat - this.heatThreshold) / 20;
+            this.heatPenalty = Math.min(0.5, overheat * 0.01);
+            baseProduction *= (1 - this.heatPenalty);
+        } else {
+            this.heatPenalty = 0;
+        }
+        
+        this.energyProduction = baseProduction;
+        
+        let recharge = this.energyProduction * this.energyBudget * deltaTime * 0.5;
+        this.energyPool = Math.min(this.maxEnergyPool, this.energyPool + recharge);
+    }
+    
+    ventHeat() {
+        let vented = Math.min(this.wasteHeat, 20);
+        this.wasteHeat -= vented;
+        return vented;
+    }
+    
+    setEnergyBudget(percent) {
+        this.energyBudget = percent / 100;
+    }
+    
+    getEnergyPool() {
+        return parseFloat(this.energyPool.toFixed(2));
+    }
+    
+    getWasteHeat() {
+        return parseFloat(this.wasteHeat.toFixed(2));
+    }
+    
+    getHeatPenalty() {
+        return parseFloat((this.heatPenalty * 100).toFixed(2));
+    }
+}
+</script>
+
+<!-- UI与主循环 -->
+<script>
+class GameSystem {
+    constructor() {
+        this.energyRouter = new EnergyRouter();
+        this.phaseShield = new PhaseShield(this.energyRouter);
+        this.hardlightShield = new HardLightShield(this.energyRouter);
+        this.singularityShield = new SingularityShield(this.energyRouter);
+        
+        this.hullIntegrity = 100;
+        this.maxHullIntegrity = 100;
+        
+        this.lastUpdate = Date.now();
+        this.updateInterval = 100;
+        
+        this.autoOverloadConditions = {
+            consecutiveHits: 0,
+            lastHitTime: 0,
+            lowHealthTriggered: false
+        };
+        
+        this.setupEventListeners();
+        this.startGameLoop();
+        this.log('系统初始化完成', 'system');
+    }
+    
+    setupEventListeners() {
+        document.getElementById('energyBudget').addEventListener('input', (e) => {
+            this.energyRouter.setEnergyBudget(e.target.value);
+            document.getElementById('energyBudgetValue').textContent = e.target.value + '%';
+        });
+        
+        document.getElementById('damageSlider').addEventListener('input', (e) => {
+            document.getElementById('damageValue').textContent = e.target.value;
+        });
+        
+        document.getElementById('attackBtn').addEventListener('click', () => {
+            this.triggerAttack();
+        });
+        
+        document.getElementById('ventHeatBtn').addEventListener('click', () => {
+            let vented = this.energyRouter.ventHeat();
+            this.log(`手动散热: 排出 ${vented.toFixed(2)} 单位废热`, 'energy');
+        });
+        
+        document.getElementById('phaseOverloadToggle').addEventListener('click', (e) => {
+            e.target.classList.toggle('active');
+            this.phaseShield.setOverload(e.target.classList.contains('active'));
+            this.log(`相位护盾过载: ${e.target.classList.contains('active') ? '开启' : '关闭'}`, 'system');
+        });
+        
+        document.getElementById('hardlightOverloadToggle').addEventListener('click', (e) => {
+            e.target.classList.toggle('active');
+            this.hardlightShield.setOverload(e.target.classList.contains('active'));
+            this.log(`硬光护盾过载: ${e.target.classList.contains('active') ? '开启' : '关闭'}`, 'system');
+        });
+        
+        document.getElementById('singularityOverloadToggle').addEventListener('click', (e) => {
+            e.target.classList.toggle('active');
+            this.singularityShield.setOverload(e.target.classList.contains('active'));
+            this.log(`奇点护盾过载: ${e.target.classList.contains('active') ? '开启' : '关闭'}`, 'system');
+        });
+        
+        document.getElementById('autoOverloadBtn').addEventListener('click', () => {
+            this.checkAutoOverloadConditions();
+        });
+        
+        document.addEventListener('singularityCollapse', (e) => {
+            this.handleSingularityCollapse(e.detail.damage);
+        });
+    }
+    
+    triggerAttack() {
+        let damage = parseInt(document.getElementById('damageSlider').value);
+        let damageType = document.getElementById('damageType').value;
+        
+        this.log(`遭受攻击: ${damage} 点 ${this.getDamageTypeName(damageType)}`, 'damage');
+        
+        let remainingDamage = damage;
+        
+        remainingDamage = this.singularityShield.absorbDamage(remainingDamage, damageType);
+        if (remainingDamage < damage) {
+            this.log(`奇点护盾吸收: ${(damage - remainingDamage).toFixed(2)}`, 'damage');
+        }
+        
+        damage = remainingDamage;
+        remainingDamage = this.hardlightShield.absorbDamage(remainingDamage, damageType);
+        if (remainingDamage < damage) {
+            this.log(`硬光护盾吸收: ${(damage - remainingDamage).toFixed(2)}`, 'damage');
+        }
+        
+        damage = remainingDamage;
+        remainingDamage = this.phaseShield.absorbDamage(remainingDamage, damageType);
+        if (remainingDamage < damage) {
+            this.log(`相位护盾吸收: ${(damage - remainingDamage).toFixed(2)}`, 'damage');
+        }
+        
+        if (remainingDamage > 0) {
+            this.hullIntegrity -= remainingDamage;
+            this.hullIntegrity = Math.max(0, this.hullIntegrity);
+            this.log(`船体受损: ${remainingDamage.toFixed(2)} 点穿透伤害!`, 'damage');
+            this.showDamageFlash();
+            
+            if (this.hullIntegrity <= 0) {
+                this.log('警告: 船体结构严重受损!', 'warning');
+            }
+        }
+        
+        this.autoOverloadConditions.consecutiveHits++;
+        this.autoOverloadConditions.lastHitTime = Date.now();
+        
+        this.checkAutoOverload();
+    }
+    
+    getDamageTypeName(type) {
+        const names = {
+            'energy': '能量武器',
+            'kinetic': '动能武器',
+            'projectile': '实弹武器'
+        };
+        return names[type] || type;
+    }
+    
+    showDamageFlash() {
+        const flash = document.getElementById('damageFlash');
+        flash.classList.remove('active');
+        void flash.offsetWidth;
+        flash.classList.add('active');
+    }
+    
+    handleSingularityCollapse(damage) {
+        this.log(`奇点护盾坍缩! 爆炸造成 ${damage.toFixed(2)} 点结构伤害`, 'warning');
+        this.hullIntegrity -= damage;
+        this.hullIntegrity = Math.max(0, this.hullIntegrity);
+        
+        const flash = document.getElementById('collapseFlash');
+        flash.classList.add('active');
+        
+        const ring = document.getElementById('singularityRing');
+        ring.style.opacity = '0';
+        
+        setTimeout(() => {
+            flash.classList.remove('active');
+        }, 500);
+        
+        setTimeout(() => {
+            if (this.energyRouter.getEnergyPool() > 200) {
+                this.singularityShield.reset();
+                ring.style.opacity = '1';
+                this.log('奇点护盾重新上线', 'system');
+            }
+        }, 3000);
+    }
+    
+    checkAutoOverload() {
+        let shouldOverload = false;
+        let shieldsToOverload = [];
+        
+        if (this.hullIntegrity < 30 && !this.autoOverloadConditions.lowHealthTriggered) {
+            shouldOverload = true;
+            shieldsToOverload.push('phase', 'hardlight');
+            this.autoOverloadConditions.lowHealthTriggered = true;
+            this.log('自动过载触发: 船体严重受损!', 'warning');
+        }
+        
+        if (this.autoOverloadConditions.consecutiveHits >= 3) {
+            shouldOverload = true;
+            shieldsToOverload.push('singularity');
+            this.log('自动过载触发: 连续遭受攻击!', 'warning');
+        }
+        
+        let avgShieldStrength = (
+            this.phaseShield.getCurrentStrength() +
+            this.hardlightShield.getCurrentStrength() +
+            (this.singularityShield.isCollapsed() ? 0 : this.singularityShield.getCurrentStrength())
+        ) / 3;
+        
+        if (avgShieldStrength < 25 && !this.singularityShield.isCollapsed()) {
+            shouldOverload = true;
+            shieldsToOverload.push('singularity');
+            this.log('自动过载触发: 护盾强度过低!', 'warning');
+        }
+        
+        if (shouldOverload) {
+            if (shieldsToOverload.includes('phase') && !this.phaseShield.overloaded) {
+                this.phaseShield.setOverload(true);
+                document.getElementById('phaseOverloadToggle').classList.add('active');
+            }
+            if (shieldsToOverload.includes('hardlight') && !this.hardlightShield.overloaded) {
+                this.hardlightShield.setOverload(true);
+                document.getElementById('hardlightOverloadToggle').classList.add('active');
+            }
+            if (shieldsToOverload.includes('singularity') && !this.singularityShield.overloaded && !this.singularityShield.isCollapsed()) {
+                this.singularityShield.setOverload(true);
+                document.getElementById('singularityOverloadToggle').classList.add('active');
+            }
+        }
+        
+        setTimeout(() => {
+            this.autoOverloadConditions.consecutiveHits = 0;
+        }, 5000);
+    }
+    
+    checkAutoOverloadConditions() {
+        this.log('检测自动过载条件:', 'system');
+        this.log(`  - 连续命中次数: ${this.autoOverloadConditions.consecutiveHits}/3`, 'system');
+        this.log(`  - 船体完整度: ${this.hullIntegrity.toFixed(2)}%`, 'system');
+        let avgStrength = (
+            this.phaseShield.getCurrentStrength() +
+            this.hardlightShield.getCurrentStrength() +
+            (this.singularityShield.isCollapsed() ? 0 : this.singularityShield.getCurrentStrength())
+        ) / 3;
+        this.log(`  - 平均护盾强度: ${avgStrength.toFixed(2)}%`, 'system');
+    }
+    
+    log(message, type = 'system') {
+        const container = document.getElementById('logContainer');
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${type}`;
+        const time = new Date().toLocaleTimeString();
+        entry.textContent = `[${time}] ${message}`;
+        container.insertBefore(entry, container.firstChild);
+        
+        while (container.children.length > 50) {
+            container.removeChild(container.lastChild);
+        }
+    }
+    
+    updateUI() {
+        document.getElementById('hullValue').textContent = this.hullIntegrity.toFixed(2) + '%';
+        document.getElementById('hullBar').style.width = this.hullIntegrity + '%';
+        
+        let phaseStrength = this.phaseShield.getCurrentStrength();
+        document.getElementById('phaseValue').textContent = phaseStrength + '%';
+        document.getElementById('phaseBar').style.width = phaseStrength + '%';
+        document.getElementById('phaseStrength').textContent = phaseStrength + '%';
+        document.getElementById('phaseRing').style.opacity = phaseStrength / 100 * 0.8 + 0.2;
+        
+        let hardlightStrength = this.hardlightShield.getCurrentStrength();
+        document.getElementById('hardlightValue').textContent = hardlightStrength + '%';
+        document.getElementById('hardlightBar').style.width = hardlightStrength + '%';
+        document.getElementById('hardlightStrength').textContent = hardlightStrength + '%';
+        document.getElementById('hardlightRing').style.opacity = hardlightStrength / 100 * 0.8 + 0.2;
+        
+        let singularityStrength = this.singularityShield.getCurrentStrength();
+        document.getElementById('singularityValue').textContent = singularityStrength + '%';
+        document.getElementById('singularityBar').style.width = singularityStrength + '%';
+        document.getElementById('singularityStrength').textContent = singularityStrength + '%';
+        if (!this.singularityShield.isCollapsed()) {
+            document.getElementById('singularityRing').style.opacity = singularityStrength / 100 * 0.8 + 0.2;
+        }
+        
+        document.getElementById('energyPoolValue').textContent = this.energyRouter.getEnergyPool();
+        document.getElementById('energyPoolBar').style.width = (this.energyRouter.getEnergyPool() / 10) + '%';
+        
+        let heat = this.energyRouter.getWasteHeat();
+        document.getElementById('heatValue').textContent = heat;
+        document.getElementById('heatBar').style.width = Math.min(100, heat) + '%';
+        
+        let heatPenalty = this.energyRouter.getHeatPenalty();
+        if (heatPenalty > 0) {
+            document.getElementById('heatValue').classList.add('heat-warning');
+        } else {
+            document.getElementById('heatValue').classList.remove('heat-warning');
+        }
+        
+        if (this.hardlightShield.hasPhotonLeak()) {
+            document.getElementById('hardlightRing').style.animation = 'pulse 0.5s ease-in-out infinite';
+        } else {
+            document.getElementById('hardlightRing').style.animation = 'none';
+        }
+        
+        if (this.phaseShield.overloaded) {
+            document.getElementById('phaseRing').style.boxShadow = '0 0 30px #ff00ff, inset 0 0 60px rgba(255, 0, 255, 0.5), 0 0 50px #ff00ff';
+        } else {
+            document.getElementById('phaseRing').style.boxShadow = '0 0 20px #ff00ff, inset 0 0 40px rgba(255, 0, 255, 0.3)';
+        }
+        
+        if (this.hardlightShield.overloaded) {
+            document.getElementById('hardlightRing').style.boxShadow = '0 0 30px #00ffff, inset 0 0 60px rgba(0, 255, 255, 0.5), 0 0 50px #00ffff';
+        }
+        
+        if (this.singularityShield.overloaded && !this.singularityShield.isCollapsed()) {
+            document.getElementById('singularityRing').style.boxShadow = '0 0 30px #ffff00, inset 0 0 60px rgba(255, 255, 0, 0.5), 0 0 50px #ffff00';
+        }
+    }
+    
+    startGameLoop() {
+        setInterval(() => {
+            let now = Date.now();
+            let deltaTime = (now - this.lastUpdate) / 1000;
+            this.lastUpdate = now;
+            
+            deltaTime = Math.min(deltaTime, 0.1);
+            
+            this.energyRouter.update(deltaTime);
+            
+            this.singularityShield.update(deltaTime, this.energyRouter);
+            this.hardlightShield.update(deltaTime, this.energyRouter);
+            this.phaseShield.update(deltaTime, this.energyRouter);
+            
+            let results = this.energyRouter.processRequests(deltaTime);
+            
+            this.updateUI();
+        }, this.updateInterval);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    window.game = new GameSystem();
+});
+</script>
+</body>
+</html>

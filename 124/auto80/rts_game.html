@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTS游戏原型</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1a2e; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: sans-serif; }
+        #gameContainer { position: relative; }
+        canvas { display: block; }
+        #buildPanel { position: absolute; display: none; background: rgba(30, 30, 50, 0.95); border: 2px solid #4a9; padding: 10px; border-radius: 8px; z-index: 100; }
+        #buildPanel button { display: block; width: 100%; margin: 5px 0; padding: 8px 15px; background: #2a4a6a; color: #fff; border: 1px solid #4a9; cursor: pointer; font-size: 14px; }
+        #buildPanel button:hover { background: #3a5a7a; }
+        #gameOver { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 30px; border-radius: 10px; text-align: center; display: none; z-index: 200; }
+        #gameOver h2 { color: #fff; margin-bottom: 20px; font-size: 24px; }
+        #gameOver button { padding: 10px 30px; font-size: 18px; background: #4a9; color: #fff; border: none; cursor: pointer; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="630"></canvas>
+        <div id="buildPanel">
+            <button id="buildBarracks">兵营 (150金+50木)</button>
+            <button id="buildTower">防御塔 (100金+100木)</button>
+        </div>
+        <div id="gameOver">
+            <h2 id="gameResult"></h2>
+            <button id="restartBtn">重新开始</button>
+        </div>
+    </div>
+
+<script>
+const Constants = {
+    FPS: 60,
+    CANVAS_WIDTH: 800,
+    CANVAS_HEIGHT: 600,
+    INFO_BAR_HEIGHT: 30,
+    MAP_WIDTH: 1600,
+    MAP_HEIGHT: 1600,
+    MINIMAP_SIZE: 150,
+    SCROLL_SPEED: 3,
+    RESOURCE_GOLD: 'gold',
+    RESOURCE_WOOD: 'wood',
+    UNIT_PEASANT: 'peasant',
+    UNIT_SWORDSMAN: 'swordsman',
+    UNIT_ARCHER: 'archer',
+    BUILDING_BASE: 'base',
+    BUILDING_BARRACKS: 'barracks',
+    BUILDING_TOWER: 'tower',
+    RESOURCE_TREE: 'tree',
+    RESOURCE_GOLDMINE: 'goldmine',
+    HARVEST_TIME: 5 * 60,
+    HARVEST_AMOUNT: 10,
+    MIN_HARVEST_DISTANCE: 150,
+    BUILD_COSTS: {
+        barracks: { gold: 150, wood: 50 },
+        tower: { gold: 100, wood: 100 }
+    },
+    BUILD_TIMES: { barracks: 20 * 60, tower: 15 * 60 },
+    BUILDING_HP: { base: 500, barracks: 300, tower: 200 },
+    TRAIN_COSTS: {
+        swordsman: { gold: 50, wood: 0 },
+        archer: { gold: 40, wood: 20 }
+    },
+    TRAIN_TIMES: { swordsman: 10 * 60, archer: 12 * 60 },
+    UNIT_STATS: {
+        peasant: { hp: 50, speed: 2, attack: 2, range: 20, attackSpeed: 60 },
+        swordsman: { hp: 100, speed: 2, attack: 10, range: 20, attackSpeed: 60 },
+        archer: { hp: 60, speed: 1.5, attack: 8, range: 200, attackSpeed: 60 }
+    },
+    TOWER_STATS: { attack: 15, range: 250, attackSpeed: 1.5 * 60 },
+    TOWER_RANGE: 250,
+    SIGHT_RADIUS_UNIT: 200,
+    SIGHT_RADIUS_BUILDING: 300,
+    COLLISION_RADIUS: 15,
+    distance(a, b) { return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2); },
+    clamp(val, min, max) { return Math.max(min, Math.min(max, val)); },
+    randomRange(min, max) { return Math.random() * (max - min) + min; }
+};
+
+const Game = {
+    canvas: null,
+    ctx: null,
+    camera: { x: 0, y: 0 },
+    gameObjects: { units: [], buildings: [], resources: [], projectiles: [] },
+    selectedUnits: [],
+    buildingPreview: null,
+    gameOver: false,
+    winner: null,
+    players: [],
+    groups: [[], [], [], [], []],
+    mousePos: { x: 0, y: 0 },
+    keys: {},
+    init() {
+        Game.canvas = document.getElementById('gameCanvas');
+        Game.ctx = Game.canvas.getContext('2d');
+        
+        Game.initPlayers();
+        Game.spawnResources();
+        
+        Game.camera.x = 100 - Constants.CANVAS_WIDTH / 2;
+        Game.camera.y = Constants.MAP_HEIGHT - 400 - Constants.CANVAS_HEIGHT / 2;
+        
+        InputHandler.init();
+        AI.init();
+        
+        requestAnimationFrame(Game.gameLoop);
+    },
+    spawnResources() {
+        for (let i = 0; i < 12; i++) {
+            let x, y, valid;
+            do {
+                x = Constants.randomRange(200, Constants.MAP_WIDTH - 200);
+                y = Constants.randomRange(200, Constants.MAP_HEIGHT - 200);
+                valid = !Game.isNearStartPosition(x, y);
+            } while (!valid);
+            
+            Game.gameObjects.resources.push({
+                id: `tree_${i}`,
+                type: Constants.RESOURCE_TREE,
+                x, y,
+                amount: 500,
+                maxAmount: 500
+            });
+        }
+        
+        for (let i = 0; i < 8; i++) {
+            let x, y, valid;
+            do {
+                x = Constants.randomRange(200, Constants.MAP_WIDTH - 200);
+                y = Constants.randomRange(200, Constants.MAP_HEIGHT - 200);
+                valid = !Game.isNearStartPosition(x, y);
+            } while (!valid);
+            
+            Game.gameObjects.resources.push({
+                id: `goldmine_${i}`,
+                type: Constants.RESOURCE_GOLDMINE,
+                x, y,
+                amount: 800,
+                maxAmount: 800
+            });
+        }
+    },
+    isNearStartPosition(x, y) {
+        const player1Start = { x: 150, y: Constants.MAP_HEIGHT - 150 };
+        const player2Start = { x: Constants.MAP_WIDTH - 150, y: 150 };
+        return Constants.distance({ x, y }, player1Start) < 250 ||
+               Constants.distance({ x, y }, player2Start) < 250;
+    },
+    lastTime: 0,
+    gameLoop(timestamp) {
+        if (!Game.lastTime) Game.lastTime = timestamp;
+        const delta = timestamp - Game.lastTime;
+        
+        if (delta >= 1000 / Constants.FPS && !Game.gameOver) {
+            Game.update();
+            Game.lastTime = timestamp;
+        }
+        
+        Renderer.render();
+        requestAnimationFrame(Game.gameLoop);
+    },
+    update() {
+        Game.updateCamera();
+        
+        Game.gameObjects.units.forEach(unit => unit.update());
+        Game.gameObjects.buildings.forEach(building => building.update());
+        Game.gameObjects.projectiles = Game.gameObjects.projectiles.filter(p => p.update());
+        
+        AI.update();
+        Game.checkGameOver();
+        Game.cleanupDeadUnits();
+    },
+    updateCamera() {
+        const mouse = Game.mousePos;
+        const edgeSize = 10;
+        
+        if (mouse.x < edgeSize) Game.camera.x -= Constants.SCROLL_SPEED;
+        if (mouse.x > Constants.CANVAS_WIDTH - edgeSize) Game.camera.x += Constants.SCROLL_SPEED;
+        if (mouse.y < Constants.INFO_BAR_HEIGHT + edgeSize) Game.camera.y -= Constants.SCROLL_SPEED;
+        if (mouse.y > Constants.CANVAS_HEIGHT + Constants.INFO_BAR_HEIGHT - edgeSize) Game.camera.y += Constants.SCROLL_SPEED;
+        
+        Game.camera.x = Constants.clamp(Game.camera.x, 0, Constants.MAP_WIDTH - Constants.CANVAS_WIDTH);
+        Game.camera.y = Constants.clamp(Game.camera.y, 0, Constants.MAP_HEIGHT - Constants.CANVAS_HEIGHT);
+    },
+    cleanupDeadUnits() {
+        Game.gameObjects.units = Game.gameObjects.units.filter(u => {
+            if (u.hp <= 0) {
+                Game.removeUnitFromAllGroups(u);
+                return false;
+            }
+            return true;
+        });
+        
+        Game.gameObjects.buildings = Game.gameObjects.buildings.filter(b => b.hp > 0);
+    },
+    checkGameOver() {
+        const p1Buildings = Game.gameObjects.buildings.filter(b => b.playerId === 1);
+        const p2Buildings = Game.gameObjects.buildings.filter(b => b.playerId === 2);
+        
+        if (p1Buildings.length === 0) {
+            Game.gameOver = true;
+            Game.winner = 2;
+            Game.showGameOver('失败！敌方获胜');
+        } else if (p2Buildings.length === 0) {
+            Game.gameOver = true;
+            Game.winner = 1;
+            Game.showGameOver('胜利！你赢了');
+        }
+    },
+    showGameOver(message) {
+        const gameOverDiv = document.getElementById('gameOver');
+        document.getElementById('gameResult').textContent = message;
+        gameOverDiv.style.display = 'block';
+    },
+    restartGame() {
+        Game.gameObjects = { units: [], buildings: [], resources: [], projectiles: [] };
+        Game.selectedUnits = [];
+        Game.buildingPreview = null;
+        Game.gameOver = false;
+        Game.winner = null;
+        document.getElementById('gameOver').style.display = 'none';
+        Game.players = [];
+        Game.groups = [[], [], [], [], []];
+        Fog.init();
+        Game.init();
+    },
+    screenToWorld(screenX, screenY) {
+        return {
+            x: screenX + Game.camera.x,
+            y: screenY + Game.camera.y - Constants.INFO_BAR_HEIGHT
+        };
+    },
+    worldToScreen(worldX, worldY) {
+        return {
+            x: worldX - Game.camera.x,
+            y: worldY - Game.camera.y + Constants.INFO_BAR_HEIGHT
+        };
+    },
+    initPlayers() {
+        Game.players.push({ id: 1, resources: { gold: 500, wood: 200 } });
+        Game.players.push({ id: 2, resources: { gold: 500, wood: 200 } });
+
+        const p1Base = new Building(Constants.BUILDING_BASE, 150, Constants.MAP_HEIGHT - 150, 1);
+        const p2Base = new Building(Constants.BUILDING_BASE, Constants.MAP_WIDTH - 150, 150, 2);
+        Game.gameObjects.buildings.push(p1Base, p2Base);
+
+        Game.gameObjects.units.push(new Unit(Constants.UNIT_PEASANT, 100, Constants.MAP_HEIGHT - 200, 1));
+        Game.gameObjects.units.push(new Unit(Constants.UNIT_PEASANT, 200, Constants.MAP_HEIGHT - 200, 1));
+        Game.gameObjects.units.push(new Unit(Constants.UNIT_PEASANT, Constants.MAP_WIDTH - 200, 100, 2));
+        Game.gameObjects.units.push(new Unit(Constants.UNIT_PEASANT, Constants.MAP_WIDTH - 100, 100, 2));
+    },
+    addResource(playerId, type, amount) {
+        const player = Game.players.find(p => p.id === playerId);
+        if (player) {
+            player.resources[type] = Math.max(0, player.resources[type] + amount);
+        }
+    },
+    canAfford(playerId, cost) {
+        const player = Game.players.find(p => p.id === playerId);
+        return player && player.resources.gold >= cost.gold && player.resources.wood >= cost.wood;
+    },
+    setGroup(groupIndex, units) {
+        if (groupIndex >= 0 && groupIndex < 5) {
+            Game.groups[groupIndex] = [...units];
+        }
+    },
+    getGroup(groupIndex) {
+        if (groupIndex >= 0 && groupIndex < 5) {
+            Game.groups[groupIndex] = Game.groups[groupIndex].filter(u => u.hp > 0);
+            return Game.groups[groupIndex];
+        }
+        return [];
+    },
+    removeUnitFromAllGroups(unit) {
+        Game.groups.forEach(group => {
+            const idx = group.findIndex(u => u.id === unit.id);
+            if (idx !== -1) group.splice(idx, 1);
+        });
+    }
+};
+
+class Unit {
+    constructor(type, x, y, playerId) {
+        this.id = `unit_${Date.now()}_${Math.random()}`;
+        this.type = type;
+        this.x = x;
+        this.y = y;
+        this.playerId = playerId;
+        this.stats = { ...Constants.UNIT_STATS[type] };
+        this.hp = this.stats.hp;
+        this.maxHp = this.stats.hp;
+        this.speed = this.stats.speed;
+        this.targetX = x;
+        this.targetY = y;
+        this.state = 'idle';
+        this.attackCooldown = 0;
+        this.target = null;
+        this.angle = 0;
+        this.carrying = null;
+        this.carryAmount = 0;
+        this.harvestProgress = 0;
+        this.buildTarget = null;
+        this.repairTarget = null;
+        this.repairCooldown = 0;
+    }
+
+    update() {
+        this.attackCooldown = Math.max(0, this.attackCooldown - 1);
+        
+        switch (this.state) {
+            case 'moving':
+            case 'attackMoving':
+            case 'movingToHarvest':
+            case 'returning':
+            case 'movingToBuild':
+            case 'movingToRepair':
+                this.move();
+                if (this.state === 'attackMoving') this.checkForEnemies();
+                break;
+            case 'harvesting':
+                this.harvest();
+                break;
+            case 'attacking':
+                this.attack();
+                break;
+            case 'building':
+                this.build();
+                break;
+            case 'repairing':
+                this.repair();
+                break;
+            case 'idle':
+                this.checkForEnemies();
+                break;
+        }
+        
+        this.separateFromOthers();
+    }
+
+    move() {
+        const dx = this.targetX - this.x;
+        const dy = this.targetY - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < 2) {
+            if (this.state === 'moving' || this.state === 'attackMoving') {
+                this.state = 'idle';
+            } else if (this.state === 'movingToHarvest') {
+                this.state = 'harvesting';
+            } else if (this.state === 'movingToBuild') {
+                this.state = 'building';
+            } else if (this.state === 'movingToRepair') {
+                this.state = 'repairing';
+            } else if (this.state === 'returning') {
+                this.depositResources();
+            }
+            return;
+        }
+        
+        this.angle = Math.atan2(dy, dx);
+        this.x += (dx / dist) * this.speed;
+        this.y += (dy / dist) * this.speed;
+        
+        this.x = Constants.clamp(this.x, 20, Constants.MAP_WIDTH - 20);
+        this.y = Constants.clamp(this.y, 20, Constants.MAP_HEIGHT - 20);
+    }
+
+    moveTo(x, y) {
+        this.targetX = Constants.clamp(x, 20, Constants.MAP_WIDTH - 20);
+        this.targetY = Constants.clamp(y, 20, Constants.MAP_HEIGHT - 20);
+        this.state = 'moving';
+        this.target = null;
+        this.buildTarget = null;
+        this.repairTarget = null;
+        if (this.carrying) {
+            this.carrying = null;
+            this.carryAmount = 0;
+        }
+    }
+
+    attackMove(x, y) {
+        this.targetX = x;
+        this.targetY = y;
+        this.state = 'attackMoving';
+        this.target = null;
+    }
+
+    checkForEnemies() {
+        if (this.type === Constants.UNIT_PEASANT) return;
+        
+        const enemies = this.findEnemiesInRange(this.stats.range * 2);
+        if (enemies.length > 0 && this.attackCooldown === 0) {
+            this.setTarget(enemies[0]);
+        }
+    }
+
+    findEnemiesInRange(range) {
+        const allTargets = [...Game.gameObjects.units, ...Game.gameObjects.buildings];
+        return allTargets.filter(t => {
+            if (t.playerId === this.playerId) return false;
+            return Constants.distance(this, t) <= range;
+        }).sort((a, b) => Constants.distance(this, a) - Constants.distance(this, b));
+    }
+
+    setTarget(target) {
+        this.target = target;
+        this.state = 'attacking';
+    }
+
+    attack() {
+        if (!this.target || this.target.hp <= 0) {
+            this.target = null;
+            this.state = 'idle';
+            return;
+        }
+
+        const dist = Constants.distance(this, this.target);
+        
+        if (dist > this.stats.range) {
+            const dx = this.target.x - this.x;
+            const dy = this.target.y - this.y;
+            this.angle = Math.atan2(dy, dx);
+            this.x += (dx / dist) * this.speed;
+            this.y += (dy / dist) * this.speed;
+            this.x = Constants.clamp(this.x, 20, Constants.MAP_WIDTH - 20);
+            this.y = Constants.clamp(this.y, 20, Constants.MAP_HEIGHT - 20);
+        } else if (this.attackCooldown === 0) {
+            this.angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+            
+            if (this.type === Constants.UNIT_ARCHER) {
+                Game.gameObjects.projectiles.push(new Projectile(
+                    this.x, this.y, this.target, this.stats.attack, this.playerId
+                ));
+            } else {
+                this.target.hp -= this.stats.attack;
+            }
+            
+            this.attackCooldown = this.stats.attackSpeed;
+        }
+    }
+
+    startHarvest(resource) {
+        this.harvestTarget = resource;
+        this.targetX = Constants.clamp(resource.x, 20, Constants.MAP_WIDTH - 20);
+        this.targetY = Constants.clamp(resource.y, 20, Constants.MAP_HEIGHT - 20);
+        this.state = 'movingToHarvest';
+        this.target = null;
+        this.buildTarget = null;
+        this.repairTarget = null;
+    }
+
+    harvest() {
+        if (!this.harvestTarget || this.harvestTarget.amount <= 0) {
+            this.state = 'idle';
+            return;
+        }
+
+        this.harvestProgress++;
+        if (this.harvestProgress >= Constants.HARVEST_TIME) {
+            this.carrying = this.harvestTarget.type;
+            this.carryAmount = Math.min(Constants.HARVEST_AMOUNT, this.harvestTarget.amount);
+            this.harvestTarget.amount -= this.carryAmount;
+            this.harvestProgress = 0;
+            
+            const base = Game.gameObjects.buildings.find(
+                b => b.playerId === this.playerId && b.type === Constants.BUILDING_BASE
+            );
+            if (base) {
+                this.targetX = base.x;
+                this.targetY = base.y;
+                this.state = 'returning';
+            }
+        }
+    }
+
+    depositResources() {
+        const resourceType = this.carrying === Constants.RESOURCE_TREE ? Constants.RESOURCE_WOOD : Constants.RESOURCE_GOLD;
+        Game.addResource(this.playerId, resourceType, this.carryAmount);
+        this.carrying = null;
+        this.carryAmount = 0;
+        
+        if (this.harvestTarget && this.harvestTarget.amount > 0) {
+            this.targetX = this.harvestTarget.x;
+            this.targetY = this.harvestTarget.y;
+            this.state = 'movingToHarvest';
+        } else {
+            this.state = 'idle';
+        }
+    }
+
+    returnResources() {
+        const base = Game.gameObjects.buildings.find(
+            b => b.playerId === this.playerId && b.type === Constants.BUILDING_BASE
+        );
+        
+        if (!base) {
+            this.carrying = null;
+            this.carryAmount = 0;
+            this.state = 'idle';
+            return;
+        }
+
+        const dist = Constants.distance(this, base);
+        if (dist > 50) {
+            this.targetX = base.x;
+            this.targetY = base.y;
+            this.state = 'returning';
+            return;
+        }
+
+        this.depositResources();
+    }
+
+    startBuilding(building) {
+        this.buildTarget = building;
+        this.targetX = Constants.clamp(building.x, 20, Constants.MAP_WIDTH - 20);
+        this.targetY = Constants.clamp(building.y, 20, Constants.MAP_HEIGHT - 20);
+        this.state = 'movingToBuild';
+        this.target = null;
+        this.repairTarget = null;
+    }
+
+    build() {
+        if (!this.buildTarget) {
+            this.state = 'idle';
+            return;
+        }
+
+        this.buildTarget.buildProgress++;
+        if (this.buildTarget.buildProgress >= this.buildTarget.buildTime) {
+            this.buildTarget.built = true;
+            this.buildTarget = null;
+            this.state = 'idle';
+        }
+    }
+
+    startRepairing(building) {
+        this.repairTarget = building;
+        this.targetX = Constants.clamp(building.x, 20, Constants.MAP_WIDTH - 20);
+        this.targetY = Constants.clamp(building.y, 20, Constants.MAP_HEIGHT - 20);
+        this.state = 'movingToRepair';
+        this.target = null;
+        this.buildTarget = null;
+    }
+
+    repair() {
+        if (!this.repairTarget || this.repairTarget.hp >= this.repairTarget.maxHp) {
+            this.repairTarget = null;
+            this.state = 'idle';
+            return;
+        }
+
+        if (!this.repairCooldown) this.repairCooldown = 0;
+
+        if (this.repairCooldown-- <= 0) {
+            const player = Game.players.find(p => p.id === this.playerId);
+            if (player.resources.wood >= 2) {
+                Game.addResource(this.playerId, Constants.RESOURCE_WOOD, -2);
+                this.repairTarget.hp = Math.min(this.repairTarget.maxHp, this.repairTarget.hp + 5);
+            }
+            this.repairCooldown = 30;
+        }
+    }
+
+    separateFromOthers() {
+        Game.gameObjects.units.forEach(other => {
+            if (other.id === this.id) return;
+            const dist = Constants.distance(this, other);
+            if (dist < Constants.COLLISION_RADIUS * 1.5 && dist > 0) {
+                const dx = this.x - other.x;
+                const dy = this.y - other.y;
+                const push = (Constants.COLLISION_RADIUS * 1.5 - dist) / 2;
+                this.x += (dx / dist) * push;
+                this.y += (dy / dist) * push;
+            }
+        });
+    }
+}
+
+class Projectile {
+    constructor(x, y, target, damage, playerId) {
+        this.x = x;
+        this.y = y;
+        this.target = target;
+        this.damage = damage;
+        this.playerId = playerId;
+        this.speed = 8;
+    }
+
+    update() {
+        if (!this.target || this.target.hp <= 0) return false;
+
+        const dx = this.target.x - this.x;
+        const dy = this.target.y - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 10) {
+            this.target.hp -= this.damage;
+            return false;
+        }
+
+        this.x += (dx / dist) * this.speed;
+        this.y += (dy / dist) * this.speed;
+        return true;
+    }
+}
+
+class Building {
+    constructor(type, x, y, playerId, built = true) {
+        this.id = `building_${Date.now()}_${Math.random()}`;
+        this.type = type;
+        this.x = x;
+        this.y = y;
+        this.playerId = playerId;
+        this.hp = Constants.BUILDING_HP[type];
+        this.maxHp = this.hp;
+        this.built = built;
+        this.buildProgress = built ? Constants.BUILD_TIMES[type] || 0 : 0;
+        this.buildTime = Constants.BUILD_TIMES[type] || 0;
+        this.size = this.getSize();
+        this.trainingQueue = [];
+        this.trainingProgress = 0;
+        this.attackCooldown = 0;
+    }
+
+    getSize() {
+        switch (this.type) {
+            case Constants.BUILDING_BASE: return 60;
+            case Constants.BUILDING_BARRACKS: return 50;
+            case Constants.BUILDING_TOWER: return 35;
+            default: return 40;
+        }
+    }
+
+    update() {
+        if (!this.built) return;
+        
+        this.attackCooldown = Math.max(0, this.attackCooldown - 1);
+        
+        if (this.type === Constants.BUILDING_BARRACKS && this.trainingQueue.length > 0) {
+            this.trainingProgress++;
+            if (this.trainingProgress >= Constants.TRAIN_TIMES[this.trainingQueue[0]]) {
+                this.spawnUnit(this.trainingQueue[0]);
+                this.trainingQueue.shift();
+                this.trainingProgress = 0;
+            }
+        }
+
+        if (this.type === Constants.BUILDING_TOWER) {
+            this.towerAttack();
+        }
+    }
+
+    towerAttack() {
+        if (this.attackCooldown > 0) return;
+
+        const enemies = Game.gameObjects.units.filter(u => 
+            u.playerId !== this.playerId &&
+            Constants.distance(this, u) <= Constants.TOWER_RANGE
+        );
+
+        if (enemies.length > 0) {
+            enemies[0].hp -= Constants.TOWER_STATS.attack;
+            this.attackCooldown = Constants.TOWER_STATS.attackSpeed;
+        }
+    }
+
+    trainUnit(unitType) {
+        const cost = Constants.TRAIN_COSTS[unitType];
+        const player = Game.players.find(p => p.id === this.playerId);
+        
+        if (player.resources.gold >= cost.gold && player.resources.wood >= cost.wood) {
+            Game.addResource(this.playerId, Constants.RESOURCE_GOLD, -cost.gold);
+            Game.addResource(this.playerId, Constants.RESOURCE_WOOD, -cost.wood);
+            this.trainingQueue.push(unitType);
+            return true;
+        }
+        return false;
+    }
+
+    spawnUnit(unitType) {
+        const angle = Math.random() * Math.PI * 2;
+        const spawnDist = this.size / 2 + 20;
+        const unit = new Unit(
+            unitType,
+            this.x + Math.cos(angle) * spawnDist,
+            this.y + Math.sin(angle) * spawnDist,
+            this.playerId
+        );
+        Game.gameObjects.units.push(unit);
+    }
+}
+
+const InputHandler = {
+    isDragging: false,
+    dragStart: { x: 0, y: 0 },
+    buildMode: null,
+    attackMoveMode: false,
+
+    init() {
+        const canvas = Game.canvas;
+        
+        canvas.addEventListener('mousemove', e => {
+            const rect = canvas.getBoundingClientRect();
+            Game.mousePos.x = e.clientX - rect.left;
+            Game.mousePos.y = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener('mousedown', e => {
+            if (e.button === 0) {
+                InputHandler.handleLeftMouseDown(e);
+            } else if (e.button === 2) {
+                InputHandler.handleRightMouseDown(e);
+            }
+        });
+
+        canvas.addEventListener('mouseup', e => {
+            if (e.button === 0 && InputHandler.isDragging) {
+                InputHandler.selectDragBox();
+                InputHandler.isDragging = false;
+            }
+        });
+
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+        document.addEventListener('keydown', e => {
+            Game.keys[e.key.toLowerCase()] = true;
+            InputHandler.handleKeyDown(e);
+        });
+
+        document.addEventListener('keyup', e => {
+            Game.keys[e.key.toLowerCase()] = false;
+        });
+
+        document.getElementById('buildBarracks').addEventListener('click', () => InputHandler.startBuildMode(Constants.BUILDING_BARRACKS));
+        document.getElementById('buildTower').addEventListener('click', () => InputHandler.startBuildMode(Constants.BUILDING_TOWER));
+        document.getElementById('restartBtn').addEventListener('click', () => Game.restartGame());
+    },
+
+    handleLeftMouseDown(e) {
+        const worldPos = Game.screenToWorld(Game.mousePos.x, Game.mousePos.y);
+        
+        if (InputHandler.handleMinimapClick()) return;
+        
+        if (InputHandler.buildMode) {
+            InputHandler.placeBuilding(worldPos);
+            return;
+        }
+        
+        if (InputHandler.attackMoveMode) {
+            Game.selectedUnits.forEach(u => u.attackMove(worldPos.x, worldPos.y));
+            InputHandler.attackMoveMode = false;
+            Game.canvas.style.cursor = 'default';
+            return;
+        }
+        
+        if (!Game.keys['shift']) {
+            Game.selectedUnits = [];
+        }
+        
+        InputHandler.isDragging = true;
+        InputHandler.dragStart = { x: Game.mousePos.x, y: Game.mousePos.y };
+        
+        const clickedUnit = InputHandler.findUnitAt(worldPos);
+        const clickedBuilding = InputHandler.findBuildingAt(worldPos);
+        
+        if (clickedUnit) {
+            if (!Game.selectedUnits.includes(clickedUnit)) {
+                Game.selectedUnits.push(clickedUnit);
+            }
+            InputHandler.isDragging = false;
+        } else if (clickedBuilding) {
+            if (clickedBuilding.playerId === 1) {
+                Game.selectedUnits = [];
+                InputHandler.isDragging = false;
+            }
+        }
+    },
+
+    handleRightMouseDown(e) {
+        const worldPos = Game.screenToWorld(Game.mousePos.x, Game.mousePos.y);
+        
+        InputHandler.buildMode = null;
+        Game.buildingPreview = null;
+        document.getElementById('buildPanel').style.display = 'none';
+        Game.canvas.style.cursor = 'default';
+        InputHandler.attackMoveMode = false;
+        
+        if (Game.selectedUnits.length === 0) return;
+
+        const targetUnit = InputHandler.findUnitAt(worldPos);
+        const targetBuilding = InputHandler.findBuildingAt(worldPos);
+        const targetResource = InputHandler.findResourceAt(worldPos);
+
+        Game.selectedUnits.forEach(unit => {
+            if (unit.playerId !== 1) return;
+
+            if (targetResource && unit.type === Constants.UNIT_PEASANT) {
+                unit.startHarvest(targetResource);
+            } else if (targetBuilding) {
+                if (targetBuilding.playerId === 1) {
+                    if (unit.type === Constants.UNIT_PEASANT && targetBuilding.hp < targetBuilding.maxHp) {
+                        unit.startRepairing(targetBuilding);
+                    }
+                } else {
+                    unit.setTarget(targetBuilding);
+                }
+            } else if (targetUnit) {
+                if (targetUnit.playerId !== 1) {
+                    unit.setTarget(targetUnit);
+                }
+            } else {
+                unit.moveTo(worldPos.x, worldPos.y);
+            }
+        });
+    },
+
+    handleKeyDown(e) {
+        if (Game.gameOver) return;
+        
+        const num = parseInt(e.key);
+        if (num >= 1 && num <= 5) {
+            if (e.ctrlKey) {
+                Game.setGroup(num - 1, Game.selectedUnits.filter(u => u.playerId === 1));
+            } else {
+                Game.selectedUnits = Game.getGroup(num - 1);
+            }
+        }
+        
+        if (e.key.toLowerCase() === 'b' && Game.selectedUnits.some(u => u.type === Constants.UNIT_PEASANT && u.playerId === 1)) {
+            const panel = document.getElementById('buildPanel');
+            panel.style.display = 'block';
+            panel.style.left = `${Game.mousePos.x}px`;
+            panel.style.top = `${Game.mousePos.y}px`;
+        }
+        
+        if (e.key.toLowerCase() === 'a' && Game.selectedUnits.length > 0) {
+            InputHandler.attackMoveMode = true;
+            Game.canvas.style.cursor = 'crosshair';
+        }
+        
+        if (e.key.toLowerCase() === 'h' && Game.selectedUnits.length > 0) {
+            const base = Game.gameObjects.buildings.find(b => b.playerId === 1 && b.type === Constants.BUILDING_BASE);
+            if (base) {
+                Game.selectedUnits.forEach(u => {
+                    if (u.playerId === 1) u.moveTo(base.x, base.y);
+                });
+            }
+        }
+        
+        if (e.key === 'Escape') {
+            InputHandler.buildMode = null;
+            Game.buildingPreview = null;
+            document.getElementById('buildPanel').style.display = 'none';
+            InputHandler.attackMoveMode = false;
+            Game.canvas.style.cursor = 'default';
+        }
+    },
+
+    startBuildMode(buildingType) {
+        InputHandler.buildMode = buildingType;
+        document.getElementById('buildPanel').style.display = 'none';
+        Game.canvas.style.cursor = 'none';
+    },
+
+    placeBuilding(worldPos) {
+        const cost = Constants.BUILD_COSTS[InputHandler.buildMode];
+        if (!Game.canAfford(1, cost)) {
+            InputHandler.buildMode = null;
+            Game.canvas.style.cursor = 'default';
+            return;
+        }
+        
+        if (!InputHandler.isValidBuildPosition(worldPos.x, worldPos.y, InputHandler.buildMode)) {
+            return;
+        }
+
+        const peasant = Game.selectedUnits.find(u => u.type === Constants.UNIT_PEASANT && u.playerId === 1);
+        if (!peasant) return;
+
+        Game.addResource(1, Constants.RESOURCE_GOLD, -cost.gold);
+        Game.addResource(1, Constants.RESOURCE_WOOD, -cost.wood);
+
+        const building = new Building(InputHandler.buildMode, worldPos.x, worldPos.y, 1, false);
+        Game.gameObjects.buildings.push(building);
+        peasant.startBuilding(building);
+
+        InputHandler.buildMode = null;
+        Game.buildingPreview = null;
+        Game.canvas.style.cursor = 'default';
+    },
+
+    isValidBuildPosition(x, y, type) {
+        const size = type === Constants.BUILDING_BASE ? 60 : type === Constants.BUILDING_BARRACKS ? 50 : 35;
+        const halfSize = size / 2;
+        
+        if (x - halfSize < 0 || x + halfSize > Constants.MAP_WIDTH ||
+            y - halfSize < 0 || y + halfSize > Constants.MAP_HEIGHT) {
+            return false;
+        }
+
+        for (const building of Game.gameObjects.buildings) {
+            const bSize = building.size;
+            if (Math.abs(x - building.x) < (halfSize + bSize / 2) &&
+                Math.abs(y - building.y) < (halfSize + bSize / 2)) {
+                return false;
+            }
+        }
+
+        for (const unit of Game.gameObjects.units) {
+            if (Constants.distance({ x, y }, unit) < halfSize + 20) {
+                return false;
+            }
+        }
+
+        return true;
+    },
+
+    findUnitAt(pos) {
+        return Game.gameObjects.units.find(u => Constants.distance(pos, u) < 20);
+    },
+
+    findBuildingAt(pos) {
+        return Game.gameObjects.buildings.find(b => {
+            const halfSize = b.size / 2;
+            return pos.x >= b.x - halfSize && pos.x <= b.x + halfSize &&
+                   pos.y >= b.y - halfSize && pos.y <= b.y + halfSize;
+        });
+    },
+
+    findResourceAt(pos) {
+        return Game.gameObjects.resources.find(r => Constants.distance(pos, r) < 25);
+    },
+
+    selectDragBox() {
+        const minX = Math.min(InputHandler.dragStart.x, Game.mousePos.x);
+        const maxX = Math.max(InputHandler.dragStart.x, Game.mousePos.x);
+        const minY = Math.min(InputHandler.dragStart.y, Game.mousePos.y);
+        const maxY = Math.max(InputHandler.dragStart.y, Game.mousePos.y);
+
+        if (maxX - minX < 5 || maxY - minY < 5) return;
+
+        const worldMin = Game.screenToWorld(minX, minY);
+        const worldMax = Game.screenToWorld(maxX, maxY);
+
+        const newSelection = Game.gameObjects.units.filter(u =>
+            u.playerId === 1 &&
+            u.x >= worldMin.x && u.x <= worldMax.x &&
+            u.y >= worldMin.y && u.y <= worldMax.y
+        );
+
+        if (!Game.keys['shift']) {
+            Game.selectedUnits = newSelection;
+        } else {
+            newSelection.forEach(u => {
+                if (!Game.selectedUnits.includes(u)) Game.selectedUnits.push(u);
+            });
+        }
+    },
+
+    handleMinimapClick() {
+        const mmX = Constants.CANVAS_WIDTH - Constants.MINIMAP_SIZE;
+        const mmY = Constants.CANVAS_HEIGHT + Constants.INFO_BAR_HEIGHT - Constants.MINIMAP_SIZE;
+        
+        if (Game.mousePos.x >= mmX && Game.mousePos.x <= mmX + Constants.MINIMAP_SIZE &&
+            Game.mousePos.y >= mmY && Game.mousePos.y <= mmY + Constants.MINIMAP_SIZE) {
+            
+            const relX = (Game.mousePos.x - mmX) / Constants.MINIMAP_SIZE;
+            const relY = (Game.mousePos.y - mmY) / Constants.MINIMAP_SIZE;
+            
+            Game.camera.x = relX * Constants.MAP_WIDTH - Constants.CANVAS_WIDTH / 2;
+            Game.camera.y = relY * Constants.MAP_HEIGHT - Constants.CANVAS_HEIGHT / 2;
+            
+            Game.camera.x = Constants.clamp(Game.camera.x, 0, Constants.MAP_WIDTH - Constants.CANVAS_WIDTH);
+            Game.camera.y = Constants.clamp(Game.camera.y, 0, Constants.MAP_HEIGHT - Constants.CANVAS_HEIGHT);
+            
+            return true;
+        }
+        return false;
+    }
+};
+
+const Fog = {
+    explored: new Set(),
+    visible: new Set(),
+    cellSize: 16,
+    mapCellsX: Math.ceil(Constants.MAP_WIDTH / 16),
+    mapCellsY: Math.ceil(Constants.MAP_HEIGHT / 16),
+    
+    init() {
+        Fog.explored = new Set();
+        Fog.visible = new Set();
+    },
+
+    update() {
+        Fog.visible.clear();
+        
+        const player1Units = Game.gameObjects.units.filter(u => u.playerId === 1);
+        const player1Buildings = Game.gameObjects.buildings.filter(b => b.playerId === 1);
+        
+        [...player1Units, ...player1Buildings].forEach(obj => {
+            const radius = obj.size ? Constants.SIGHT_RADIUS_BUILDING : Constants.SIGHT_RADIUS_UNIT;
+            
+            const centerCellX = Math.floor(obj.x / Fog.cellSize);
+            const centerCellY = Math.floor(obj.y / Fog.cellSize);
+            const cellRadius = Math.ceil(radius / Fog.cellSize);
+            
+            for (let dx = -cellRadius; dx <= cellRadius; dx++) {
+                for (let dy = -cellRadius; dy <= cellRadius; dy++) {
+                    const cx = centerCellX + dx;
+                    const cy = centerCellY + dy;
+                    if (cx >= 0 && cx < Fog.mapCellsX && cy >= 0 && cy < Fog.mapCellsY) {
+                        const dist = Math.sqrt(dx * dx + dy * dy) * Fog.cellSize;
+                        if (dist <= radius) {
+                            const key = `${cx},${cy}`;
+                            Fog.visible.add(key);
+                            Fog.explored.add(key);
+                        }
+                    }
+                }
+            }
+        });
+    },
+
+    isVisible(x, y) {
+        const cx = Math.floor(x / Fog.cellSize);
+        const cy = Math.floor(y / Fog.cellSize);
+        return Fog.visible.has(`${cx},${cy}`);
+    },
+
+    isExplored(x, y) {
+        const cx = Math.floor(x / Fog.cellSize);
+        const cy = Math.floor(y / Fog.cellSize);
+        return Fog.explored.has(`${cx},${cy}`);
+    }
+};
+
+const Renderer = {
+    render() {
+        const ctx = Game.ctx;
+        ctx.clearRect(0, 0, Constants.CANVAS_WIDTH, Constants.CANVAS_HEIGHT + Constants.INFO_BAR_HEIGHT);
+
+        Renderer.renderBackground();
+        Fog.update();
+        Renderer.renderMap();
+        Renderer.renderResources();
+        Renderer.renderBuildings();
+        Renderer.renderUnits();
+        Renderer.renderProjectiles();
+        Renderer.renderFog();
+        Renderer.renderSelection();
+        Renderer.renderBuildPreview();
+        Renderer.renderInfoBar();
+        Renderer.renderMinimap();
+        Renderer.renderDragBox();
+    },
+
+    renderBackground() {
+        const ctx = Game.ctx;
+        ctx.fillStyle = '#2d4a2d';
+        ctx.fillRect(0, Constants.INFO_BAR_HEIGHT, Constants.CANVAS_WIDTH, Constants.CANVAS_HEIGHT);
+    },
+
+    renderMap() {
+        const ctx = Game.ctx;
+        ctx.save();
+        ctx.translate(-Game.camera.x, -Game.camera.y + Constants.INFO_BAR_HEIGHT);
+
+        ctx.fillStyle = '#3d5a3d';
+        for (let x = 0; x < Constants.MAP_WIDTH; x += 40) {
+            for (let y = 0; y < Constants.MAP_HEIGHT; y += 40) {
+                if ((x + y) % 80 === 0) {
+                    ctx.fillRect(x, y, 40, 40);
+                }
+            }
+        }
+
+        ctx.restore();
+    },
+
+    renderResources() {
+        const ctx = Game.ctx;
+        ctx.save();
+        ctx.translate(-Game.camera.x, -Game.camera.y + Constants.INFO_BAR_HEIGHT);
+
+        Game.gameObjects.resources.forEach(r => {
+            if (!Fog.isVisible(r.x, r.y)) return;
+            
+            if (r.type === Constants.RESOURCE_TREE) {
+                ctx.fillStyle = '#2d6a2d';
+                ctx.beginPath();
+                ctx.arc(r.x, r.y - 5, 18, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#5a3d1a';
+                ctx.fillRect(r.x - 4, r.y, 8, 15);
+            } else {
+                ctx.fillStyle = '#ffd700';
+                ctx.beginPath();
+                ctx.moveTo(r.x - 15, r.y + 10);
+                ctx.lineTo(r.x, r.y - 15);
+                ctx.lineTo(r.x + 15, r.y + 10);
+                ctx.closePath();
+                ctx.fill();
+                ctx.fillStyle = '#b8860b';
+                ctx.fillRect(r.x - 12, r.y + 10, 24, 8);
+            }
+        });
+
+        ctx.restore();
+    },
+
+    renderBuildings() {
+        const ctx = Game.ctx;
+        ctx.save();
+        ctx.translate(-Game.camera.x, -Game.camera.y + Constants.INFO_BAR_HEIGHT);
+
+        Game.gameObjects.buildings.forEach(b => {
+            const visible = Fog.isVisible(b.x, b.y);
+            const explored = Fog.isExplored(b.x, b.y);
+            
+            if (!explored) return;
+            
+            const size = b.size;
+            const halfSize = size / 2;
+
+            let baseColor = b.playerId === 1 ? '#4a9' : '#a44';
+            if (!visible) baseColor = '#666';
+
+            ctx.fillStyle = baseColor;
+            ctx.fillRect(b.x - halfSize, b.y - halfSize, size, size);
+            
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(b.x - halfSize, b.y - halfSize, size, size);
+
+            if (!b.built) {
+                const progress = b.buildProgress / b.buildTime;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(b.x - halfSize, b.y - halfSize - 10, size, 6);
+                ctx.fillStyle = '#4f4';
+                ctx.fillRect(b.x - halfSize, b.y - halfSize - 10, size * progress, 6);
+            }
+
+            if (b.type === Constants.BUILDING_BARRACKS && b.trainingQueue.length > 0) {
+                const progress = b.trainingProgress / Constants.TRAIN_TIMES[b.trainingQueue[0]];
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(b.x - halfSize, b.y - halfSize - 20, size, 6);
+                ctx.fillStyle = '#4af';
+                ctx.fillRect(b.x - halfSize, b.y - halfSize - 20, size * progress, 6);
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(b.trainingQueue.length, b.x, b.y - halfSize - 25);
+            }
+
+            if (b.hp < b.maxHp) {
+                const hpPercent = b.hp / b.maxHp;
+                ctx.fillStyle = '#333';
+                ctx.fillRect(b.x - halfSize, b.y + halfSize + 2, size, 4);
+                ctx.fillStyle = hpPercent > 0.5 ? '#4f4' : hpPercent > 0.25 ? '#ff0' : '#f44';
+                ctx.fillRect(b.x - halfSize, b.y + halfSize + 2, size * hpPercent, 4);
+            }
+
+            if (b.type === Constants.BUILDING_BASE) {
+                ctx.fillStyle = b.playerId === 1 ? '#6ca' : '#c66';
+                ctx.fillRect(b.x - 15, b.y - 25, 30, 25);
+                ctx.beginPath();
+                ctx.moveTo(b.x - 20, b.y - 25);
+                ctx.lineTo(b.x, b.y - 40);
+                ctx.lineTo(b.x + 20, b.y - 25);
+                ctx.closePath();
+                ctx.fill();
+            } else if (b.type === Constants.BUILDING_TOWER) {
+                ctx.fillStyle = b.playerId === 1 ? '#48a' : '#844';
+                ctx.fillRect(b.x - 10, b.y - 25, 20, 30);
+                ctx.fillRect(b.x - 15, b.y - 30, 30, 8);
+            }
+        });
+
+        ctx.restore();
+    },
+
+    renderUnits() {
+        const ctx = Game.ctx;
+        ctx.save();
+        ctx.translate(-Game.camera.x, -Game.camera.y + Constants.INFO_BAR_HEIGHT);
+
+        Game.gameObjects.units.forEach(u => {
+            if (!Fog.isVisible(u.x, u.y) && u.playerId !== 1) return;
+            
+            const isSelected = Game.selectedUnits.includes(u);
+            
+            ctx.save();
+            ctx.translate(u.x, u.y);
+
+            const unitColor = u.playerId === 1 ? '#4f4' : '#f44';
+            
+            if (u.type === Constants.UNIT_PEASANT) {
+                ctx.fillStyle = unitColor;
+                ctx.beginPath();
+                ctx.arc(0, 0, 10, 0, Math.PI * 2);
+                ctx.fill();
+                if (u.carrying) {
+                    ctx.fillStyle = u.carrying === Constants.RESOURCE_TREE ? '#2d6a2d' : '#ffd700';
+                    ctx.beginPath();
+                    ctx.arc(5, -5, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (u.type === Constants.UNIT_SWORDSMAN) {
+                ctx.fillStyle = unitColor;
+                ctx.fillRect(-8, -8, 16, 16);
+                ctx.strokeStyle = '#aaa';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(8, 0);
+                ctx.lineTo(14, -4);
+                ctx.stroke();
+            } else if (u.type === Constants.UNIT_ARCHER) {
+                ctx.fillStyle = unitColor;
+                ctx.beginPath();
+                ctx.moveTo(0, -10);
+                ctx.lineTo(8, 8);
+                ctx.lineTo(-8, 8);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            if (isSelected) {
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, 14, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            if (u.hp < u.maxHp) {
+                const hpPercent = u.hp / u.maxHp;
+                ctx.fillStyle = '#333';
+                ctx.fillRect(-12, -18, 24, 4);
+                ctx.fillStyle = hpPercent > 0.5 ? '#4f4' : hpPercent > 0.25 ? '#ff0' : '#f44';
+                ctx.fillRect(-12, -18, 24 * hpPercent, 4);
+            }
+
+            if (u.state === 'harvesting' && u.harvestProgress > 0) {
+                const progress = u.harvestProgress / Constants.HARVEST_TIME;
+                ctx.fillStyle = '#333';
+                ctx.fillRect(-12, -24, 24, 4);
+                ctx.fillStyle = '#4af';
+                ctx.fillRect(-12, -24, 24 * progress, 4);
+            }
+
+            ctx.restore();
+        });
+
+        ctx.restore();
+    },
+
+    renderProjectiles() {
+        const ctx = Game.ctx;
+        ctx.save();
+        ctx.translate(-Game.camera.x, -Game.camera.y + Constants.INFO_BAR_HEIGHT);
+
+        ctx.fillStyle = '#aaa';
+        Game.gameObjects.projectiles.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        ctx.restore();
+    },
+
+    renderFog() {
+        const ctx = Game.ctx;
+        ctx.save();
+        ctx.translate(-Game.camera.x, -Game.camera.y + Constants.INFO_BAR_HEIGHT);
+        
+        ctx.globalAlpha = 0.7;
+        
+        for (let cx = 0; cx < Math.ceil(Constants.MAP_WIDTH / Fog.cellSize); cx++) {
+            for (let cy = 0; cy < Math.ceil(Constants.MAP_HEIGHT / Fog.cellSize); cy++) {
+                const x = cx * Fog.cellSize;
+                const y = cy * Fog.cellSize;
+                const key = `${cx},${cy}`;
+                
+                if (Fog.visible.has(key)) {
+                    continue;
+                } else if (Fog.explored.has(key)) {
+                    ctx.fillStyle = 'rgba(50, 50, 50, 0.6)';
+                } else {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                }
+                ctx.fillRect(x, y, Fog.cellSize, Fog.cellSize);
+            }
+        }
+        
+        ctx.restore();
+    },
+
+    renderSelection() {
+        const ctx = Game.ctx;
+        
+        Game.selectedUnits.forEach(u => {
+            const screenPos = Game.worldToScreen(u.x, u.y);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(screenPos.x, screenPos.y, 16, 0, Math.PI * 2);
+            ctx.stroke();
+        });
+    },
+
+    renderBuildPreview() {
+        if (!InputHandler.buildMode) return;
+        
+        const ctx = Game.ctx;
+        const worldPos = Game.screenToWorld(Game.mousePos.x, Game.mousePos.y);
+        const isValid = InputHandler.isValidBuildPosition(worldPos.x, worldPos.y, InputHandler.buildMode);
+        
+        const size = InputHandler.buildMode === Constants.BUILDING_BARRACKS ? 50 : 35;
+        const screenPos = Game.worldToScreen(worldPos.x, worldPos.y);
+        
+        ctx.fillStyle = isValid ? 'rgba(100, 200, 100, 0.5)' : 'rgba(200, 100, 100, 0.5)';
+        ctx.fillRect(screenPos.x - size / 2, screenPos.y - size / 2, size, size);
+        ctx.strokeStyle = isValid ? '#4f4' : '#f44';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(screenPos.x - size / 2, screenPos.y - size / 2, size, size);
+    },
+
+    renderInfoBar() {
+        const ctx = Game.ctx;
+        const player = Game.players.find(p => p.id === 1);
+        
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, Constants.CANVAS_WIDTH, Constants.INFO_BAR_HEIGHT);
+        
+        ctx.font = '14px sans-serif';
+        ctx.fillStyle = '#ffd700';
+        ctx.fillText(`金币: ${player.resources.gold}`, 10, 20);
+        
+        ctx.fillStyle = '#4a9f4a';
+        ctx.fillText(`木材: ${player.resources.wood}`, 120, 20);
+        
+        if (Game.selectedUnits.length > 0) {
+            const unit = Game.selectedUnits[0];
+            const unitNames = { peasant: '农民', swordsman: '剑士', archer: '弓箭手' };
+            ctx.fillStyle = '#fff';
+            ctx.fillText(`${unitNames[unit.type]}: ${unit.hp}/${unit.maxHp}`, 250, 20);
+        } else {
+            const targetUnit = Game.gameObjects.units.find(u => {
+                const pos = Game.screenToWorld(Game.mousePos.x, Game.mousePos.y);
+                return Constants.distance(pos, u) < 20 && u.playerId !== 1 && Fog.isVisible(u.x, u.y);
+            });
+            const targetBuilding = Game.gameObjects.buildings.find(b => {
+                const pos = Game.screenToWorld(Game.mousePos.x, Game.mousePos.y);
+                const halfSize = b.size / 2;
+                return pos.x >= b.x - halfSize && pos.x <= b.x + halfSize &&
+                       pos.y >= b.y - halfSize && pos.y <= b.y + halfSize &&
+                       b.playerId !== 1 && Fog.isVisible(b.x, b.y);
+            });
+            
+            if (targetUnit) {
+                const unitNames = { peasant: '农民', swordsman: '剑士', archer: '弓箭手' };
+                ctx.fillStyle = '#f88';
+                ctx.fillText(`敌方${unitNames[targetUnit.type]}: ${targetUnit.hp}/${targetUnit.maxHp}`, 250, 20);
+            } else if (targetBuilding) {
+                const buildingNames = { base: '基地', barracks: '兵营', tower: '防御塔' };
+                ctx.fillStyle = '#f88';
+                ctx.fillText(`敌方${buildingNames[targetBuilding.type]}: ${targetBuilding.hp}/${targetBuilding.maxHp}`, 250, 20);
+            }
+        }
+    },
+
+    renderMinimap() {
+        const ctx = Game.ctx;
+        const mmX = Constants.CANVAS_WIDTH - Constants.MINIMAP_SIZE;
+        const mmY = Constants.CANVAS_HEIGHT + Constants.INFO_BAR_HEIGHT - Constants.MINIMAP_SIZE;
+        const scale = Constants.MINIMAP_SIZE / Math.max(Constants.MAP_WIDTH, Constants.MAP_HEIGHT);
+
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(mmX, mmY, Constants.MINIMAP_SIZE, Constants.MINIMAP_SIZE);
+
+        for (let cx = 0; cx < Math.ceil(Constants.MAP_WIDTH / Fog.cellSize); cx++) {
+            for (let cy = 0; cy < Math.ceil(Constants.MAP_HEIGHT / Fog.cellSize); cy++) {
+                const x = cx * Fog.cellSize;
+                const y = cy * Fog.cellSize;
+                const key = `${cx},${cy}`;
+                
+                if (Fog.visible.has(key)) {
+                    ctx.fillStyle = 'rgba(60, 100, 60, 0.8)';
+                } else if (Fog.explored.has(key)) {
+                    ctx.fillStyle = 'rgba(80, 80, 80, 0.5)';
+                } else {
+                    continue;
+                }
+                ctx.fillRect(mmX + x * scale, mmY + y * scale, 3, 3);
+            }
+        }
+
+        Game.gameObjects.buildings.forEach(b => {
+            if (Fog.isVisible(b.x, b.y) || b.playerId === 1) {
+                ctx.fillStyle = b.playerId === 1 ? '#4f4' : '#f44';
+                ctx.fillRect(mmX + b.x * scale - 3, mmY + b.y * scale - 3, 6, 6);
+            }
+        });
+
+        Game.gameObjects.units.forEach(u => {
+            if (Fog.isVisible(u.x, u.y) || u.playerId === 1) {
+                ctx.fillStyle = u.playerId === 1 ? '#4f4' : '#f44';
+                ctx.beginPath();
+                ctx.arc(mmX + u.x * scale, mmY + u.y * scale, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(
+            mmX + Game.camera.x * scale,
+            mmY + Game.camera.y * scale,
+            Constants.CANVAS_WIDTH * scale,
+            Constants.CANVAS_HEIGHT * scale
+        );
+
+        ctx.strokeStyle = '#666';
+        ctx.strokeRect(mmX, mmY, Constants.MINIMAP_SIZE, Constants.MINIMAP_SIZE);
+    },
+
+    renderDragBox() {
+        if (!InputHandler.isDragging) return;
+        
+        const ctx = Game.ctx;
+        const minX = Math.min(InputHandler.dragStart.x, Game.mousePos.x);
+        const minY = Math.min(InputHandler.dragStart.y, Game.mousePos.y);
+        const maxX = Math.max(InputHandler.dragStart.x, Game.mousePos.x);
+        const maxY = Math.max(InputHandler.dragStart.y, Game.mousePos.y);
+
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+        ctx.setLineDash([]);
+    }
+};
+
+const AI = {
+    updateCounter: 0,
+    attackWave: 0,
+    lastAttackTime: 0,
+
+    init() {
+        AI.updateCounter = 0;
+        AI.attackWave = 0;
+        AI.lastAttackTime = 0;
+    },
+
+    update() {
+        AI.updateCounter++;
+        
+        if (AI.updateCounter % 30 !== 0) return;
+
+        AI.managePeasants();
+        AI.manageBuilding();
+        AI.manageArmy();
+        AI.manageAttacks();
+    },
+
+    managePeasants() {
+        const peasants = Game.gameObjects.units.filter(u => u.playerId === 2 && u.type === Constants.UNIT_PEASANT);
+        
+        peasants.forEach(peasant => {
+            if (peasant.state !== 'idle' && peasant.state !== 'moving') return;
+            
+            if (peasant.carrying) return;
+
+            const player = Game.players.find(p => p.id === 2);
+            const needGold = player.resources.gold < player.resources.wood;
+            
+            const resourceType = needGold ? Constants.RESOURCE_GOLDMINE : Constants.RESOURCE_TREE;
+            const resources = Game.gameObjects.resources.filter(r => r.type === resourceType && r.amount > 0);
+            
+            if (resources.length > 0) {
+                const nearest = resources.reduce((a, b) => 
+                    Constants.distance(peasant, a) < Constants.distance(peasant, b) ? a : b
+                );
+                peasant.startHarvest(nearest);
+            }
+        });
+    },
+
+    manageBuilding() {
+        const player = Game.players.find(p => p.id === 2);
+        if (!player) return;
+
+        const buildings = Game.gameObjects.buildings.filter(b => b.playerId === 2);
+        const hasBarracks = buildings.some(b => b.type === Constants.BUILDING_BARRACKS && b.built);
+        const hasTower = buildings.some(b => b.type === Constants.BUILDING_TOWER && b.built);
+        const base = buildings.find(b => b.type === Constants.BUILDING_BASE);
+        
+        if (!base) return;
+
+        const freePeasant = Game.gameObjects.units.find(u => 
+            u.playerId === 2 && u.type === Constants.UNIT_PEASANT && 
+            u.state === 'idle' && !u.buildTarget
+        );
+        
+        if (!freePeasant) return;
+
+        if (!hasBarracks && Game.canAfford(2, Constants.BUILD_COSTS.barracks)) {
+            const buildX = base.x - 80 + Math.random() * 60;
+            const buildY = base.y - 80 + Math.random() * 60;
+            
+            Game.addResource(2, Constants.RESOURCE_GOLD, -Constants.BUILD_COSTS.barracks.gold);
+            Game.addResource(2, Constants.RESOURCE_WOOD, -Constants.BUILD_COSTS.barracks.wood);
+            
+            const barracks = new Building(Constants.BUILDING_BARRACKS, buildX, buildY, 2, false);
+            Game.gameObjects.buildings.push(barracks);
+            freePeasant.startBuilding(barracks);
+            return;
+        }
+
+        if (!hasTower && Game.canAfford(2, Constants.BUILD_COSTS.tower)) {
+            const enemyBase = Game.gameObjects.buildings.find(b => b.playerId === 1 && b.type === Constants.BUILDING_BASE);
+            if (enemyBase) {
+                const angle = Math.atan2(enemyBase.y - base.y, enemyBase.x - base.x);
+                const buildX = base.x + Math.cos(angle) * 80;
+                const buildY = base.y + Math.sin(angle) * 80;
+                
+                Game.addResource(2, Constants.RESOURCE_GOLD, -Constants.BUILD_COSTS.tower.gold);
+                Game.addResource(2, Constants.RESOURCE_WOOD, -Constants.BUILD_COSTS.tower.wood);
+                
+                const tower = new Building(Constants.BUILDING_TOWER, buildX, buildY, 2, false);
+                Game.gameObjects.buildings.push(tower);
+                freePeasant.startBuilding(tower);
+            }
+        }
+    },
+
+    manageArmy() {
+        const barracks = Game.gameObjects.buildings.find(
+            b => b.playerId === 2 && b.type === Constants.BUILDING_BARRACKS && b.built
+        );
+        
+        if (!barracks) return;
+
+        const unitCounts = { swordsman: 0, archer: 0 };
+        Game.gameObjects.units.forEach(u => {
+            if (u.playerId === 2 && u.type in unitCounts) {
+                unitCounts[u.type]++;
+            }
+        });
+
+        if (unitCounts.swordsman < unitCounts.archer + 2) {
+            if (Game.canAfford(2, Constants.TRAIN_COSTS.swordsman)) {
+                barracks.trainUnit(Constants.UNIT_SWORDSMAN);
+            }
+        } else {
+            if (Game.canAfford(2, Constants.TRAIN_COSTS.archer)) {
+                barracks.trainUnit(Constants.UNIT_ARCHER);
+            }
+        }
+    },
+
+    manageAttacks() {
+        const army = Game.gameObjects.units.filter(u => 
+            u.playerId === 2 && u.type !== Constants.UNIT_PEASANT && u.state === 'idle'
+        );
+        
+        if (army.length < 3 + AI.attackWave) return;
+
+        const player1Buildings = Game.gameObjects.buildings.filter(b => b.playerId === 1);
+        if (player1Buildings.length === 0) return;
+
+        const target = player1Buildings.reduce((a, b) => 
+            Constants.distance(army[0], a) < Constants.distance(army[0], b) ? a : b
+        );
+
+        army.forEach(unit => unit.setTarget(target));
+        AI.attackWave++;
+    }
+};
+
+window.addEventListener('load', () => {
+    Game.init();
+});
+</script>
+</body>
+</html>

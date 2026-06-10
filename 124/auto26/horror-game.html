@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生存恐怖游戏</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #000; 
+            overflow: hidden; 
+            font-family: 'Courier New', monospace;
+            user-select: none;
+        }
+        #gameCanvas { display: block; }
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            font-size: 14px;
+            text-shadow: 2px 2px 4px #000;
+        }
+        .bar-container {
+            width: 150px;
+            height: 15px;
+            background: rgba(0,0,0,0.7);
+            border: 1px solid #444;
+            margin: 5px 0;
+            position: relative;
+        }
+        .bar-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+        .health-fill { background: linear-gradient(90deg, #f00, #ff4444); }
+        .battery-fill { background: linear-gradient(90deg, #0f0, #44ff44); }
+        .bar-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 10px;
+            color: #fff;
+            text-shadow: 1px 1px 2px #000;
+        }
+        #keys {
+            margin-top: 15px;
+            display: flex;
+            gap: 5px;
+        }
+        .key-icon {
+            width: 20px;
+            height: 20px;
+            background: #ffd700;
+            border-radius: 3px;
+            display: none;
+            box-shadow: 0 0 5px #ffd700;
+        }
+        .key-icon.collected { display: block; }
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 24px;
+            text-shadow: 2px 2px 8px #000;
+            opacity: 0;
+            transition: opacity 0.5s;
+            text-align: center;
+            white-space: nowrap;
+        }
+        #message.show { opacity: 1; }
+        #gameOver, #win {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            z-index: 100;
+        }
+        #gameOver.show, #win.show { display: flex; }
+        .end-title {
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #f00;
+        }
+        #win .end-title { text-shadow: 0 0 20px #0f0; }
+        .end-hint {
+            font-size: 18px;
+            color: #aaa;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            50% { opacity: 0.3; }
+        }
+        #muteBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 8px 15px;
+            background: rgba(0,0,0,0.7);
+            border: 1px solid #444;
+            color: #fff;
+            cursor: pointer;
+            pointer-events: auto;
+            font-family: inherit;
+            font-size: 12px;
+        }
+        #muteBtn:hover { background: rgba(50,50,50,0.8); }
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            z-index: 200;
+        }
+        #startScreen h1 {
+            font-size: 56px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 30px #f00;
+            letter-spacing: 5px;
+        }
+        #startScreen .controls {
+            font-size: 14px;
+            color: #888;
+            text-align: center;
+            line-height: 2;
+            margin-bottom: 40px;
+        }
+        #startBtn {
+            padding: 15px 40px;
+            font-size: 20px;
+            background: #111;
+            border: 2px solid #444;
+            color: #fff;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+        #startBtn:hover {
+            background: #222;
+            border-color: #888;
+            box-shadow: 0 0 20px rgba(255,255,255,0.2);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui">
+        <div id="startScreen">
+            <h1>恐惧深渊</h1>
+            <div class="controls">
+                WASD / 方向键 - 移动<br>
+                鼠标 - 控制手电筒方向<br>
+                F - 拾取物品<br>
+                E - 使用钥匙开门<br>
+                空格 - 冲刺<br>
+                收集2把钥匙，找到出口逃离！
+            </div>
+            <button id="startBtn">开始游戏</button>
+        </div>
+        
+        <div id="hud">
+            <div>生命值</div>
+            <div class="bar-container">
+                <div class="bar-fill health-fill" id="healthBar"></div>
+                <span class="bar-text" id="healthText">100/100</span>
+            </div>
+            <div>电池</div>
+            <div class="bar-container">
+                <div class="bar-fill battery-fill" id="batteryBar"></div>
+                <span class="bar-text" id="batteryText">100/100</span>
+            </div>
+            <div id="keys">
+                <div class="key-icon" id="key1"></div>
+                <div class="key-icon" id="key2"></div>
+                <span id="keyCount" style="color: #ffd700; margin-left: 5px;">0/2</span>
+            </div>
+        </div>
+        
+        <div id="message"></div>
+        
+        <div id="gameOver">
+            <div class="end-title">你死了</div>
+            <div class="end-hint">按空格键重新开始</div>
+        </div>
+        
+        <div id="win">
+            <div class="end-title">你逃出来了！</div>
+            <div class="end-hint">按空格键重新开始</div>
+        </div>
+        
+        <button id="muteBtn">🔊 音效开启</button>
+    </div>
+
+    <script type="module">
+        export const gameState = {
+            running: false,
+            resetting: false,
+            health: 100,
+            maxHealth: 100,
+            battery: 100,
+            maxBattery: 100,
+            keys: [],
+            requiredKeys: 2,
+            flashlightOn: true,
+            isSprinting: false,
+            gameOver: false,
+            won: false,
+            lastDamageTime: 0,
+            damageCooldown: 1000,
+            audioInitialized: false,
+            muted: false
+        };
+    </script>
+
+    <script type="module">
+        import { gameState } from './horror-game.html';
+        
+        const MAP_WIDTH = 20;
+        const MAP_HEIGHT = 20;
+        const TILE_SIZE = 50;
+        
+        const TILE = {
+            WALL: 0,
+            FLOOR: 1,
+            EXIT: 2
+        };
+        
+        let map = [];
+        let rooms = [];
+        let exitPos = { x: 0, y: 0 };
+        let playerStart = { x: 0, y: 0 };
+        
+        function generateMap() {
+            map = Array(MAP_HEIGHT).fill(null).map(() => Array(MAP_WIDTH).fill(TILE.WALL));
+            rooms = [];
+            
+            const roomCount = 6 + Math.floor(Math.random() * 4);
+            for (let i = 0; i < roomCount; i++) {
+                const roomW = 4 + Math.floor(Math.random() * 4);
+                const roomH = 4 + Math.floor(Math.random() * 4);
+                const roomX = 1 + Math.floor(Math.random() * (MAP_WIDTH - roomW - 2));
+                const roomY = 1 + Math.floor(Math.random() * (MAP_HEIGHT - roomH - 2));
+                
+                let overlaps = false;
+                for (const room of rooms) {
+                    if (roomX < room.x + room.w + 2 && roomX + roomW + 2 > room.x &&
+                        roomY < room.y + room.h + 2 && roomY + roomH + 2 > room.y) {
+                        overlaps = true;
+                        break;
+                    }
+                }
+                
+                if (!overlaps) {
+                    rooms.push({ x: roomX, y: roomY, w: roomW, h: roomH });
+                    for (let y = roomY; y < roomY + roomH; y++) {
+                        for (let x = roomX; x < roomX + roomW; x++) {
+                            map[y][x] = TILE.FLOOR;
+                        }
+                    }
+                }
+            }
+            
+            for (let i = 0; i < rooms.length - 1; i++) {
+                const roomA = rooms[i];
+                const roomB = rooms[i + 1];
+                const startX = Math.floor(roomA.x + roomA.w / 2);
+                const startY = Math.floor(roomA.y + roomA.h / 2);
+                const endX = Math.floor(roomB.x + roomB.w / 2);
+                const endY = Math.floor(roomB.y + roomB.h / 2);
+                
+                let cx = startX;
+                let cy = startY;
+                
+                while (cx !== endX) {
+                    map[cy][cx] = TILE.FLOOR;
+                    cx += cx < endX ? 1 : -1;
+                }
+                while (cy !== endY) {
+                    map[cy][cx] = TILE.FLOOR;
+                    cy += cy < endY ? 1 : -1;
+                }
+            }
+            
+            playerStart = {
+                x: (rooms[0].x + rooms[0].w / 2) * TILE_SIZE,
+                y: (rooms[0].y + rooms[0].h / 2) * TILE_SIZE
+            };
+            
+            let maxDist = 0;
+            let exitRoom = rooms[rooms.length - 1];
+            for (let i = 1; i < rooms.length; i++) {
+                const room = rooms[i];
+                const roomCenterX = (room.x + room.w / 2) * TILE_SIZE;
+                const roomCenterY = (room.y + room.h / 2) * TILE_SIZE;
+                const dist = Math.sqrt(Math.pow(roomCenterX - playerStart.x, 2) + Math.pow(roomCenterY - playerStart.y, 2));
+                if (dist > maxDist && dist >= 10 * TILE_SIZE) {
+                    maxDist = dist;
+                    exitRoom = room;
+                }
+            }
+            
+            exitPos = {
+                x: exitRoom.x + Math.floor(exitRoom.w / 2),
+                y: exitRoom.y + Math.floor(exitRoom.h / 2)
+            };
+            map[exitPos.y][exitPos.x] = TILE.EXIT;
+            
+            return { map, rooms, exitPos, playerStart, TILE_SIZE, MAP_WIDTH, MAP_HEIGHT, TILE };
+        }
+        
+        function isWalkable(x, y) {
+            const tileX = Math.floor(x / TILE_SIZE);
+            const tileY = Math.floor(y / TILE_SIZE);
+            if (tileX < 0 || tileX >= MAP_WIDTH || tileY < 0 || tileY >= MAP_HEIGHT) return false;
+            return map[tileY][tileX] !== TILE.WALL;
+        }
+        
+        function getExitPosition() {
+            return { x: exitPos.x * TILE_SIZE + TILE_SIZE / 2, y: exitPos.y * TILE_SIZE + TILE_SIZE / 2 };
+        }
+        
+        export const mapModule = {
+            generateMap,
+            isWalkable,
+            getExitPosition,
+            TILE_SIZE,
+            MAP_WIDTH,
+            MAP_HEIGHT,
+            TILE
+        };
+    </script>
+
+    <script type="module">
+        import { gameState } from './horror-game.html';
+        import { mapModule } from './horror-game.html';
+        
+        const player = {
+            x: 0,
+            y: 0,
+            angle: 0,
+            speed: 120,
+            sprintSpeed: 180,
+            radius: 12
+        };
+        
+        function initPlayer(startPos) {
+            player.x = startPos.x;
+            player.y = startPos.y;
+            player.angle = 0;
+        }
+        
+        function updatePlayer(deltaTime, keys, mousePos, canvas) {
+            if (gameState.gameOver || gameState.won) return;
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            player.angle = Math.atan2(mousePos.y - centerY, mousePos.x - centerX);
+            
+            let dx = 0;
+            let dy = 0;
+            const speed = gameState.isSprinting ? player.sprintSpeed : player.speed;
+            
+            if (keys['w'] || keys['arrowup']) dy -= 1;
+            if (keys['s'] || keys['arrowdown']) dy += 1;
+            if (keys['a'] || keys['arrowleft']) dx -= 1;
+            if (keys['d'] || keys['arrowright']) dx += 1;
+            
+            if (dx !== 0 || dy !== 0) {
+                const len = Math.sqrt(dx * dx + dy * dy);
+                dx /= len;
+                dy /= len;
+                
+                const newX = player.x + dx * speed * deltaTime;
+                const newY = player.y + dy * speed * deltaTime;
+                
+                if (mapModule.isWalkable(newX - player.radius, player.y) && 
+                    mapModule.isWalkable(newX + player.radius, player.y)) {
+                    player.x = newX;
+                }
+                if (mapModule.isWalkable(player.x, newY - player.radius) && 
+                    mapModule.isWalkable(player.x, newY + player.radius)) {
+                    player.y = newY;
+                }
+            }
+        }
+        
+        function getPlayer() {
+            return { ...player };
+        }
+        
+        function getPlayerAngle() {
+            return player.angle;
+        }
+        
+        export const playerModule = {
+            initPlayer,
+            updatePlayer,
+            getPlayer,
+            getPlayerAngle
+        };
+    </script>
+
+    <script type="module">
+        import { gameState } from './horror-game.html';
+        import { mapModule } from './horror-game.html';
+        import { playerModule } from './horror-game.html';
+        
+        let enemies = [];
+        let lastAITick = 0;
+        
+        const ENEMY_TYPES = {
+            WANDERER: 'wanderer',
+            SEEKER: 'seeker'
+        };
+        
+        function initEnemies(rooms) {
+            enemies = [];
+            const validRooms = rooms.slice(1);
+            
+            const wandererRoom = validRooms[Math.floor(Math.random() * validRooms.length)];
+            enemies.push(createEnemy(wandererRoom, ENEMY_TYPES.WANDERER));
+            
+            let seekerRoom;
+            do {
+                seekerRoom = validRooms[Math.floor(Math.random() * validRooms.length)];
+            } while (seekerRoom === wandererRoom && validRooms.length > 1);
+            enemies.push(createEnemy(seekerRoom, ENEMY_TYPES.SEEKER));
+        }
+        
+        function createEnemy(room, type) {
+            return {
+                x: (room.x + 1 + Math.random() * (room.w - 2)) * mapModule.TILE_SIZE,
+                y: (room.y + 1 + Math.random() * (room.h - 2)) * mapModule.TILE_SIZE,
+                type,
+                speed: type === ENEMY_TYPES.WANDERER ? 40 : 70,
+                targetX: 0,
+                targetY: 0,
+                state: 'idle',
+                radius: 15,
+                speedVariation: 0.8 + Math.random() * 0.4,
+                nextStateChange: 0,
+                wanderDirection: Math.random() * Math.PI * 2
+            };
+        }
+        
+        function updateEnemies(deltaTime, currentTime) {
+            if (gameState.gameOver || gameState.won) return;
+            
+            const player = playerModule.getPlayer();
+            
+            for (const enemy of enemies) {
+                const distToPlayer = Math.sqrt(
+                    Math.pow(enemy.x - player.x, 2) + 
+                    Math.pow(enemy.y - player.y, 2)
+                );
+                
+                if (enemy.type === ENEMY_TYPES.WANDERER) {
+                    updateWanderer(enemy, player, distToPlayer, deltaTime, currentTime);
+                } else {
+                    updateSeeker(enemy, player, distToPlayer, deltaTime, currentTime);
+                }
+                
+                if (distToPlayer < enemy.radius + 12) {
+                    if (currentTime - gameState.lastDamageTime > gameState.damageCooldown) {
+                        gameState.health -= 20;
+                        gameState.lastDamageTime = currentTime;
+                        if (gameState.health <= 0) {
+                            gameState.health = 0;
+                            gameState.gameOver = true;
+                        }
+                    }
+                }
+            }
+        }
+        
+        function updateWanderer(enemy, player, distToPlayer, deltaTime, currentTime) {
+            if (currentTime > enemy.nextStateChange) {
+                enemy.wanderDirection = Math.random() * Math.PI * 2;
+                enemy.nextStateChange = currentTime + 2000 + Math.random() * 3000;
+            }
+            
+            const speed = enemy.speed * enemy.speedVariation;
+            let dx = Math.cos(enemy.wanderDirection);
+            let dy = Math.sin(enemy.wanderDirection);
+            
+            const newX = enemy.x + dx * speed * deltaTime;
+            const newY = enemy.y + dy * speed * deltaTime;
+            
+            if (mapModule.isWalkable(newX, enemy.y)) enemy.x = newX;
+            else enemy.wanderDirection = Math.PI - enemy.wanderDirection;
+            if (mapModule.isWalkable(enemy.x, newY)) enemy.y = newY;
+            else enemy.wanderDirection = -enemy.wanderDirection;
+        }
+        
+        function updateSeeker(enemy, player, distToPlayer, deltaTime, currentTime) {
+            const inChaseRange = distToPlayer < 150;
+            
+            if (inChaseRange) {
+                enemy.state = 'chase';
+                const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+                const speed = enemy.speed * enemy.speedVariation;
+                const dx = Math.cos(angle) * speed * deltaTime;
+                const dy = Math.sin(angle) * speed * deltaTime;
+                
+                if (mapModule.isWalkable(enemy.x + dx, enemy.y)) enemy.x += dx;
+                if (mapModule.isWalkable(enemy.x, enemy.y + dy)) enemy.y += dy;
+            } else {
+                if (currentTime > enemy.nextStateChange) {
+                    enemy.state = Math.random() > 0.5 ? 'wander' : 'idle';
+                    enemy.nextStateChange = currentTime + 1000 + Math.random() * 2000;
+                    if (enemy.state === 'wander') {
+                        enemy.wanderDirection = Math.random() * Math.PI * 2;
+                    }
+                }
+                
+                if (enemy.state === 'wander') {
+                    const speed = enemy.speed * 0.5;
+                    const dx = Math.cos(enemy.wanderDirection) * speed * deltaTime;
+                    const dy = Math.sin(enemy.wanderDirection) * speed * deltaTime;
+                    
+                    if (mapModule.isWalkable(enemy.x + dx, enemy.y)) enemy.x += dx;
+                    if (mapModule.isWalkable(enemy.x, enemy.y + dy)) enemy.y += dy;
+                }
+            }
+        }
+        
+        function getEnemies() {
+            return enemies.map(e => ({ ...e }));
+        }
+        
+        export const enemyModule = {
+            initEnemies,
+            updateEnemies,
+            getEnemies
+        };
+    </script>
+
+    <script type="module">
+        import { gameState } from './horror-game.html';
+        import { playerModule } from './horror-game.html';
+        import { mapModule } from './horror-game.html';
+        
+        let items = [];
+        let keys = [];
+        
+        const ITEM_TYPES = {
+            BATTERY: 'battery',
+            MEDKIT: 'medkit',
+            KEY: 'key'
+        };
+        
+        function initItems(rooms) {
+            items = [];
+            keys = [];
+            
+            const floorTiles = [];
+            for (let y = 0; y < mapModule.MAP_HEIGHT; y++) {
+                for (let x = 0; x < mapModule.MAP_WIDTH; x++) {
+                    if (mapModule.isWalkable(x * mapModule.TILE_SIZE, y * mapModule.TILE_SIZE)) {
+                        floorTiles.push({ x, y });
+                    }
+                }
+            }
+            
+            for (let i = 0; i < 12; i++) {
+                if (floorTiles.length === 0) break;
+                const idx = Math.floor(Math.random() * floorTiles.length);
+                const tile = floorTiles.splice(idx, 1)[0];
+                
+                const type = Math.random() > 0.5 ? ITEM_TYPES.BATTERY : ITEM_TYPES.MEDKIT;
+                items.push({
+                    x: tile.x * mapModule.TILE_SIZE + mapModule.TILE_SIZE / 2,
+                    y: tile.y * mapModule.TILE_SIZE + mapModule.TILE_SIZE / 2,
+                    type,
+                    collected: false
+                });
+            }
+            
+            for (let i = 0; i < gameState.requiredKeys; i++) {
+                if (floorTiles.length === 0) break;
+                const idx = Math.floor(Math.random() * floorTiles.length);
+                const tile = floorTiles.splice(idx, 1)[0];
+                
+                keys.push({
+                    x: tile.x * mapModule.TILE_SIZE + mapModule.TILE_SIZE / 2,
+                    y: tile.y * mapModule.TILE_SIZE + mapModule.TILE_SIZE / 2,
+                    id: `key_${i}`,
+                    collected: false
+                });
+            }
+        }
+        
+        function checkPickup() {
+            if (gameState.gameOver || gameState.won) return null;
+            
+            const player = playerModule.getPlayer();
+            const pickupRange = 40;
+            
+            for (const item of items) {
+                if (item.collected) continue;
+                const dist = Math.sqrt(Math.pow(item.x - player.x, 2) + Math.pow(item.y - player.y, 2));
+                if (dist < pickupRange) {
+                    item.collected = true;
+                    if (item.type === ITEM_TYPES.BATTERY) {
+                        gameState.battery = Math.min(gameState.maxBattery, gameState.battery + 30);
+                        return 'battery';
+                    } else if (item.type === ITEM_TYPES.MEDKIT) {
+                        gameState.health = Math.min(gameState.maxHealth, gameState.health + 30);
+                        return 'medkit';
+                    }
+                }
+            }
+            
+            for (const key of keys) {
+                if (key.collected) continue;
+                const dist = Math.sqrt(Math.pow(key.x - player.x, 2) + Math.pow(key.y - player.y, 2));
+                if (dist < pickupRange) {
+                    key.collected = true;
+                    gameState.keys.push(key.id);
+                    return 'key';
+                }
+            }
+            
+            return null;
+        }
+        
+        function checkExit() {
+            if (gameState.keys.length < gameState.requiredKeys) return false;
+            
+            const player = playerModule.getPlayer();
+            const exitPos = mapModule.getExitPosition();
+            const dist = Math.sqrt(Math.pow(exitPos.x - player.x, 2) + Math.pow(exitPos.y - player.y, 2));
+            
+            return dist < 50;
+        }
+        
+        function getItems() {
+            return items.filter(i => !i.collected).map(i => ({ ...i }));
+        }
+        
+        function getKeys() {
+            return keys.filter(k => !k.collected).map(k => ({ ...k }));
+        }
+        
+        export const itemModule = {
+            initItems,
+            checkPickup,
+            checkExit,
+            getItems,
+            getKeys,
+            ITEM_TYPES
+        };
+    </script>
+
+    <script type="module">
+        import { gameState } from './horror-game.html';
+        import { playerModule } from './horror-game.html';
+        import { mapModule } from './horror-game.html';
+        
+        const CONE_ANGLE = Math.PI / 3;
+        const LIGHT_DISTANCE = 300;
+        const MOONLIGHT_RADIUS = 20;
+        
+        function renderFlashlight(ctx, canvas, cameraX, cameraY) {
+            const player = playerModule.getPlayer();
+            const angle = playerModule.getPlayerAngle();
+            
+            const screenX = canvas.width / 2;
+            const screenY = canvas.height / 2;
+            
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            tempCtx.fillStyle = '#000';
+            tempCtx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            tempCtx.globalCompositeOperation = 'destination-out';
+            
+            if (gameState.battery > 0 && gameState.flashlightOn) {
+                const gradient = tempCtx.createRadialGradient(
+                    screenX, screenY, 0,
+                    screenX, screenY, LIGHT_DISTANCE
+                );
+                gradient.addColorStop(0, 'rgba(255, 255, 200, 1)');
+                gradient.addColorStop(0.7, 'rgba(255, 255, 200, 0.5)');
+                gradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
+                
+                tempCtx.save();
+                tempCtx.translate(screenX, screenY);
+                tempCtx.rotate(angle);
+                tempCtx.beginPath();
+                tempCtx.moveTo(0, 0);
+                tempCtx.arc(0, 0, LIGHT_DISTANCE, -CONE_ANGLE / 2, CONE_ANGLE / 2);
+                tempCtx.closePath();
+                tempCtx.fillStyle = gradient;
+                tempCtx.fill();
+                tempCtx.restore();
+            }
+            
+            const moonGradient = tempCtx.createRadialGradient(
+                screenX, screenY, 0,
+                screenX, screenY, MOONLIGHT_RADIUS
+            );
+            moonGradient.addColorStop(0, 'rgba(100, 100, 150, 0.4)');
+            moonGradient.addColorStop(1, 'rgba(100, 100, 150, 0)');
+            tempCtx.beginPath();
+            tempCtx.arc(screenX, screenY, MOONLIGHT_RADIUS, 0, Math.PI * 2);
+            tempCtx.fillStyle = moonGradient;
+            tempCtx.fill();
+            
+            const exitPos = mapModule.getExitPosition();
+            const exitScreenX = exitPos.x - cameraX + canvas.width / 2;
+            const exitScreenY = exitPos.y - cameraY + canvas.height / 2;
+            
+            const exitGlow = tempCtx.createRadialGradient(
+                exitScreenX, exitScreenY, 0,
+                exitScreenX, exitScreenY, 100 + Math.sin(Date.now() / 500) * 20
+            );
+            exitGlow.addColorStop(0, 'rgba(255, 50, 50, 0.6)');
+            exitGlow.addColorStop(1, 'rgba(255, 50, 50, 0)');
+            tempCtx.beginPath();
+            tempCtx.arc(exitScreenX, exitScreenY, 120, 0, Math.PI * 2);
+            tempCtx.fillStyle = exitGlow;
+            tempCtx.fill();
+            
+            tempCtx.globalCompositeOperation = 'source-over';
+            
+            const vignetteGradient = tempCtx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, Math.min(canvas.width, canvas.height) * 0.3,
+                canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.8
+            );
+            vignetteGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            vignetteGradient.addColorStop(1, 'rgba(0, 0, 0, 0.8)');
+            tempCtx.fillStyle = vignetteGradient;
+            tempCtx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.drawImage(tempCanvas, 0, 0);
+        }
+        
+        function isInLight(enemyX, enemyY, cameraX, cameraY) {
+            if (gameState.battery <= 0 || !gameState.flashlightOn) return false;
+            
+            const player = playerModule.getPlayer();
+            const angle = playerModule.getPlayerAngle();
+            
+            const dx = enemyX - player.x;
+            const dy = enemyY - player.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist > LIGHT_DISTANCE) return false;
+            
+            const angleToEnemy = Math.atan2(dy, dx);
+            let angleDiff = Math.abs(angleToEnemy - angle);
+            if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+            
+            return angleDiff < CONE_ANGLE / 2;
+        }
+        
+        export const flashlightModule = {
+            renderFlashlight,
+            isInLight,
+            LIGHT_DISTANCE
+        };
+    </script>
+
+    <script type="module">
+        import { gameState } from './horror-game.html';
+        import { mapModule } from './horror-game.html';
+        import { playerModule } from './horror-game.html';
+        import { enemyModule } from './horror-game.html';
+        import { itemModule } from './horror-game.html';
+        import { flashlightModule } from './horror-game.html';
+        
+        function render(ctx, canvas) {
+            const player = playerModule.getPlayer();
+            const cameraX = player.x;
+            const cameraY = player.y;
+            
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.save();
+            ctx.translate(canvas.width / 2 - cameraX, canvas.height / 2 - cameraY);
+            
+            renderMap(ctx);
+            renderItems(ctx);
+            renderKeys(ctx);
+            renderEnemies(ctx);
+            renderExit(ctx);
+            
+            ctx.restore();
+            
+            flashlightModule.renderFlashlight(ctx, canvas, cameraX, cameraY);
+            
+            renderNoise(ctx, canvas);
+            
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate(playerModule.getPlayerAngle());
+            ctx.fillStyle = '#444';
+            ctx.beginPath();
+            ctx.arc(0, 0, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#666';
+            ctx.fillRect(5, -3, 15, 6);
+            ctx.restore();
+        }
+        
+        function renderMap(ctx) {
+            const tileSize = mapModule.TILE_SIZE;
+            
+            for (let y = 0; y < mapModule.MAP_HEIGHT; y++) {
+                for (let x = 0; x < mapModule.MAP_WIDTH; x++) {
+                    const tile = mapModule.map[y]?.[x] ?? mapModule.TILE.WALL;
+                    
+                    if (tile === mapModule.TILE.WALL) {
+                        ctx.fillStyle = '#1a1a1a';
+                        ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                        ctx.strokeStyle = '#2a2a2a';
+                        ctx.strokeRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                    } else if (tile === mapModule.TILE.FLOOR) {
+                        ctx.fillStyle = '#151515';
+                        ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                    } else if (tile === mapModule.TILE.EXIT) {
+                        ctx.fillStyle = '#151515';
+                        ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                    }
+                }
+            }
+        }
+        
+        function renderExit(ctx) {
+            const exitPos = mapModule.getExitPosition();
+            
+            ctx.fillStyle = gameState.keys.length >= gameState.requiredKeys ? '#44ff44' : '#884444';
+            ctx.fillRect(exitPos.x - 20, exitPos.y - 25, 40, 50);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(exitPos.x - 20, exitPos.y - 25, 40, 50);
+            
+            ctx.fillStyle = '#ffd700';
+            ctx.beginPath();
+            ctx.arc(exitPos.x + 12, exitPos.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        function renderItems(ctx) {
+            const items = itemModule.getItems();
+            
+            for (const item of items) {
+                if (item.type === itemModule.ITEM_TYPES.BATTERY) {
+                    ctx.fillStyle = '#44ff44';
+                    ctx.fillRect(item.x - 8, item.y - 12, 16, 24);
+                    ctx.fillStyle = '#66ff66';
+                    ctx.fillRect(item.x - 4, item.y - 15, 8, 5);
+                } else {
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(item.x - 12, item.y - 4, 24, 8);
+                    ctx.fillRect(item.x - 4, item.y - 12, 8, 24);
+                    ctx.fillStyle = '#ff4444';
+                    ctx.fillRect(item.x - 10, item.y - 2, 20, 4);
+                    ctx.fillRect(item.x - 2, item.y - 10, 4, 20);
+                }
+            }
+        }
+        
+        function renderKeys(ctx) {
+            const keys = itemModule.getKeys();
+            
+            for (const key of keys) {
+                ctx.fillStyle = '#ffd700';
+                ctx.beginPath();
+                ctx.arc(key.x - 5, key.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillRect(key.x, key.y - 3, 15, 6);
+                ctx.fillRect(key.x + 10, key.y + 3, 3, 6);
+                ctx.fillRect(key.x + 6, key.y + 3, 3, 6);
+                
+                ctx.shadowColor = '#ffd700';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(key.x - 5, key.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        function renderEnemies(ctx) {
+            const enemies = enemyModule.getEnemies();
+            const player = playerModule.getPlayer();
+            
+            for (const enemy of enemies) {
+                const distToPlayer = Math.sqrt(
+                    Math.pow(enemy.x - player.x, 2) + 
+                    Math.pow(enemy.y - player.y, 2)
+                );
+                
+                if (distToPlayer < 400) {
+                    const alpha = Math.max(0.2, 1 - distToPlayer / 400);
+                    
+                    ctx.fillStyle = `rgba(80, 0, 0, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(enemy.x - 5, enemy.y - 3, 3, 0, Math.PI * 2);
+                    ctx.arc(enemy.x + 5, enemy.y - 3, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+        
+        function renderNoise(ctx, canvas) {
+            if (Math.random() > 0.1) return;
+            
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            for (let i = 0; i < 100; i++) {
+                const x = Math.floor(Math.random() * canvas.width);
+                const y = Math.floor(Math.random() * canvas.height);
+                const idx = (y * canvas.width + x) * 4;
+                const noise = Math.random() * 10;
+                data[idx] += noise;
+                data[idx + 1] += noise;
+                data[idx + 2] += noise;
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+        }
+        
+        export const rendererModule = { render };
+    </script>
+
+    <script type="module">
+        import { gameState } from './horror-game.html';
+        import { playerModule } from './horror-game.html';
+        import { enemyModule } from './horror-game.html';
+        
+        let audioContext = null;
+        let heartbeatOsc = null;
+        let heartbeatGain = null;
+        let monsterOsc = null;
+        let monsterGain = null;
+        
+        function initAudio() {
+            if (gameState.audioInitialized) return;
+            
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            gameState.audioInitialized = true;
+            
+            startHeartbeat();
+            startMonsterSound();
+        }
+        
+        function startHeartbeat() {
+            if (!audioContext || heartbeatOsc) return;
+            
+            heartbeatOsc = audioContext.createOscillator();
+            heartbeatGain = audioContext.createGain();
+            
+            heartbeatOsc.type = 'sine';
+            heartbeatOsc.frequency.value = 60;
+            heartbeatGain.gain.value = 0;
+            
+            heartbeatOsc.connect(heartbeatGain);
+            heartbeatGain.connect(audioContext.destination);
+            heartbeatOsc.start();
+        }
+        
+        function updateHeartbeat() {
+            if (!audioContext || !heartbeatOsc || gameState.muted) return;
+            
+            const rate = gameState.health <= 30 ? 4 : gameState.health <= 50 ? 2 : 1;
+            const now = audioContext.currentTime;
+            
+            heartbeatOsc.frequency.setValueAtTime(80, now);
+            heartbeatOsc.frequency.setValueAtTime(60, now + 0.1 / rate);
+            
+            heartbeatGain.gain.setValueAtTime(gameState.health > 0 ? 0.15 : 0, now);
+            heartbeatGain.gain.setValueAtTime(0, now + 0.2 / rate);
+        }
+        
+        function startMonsterSound() {
+            if (!audioContext || monsterOsc) return;
+            
+            monsterOsc = audioContext.createOscillator();
+            monsterGain = audioContext.createGain();
+            
+            monsterOsc.type = 'sawtooth';
+            monsterOsc.frequency.value = 50;
+            monsterGain.gain.value = 0;
+            
+            monsterOsc.connect(monsterGain);
+            monsterGain.connect(audioContext.destination);
+            monsterOsc.start();
+        }
+        
+        function updateMonsterSound() {
+            if (!audioContext || !monsterOsc || gameState.muted) return;
+            
+            const player = playerModule.getPlayer();
+            const enemies = enemyModule.getEnemies();
+            
+            let minDist = Infinity;
+            for (const enemy of enemies) {
+                const dist = Math.sqrt(
+                    Math.pow(enemy.x - player.x, 2) + 
+                    Math.pow(enemy.y - player.y, 2)
+                );
+                minDist = Math.min(minDist, dist);
+            }
+            
+            const volume = Math.max(0, Math.min(0.3, (300 - minDist) / 1000));
+            const freq = 50 + Math.max(0, (200 - minDist) / 2);
+            
+            monsterGain.gain.value = volume;
+            monsterOsc.frequency.value = freq;
+        }
+        
+        function playPickupSound(type) {
+            if (!audioContext || gameState.muted) return;
+            
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            
+            osc.type = type === 'key' ? 'triangle' : 'sine';
+            osc.frequency.value = type === 'key' ? 880 : 660;
+            gain.gain.value = 0.2;
+            
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
+            osc.stop(audioContext.currentTime + 0.3);
+        }
+        
+        function toggleMute() {
+            gameState.muted = !gameState.muted;
+            
+            if (gameState.muted) {
+                if (heartbeatGain) heartbeatGain.gain.value = 0;
+                if (monsterGain) monsterGain.gain.value = 0;
+            }
+            
+            return gameState.muted;
+        }
+        
+        function cleanupAudio() {
+            if (heartbeatOsc) {
+                try { heartbeatOsc.stop(); } catch (e) {}
+                heartbeatOsc = null;
+            }
+            if (monsterOsc) {
+                try { monsterOsc.stop(); } catch (e) {}
+                monsterOsc = null;
+            }
+            if (audioContext) {
+                try { audioContext.close(); } catch (e) {}
+                audioContext = null;
+            }
+            gameState.audioInitialized = false;
+        }
+        
+        export const audioModule = {
+            initAudio,
+            updateHeartbeat,
+            updateMonsterSound,
+            playPickupSound,
+            toggleMute,
+            cleanupAudio
+        };
+    </script>
+
+    <script type="module">
+        import { gameState } from './horror-game.html';
+        
+        let messageTimeout = null;
+        
+        function updateUI() {
+            document.getElementById('healthBar').style.width = `${(gameState.health / gameState.maxHealth) * 100}%`;
+            document.getElementById('healthText').textContent = `${gameState.health}/${gameState.maxHealth}`;
+            
+            document.getElementById('batteryBar').style.width = `${(gameState.battery / gameState.maxBattery) * 100}%`;
+            document.getElementById('batteryText').textContent = `${Math.floor(gameState.battery)}/${gameState.maxBattery}`;
+            
+            document.getElementById('keyCount').textContent = `${gameState.keys.length}/${gameState.requiredKeys}`;
+            document.getElementById('key1').classList.toggle('collected', gameState.keys.length >= 1);
+            document.getElementById('key2').classList.toggle('collected', gameState.keys.length >= 2);
+            
+            if (gameState.gameOver) {
+                document.getElementById('gameOver').classList.add('show');
+            } else {
+                document.getElementById('gameOver').classList.remove('show');
+            }
+            
+            if (gameState.won) {
+                document.getElementById('win').classList.add('show');
+            } else {
+                document.getElementById('win').classList.remove('show');
+            }
+        }
+        
+        function showMessage(text) {
+            const msgEl = document.getElementById('message');
+            msgEl.textContent = text;
+            msgEl.classList.add('show');
+            
+            if (messageTimeout) clearTimeout(messageTimeout);
+            messageTimeout = setTimeout(() => {
+                msgEl.classList.remove('show');
+            }, 2000);
+        }
+        
+        function hideStartScreen() {
+            document.getElementById('startScreen').style.display = 'none';
+        }
+        
+        function updateMuteButton(muted) {
+            document.getElementById('muteBtn').textContent = muted ? '🔇 音效关闭' : '🔊 音效开启';
+        }
+        
+        export const uiModule = {
+            updateUI,
+            showMessage,
+            hideStartScreen,
+            updateMuteButton
+        };
+    </script>
+
+    <script type="module">
+        import { gameState } from './horror-game.html';
+        import { mapModule } from './horror-game.html';
+        import { playerModule } from './horror-game.html';
+        import { enemyModule } from './horror-game.html';
+        import { itemModule } from './horror-game.html';
+        import { flashlightModule } from './horror-game.html';
+        import { rendererModule } from './horror-game.html';
+        import { audioModule } from './horror-game.html';
+        import { uiModule } from './horror-game.html';
+        
+        const keys = {};
+        const mousePos = { x: 0, y: 0 };
+        
+        function initInput(canvas) {
+            window.addEventListener('keydown', (e) => {
+                keys[e.key.toLowerCase()] = true;
+                
+                if (e.key === ' ') {
+                    e.preventDefault();
+                    if (gameState.gameOver || gameState.won) {
+                        resetGame();
+                    } else {
+                        gameState.isSprinting = true;
+                    }
+                }
+                
+                if (e.key.toLowerCase() === 'f') {
+                    const picked = itemModule.checkPickup();
+                    if (picked === 'battery') {
+                        uiModule.showMessage('电池 +30');
+                        audioModule.playPickupSound('battery');
+                    } else if (picked === 'medkit') {
+                        uiModule.showMessage('生命 +30');
+                        audioModule.playPickupSound('medkit');
+                    } else if (picked === 'key') {
+                        uiModule.showMessage(`获得钥匙！(${gameState.keys.length}/${gameState.requiredKeys})`);
+                        audioModule.playPickupSound('key');
+                    }
+                }
+                
+                if (e.key.toLowerCase() === 'e') {
+                    if (itemModule.checkExit()) {
+                        gameState.won = true;
+                    } else if (gameState.keys.length < gameState.requiredKeys) {
+                        uiModule.showMessage(`需要 ${gameState.requiredKeys} 把钥匙才能开门`);
+                    } else {
+                        uiModule.showMessage('靠近出口才能使用');
+                    }
+                }
+            });
+            
+            window.addEventListener('keyup', (e) => {
+                keys[e.key.toLowerCase()] = false;
+                if (e.key === ' ') {
+                    gameState.isSprinting = false;
+                }
+            });
+            
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                mousePos.x = e.clientX - rect.left;
+                mousePos.y = e.clientY - rect.top;
+            });
+        }
+        
+        function getKeys() {
+            return keys;
+        }
+        
+        function getMousePos() {
+            return mousePos;
+        }
+        
+        function resetGame() {
+            audioModule.cleanupAudio();
+            
+            gameState.health = 100;
+            gameState.battery = 100;
+            gameState.keys = [];
+            gameState.gameOver = false;
+            gameState.won = false;
+            gameState.isSprinting = false;
+            gameState.lastDamageTime = 0;
+            
+            const mapData = mapModule.generateMap();
+            playerModule.initPlayer(mapData.playerStart);
+            enemyModule.initEnemies(mapData.rooms);
+            itemModule.initItems(mapData.rooms);
+            
+            audioModule.initAudio();
+            
+            uiModule.updateUI();
+        }
+        
+        export const inputModule = {
+            initInput,
+            getKeys,
+            getMousePos,
+            resetGame
+        };
+    </script>
+
+    <script type="module">
+        import { gameState } from './horror-game.html';
+        import { mapModule } from './horror-game.html';
+        import { playerModule } from './horror-game.html';
+        import { enemyModule } from './horror-game.html';
+        import { itemModule } from './horror-game.html';
+        import { rendererModule } from './horror-game.html';
+        import { audioModule } from './horror-game.html';
+        import { uiModule } from './horror-game.html';
+        import { inputModule } from './horror-game.html';
+        
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let lastTime = 0;
+        let lastBatteryTime = 0;
+        let lastHeartbeatTime = 0;
+        
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        
+        function init() {
+            resize();
+            window.addEventListener('resize', resize);
+            
+            inputModule.initInput(canvas);
+            
+            const mapData = mapModule.generateMap();
+            playerModule.initPlayer(mapData.playerStart);
+            enemyModule.initEnemies(mapData.rooms);
+            itemModule.initItems(mapData.rooms);
+            
+            document.getElementById('startBtn').addEventListener('click', () => {
+                uiModule.hideStartScreen();
+                audioModule.initAudio();
+                gameState.running = true;
+                requestAnimationFrame(gameLoop);
+            });
+            
+            document.getElementById('muteBtn').addEventListener('click', () => {
+                const muted = audioModule.toggleMute();
+                uiModule.updateMuteButton(muted);
+            });
+            
+            document.addEventListener('click', () => {
+                if (!gameState.audioInitialized && gameState.running) {
+                    audioModule.initAudio();
+                }
+            }, { once: true });
+        }
+        
+        function gameLoop(currentTime) {
+            if (!gameState.running) return;
+            
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+            
+            if (!gameState.gameOver && !gameState.won) {
+                if (currentTime - lastBatteryTime >= 1000) {
+                    const consumption = gameState.isSprinting ? 2 : 1;
+                    gameState.battery = Math.max(0, gameState.battery - consumption);
+                    lastBatteryTime = currentTime;
+                    
+                    if (gameState.battery <= 10 && gameState.battery > 0) {
+                        uiModule.showMessage('电池不足！');
+                    }
+                }
+                
+                const heartbeatInterval = gameState.health <= 30 ? 250 : 500;
+                if (currentTime - lastHeartbeatTime >= heartbeatInterval) {
+                    audioModule.updateHeartbeat();
+                    lastHeartbeatTime = currentTime;
+                }
+                audioModule.updateMonsterSound();
+            }
+            
+            playerModule.updatePlayer(deltaTime, inputModule.getKeys(), inputModule.getMousePos(), canvas);
+            enemyModule.updateEnemies(deltaTime, currentTime);
+            rendererModule.render(ctx, canvas);
+            uiModule.updateUI();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        init();
+    </script>
+</body>
+</html>

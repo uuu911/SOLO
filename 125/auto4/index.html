@@ -1,0 +1,2329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仙剑奇侠传 - 像素版</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: #1a0a00;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: monospace;
+    overflow: hidden;
+}
+#gameContainer {
+    position: relative;
+    background: #000;
+    border: 4px solid #8b4513;
+    box-shadow: 0 0 30px rgba(139, 69, 19, 0.5);
+}
+#gameCanvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+#touchControls {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    z-index: 100;
+}
+.touchBtn {
+    width: 50px;
+    height: 50px;
+    background: rgba(139, 69, 19, 0.7);
+    border: 2px solid #daa520;
+    border-radius: 8px;
+    color: #ffd700;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+}
+.touchBtn:active { background: rgba(218, 165, 32, 0.8); }
+#dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 50px);
+    grid-template-rows: repeat(3, 50px);
+    gap: 5px;
+}
+#actionBtns {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+}
+@media (max-width: 768px) {
+    #touchControls, #actionBtns { display: flex; }
+}
+#audioPrompt {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.9);
+    color: #ffd700;
+    padding: 20px 40px;
+    border: 3px solid #daa520;
+    border-radius: 8px;
+    font-size: 18px;
+    cursor: pointer;
+    z-index: 1000;
+    text-align: center;
+}
+</style>
+</head>
+<body>
+<div id="gameContainer">
+    <canvas id="gameCanvas" width="640" height="480"></canvas>
+    <div id="audioPrompt">点击开始游戏</div>
+    <div id="touchControls">
+        <div id="dpad">
+            <div></div>
+            <div class="touchBtn" data-dir="up">↑</div>
+            <div></div>
+            <div class="touchBtn" data-dir="left">←</div>
+            <div class="touchBtn" data-dir="action">●</div>
+            <div class="touchBtn" data-dir="right">→</div>
+            <div></div>
+            <div class="touchBtn" data-dir="down">↓</div>
+            <div></div>
+        </div>
+    </div>
+    <div id="actionBtns">
+        <div class="touchBtn" data-action="menu">菜单</div>
+        <div class="touchBtn" data-action="quest">任务</div>
+    </div>
+</div>
+
+<script>
+'use strict';
+
+const CANVAS_WIDTH = 640;
+const CANVAS_HEIGHT = 480;
+const TILE_SIZE = 32;
+
+const COLORS = {
+    BLACK: '#000000', WHITE: '#ffffff', RED: '#c03030',
+    CYAN: '#30c0c0', PURPLE: '#c030c0', GREEN: '#30c030',
+    BLUE: '#3030c0', YELLOW: '#c0c030', BROWN: '#805030',
+    DARK_BROWN: '#503020', GRAY: '#808080', DARK_GRAY: '#404040',
+    GOLD: '#daa520', LIGHT_GREEN: '#90ee90', SKY_BLUE: '#87ceeb',
+    PEACH: '#ffdab9'
+};
+
+const PIXEL_FONT = {
+    '0':['111','101','101','101','111'],'1':['010','110','010','010','111'],
+    '2':['111','001','111','100','111'],'3':['111','001','111','001','111'],
+    '4':['101','101','111','001','001'],'5':['111','100','111','001','111'],
+    '6':['111','100','111','101','111'],'7':['111','001','010','010','010'],
+    '8':['111','101','111','101','111'],'9':['111','101','111','001','111'],
+    'A':['111','101','111','101','101'],'B':['110','101','110','101','110'],
+    'C':['111','100','100','100','111'],'D':['110','101','101','101','110'],
+    'E':['111','100','110','100','111'],'F':['111','100','110','100','100'],
+    'G':['111','100','101','101','111'],'H':['101','101','111','101','101'],
+    'I':['111','010','010','010','111'],'J':['111','010','010','101','110'],
+    'K':['101','110','100','110','101'],'L':['100','100','100','100','111'],
+    'M':['101','111','111','101','101'],'N':['110','101','101','101','101'],
+    'O':['111','101','101','101','111'],'P':['111','101','111','100','100'],
+    'Q':['111','101','101','110','101'],'R':['111','101','110','101','101'],
+    'S':['111','100','111','001','111'],'T':['111','010','010','010','010'],
+    'U':['101','101','101','101','111'],'V':['101','101','101','110','100'],
+    'W':['101','101','111','111','101'],'X':['101','101','010','101','101'],
+    'Y':['101','101','010','010','010'],'Z':['111','001','010','100','111'],
+    '中':['01010','11111','01010','11111','01010'],'文':['10001','10001','11111','10001','01110'],
+    '仙':['10101','10101','11111','10101','10101'],'剑':['10001','11011','10101','10001','11111'],
+    '奇':['01110','10001','11111','10001','10001'],'侠':['10001','11011','10101','10001','11111'],
+    '传':['11111','00100','01110','00100','11111'],
+    ' ':['00000','00000','00000','00000','00000'],
+    '-':['00000','00000','11111','00000','00000'],
+    ':':['00000','00100','00000','00100','00000'],
+    '!':['00100','00100','00100','00000','00100'],
+    '?':['11111','00001','00110','00000','00100'],
+    '.':['00000','00000','00000','00000','00100'],
+    ',':['00000','00000','00000','00100','01000'],
+    '、':['00000','00000','00010','00100','01000'],
+    '。':['00000','00110','01001','00110','00000'],
+    '，':['00000','00000','00010','00010','00100'],
+    '！':['00100','00100','00100','00000','00100'],
+    '？':['01110','10001','00010','00000','00010'],
+    '：':['00100','00000','00100','00000','00000'],
+    '+':['00100','00100','11111','00100','00100'],
+    '/':['00001','00010','00100','01000','10000'],
+    '%':['10001','00101','00010','01000','10001'],
+    '[':['01100','01000','01000','01000','01100'],
+    ']':['00110','00010','00010','00010','00110'],
+    '(':['00100','01000','01000','01000','00100'],
+    ')':['00100','00010','00010','00010','00100'],
+    '级':['10101','11111','10101','10101','11111'],
+    '经':['11111','10101','11111','10101','10101'],
+    '验':['10001','11011','10101','10001','11111'],
+    '金':['01110','10001','11111','10001','10001'],
+    '钱':['10001','11011','10101','10001','11111'],
+    '攻':['11111','00100','01110','00100','11111'],
+    '击':['10001','11011','10101','10001','11111'],
+    '防':['11111','00100','01010','00100','11111'],
+    '御':['10001','11011','10101','10001','11111'],
+    '速':['10101','11111','10101','10101','11011'],
+    '度':['11111','10001','11111','10001','11111'],
+    '技':['10001','11111','10101','10001','10001'],
+    '能':['10101','11111','10101','10101','11111'],
+    '物':['10001','11011','10101','10001','11111'],
+    '品':['01110','10001','01110','10001','01110'],
+    '战':['11111','10101','11111','10101','11111'],
+    '斗':['10001','10101','11111','10101','10001'],
+    '胜':['11111','10001','11111','00001','11111'],
+    '利':['10101','10101','11111','10101','10101'],
+    '失':['11111','10001','11111','10000','11111'],
+    '败':['10001','10101','11111','10101','10001'],
+    '逃':['10101','11111','10101','11011','10101'],
+    '跑':['10001','11011','10101','10101','11011'],
+    '回':['01110','10001','10001','10001','01110'],
+    '合':['11111','00100','01110','00100','11111'],
+    '学':['10101','10101','11111','00100','00100'],
+    '习':['11111','00100','01000','10000','11111'],
+    '新':['10101','11111','10101','11111','10101'],
+    '获':['11111','10001','11111','00001','11111'],
+    '得':['10001','11011','10101','10001','10001'],
+    '升':['01110','10001','11111','10001','10001'],
+    '用':['10001','10101','11111','10101','10001'],
+    '使':['10101','11111','10101','10101','11111'],
+    '任':['10001','11011','10101','10001','10001'],
+    '务':['10101','11111','10101','10001','10001'],
+    '对':['10101','11111','10101','11111','10101'],
+    '话':['10001','11111','10101','10001','11111'],
+    '框':['11111','10001','11111','10001','11111'],
+    '主':['01110','00100','01110','00100','11111'],
+    '线':['10001','11011','10101','10001','10001'],
+    '支':['10101','11111','10101','00100','00100'],
+    '完':['11111','10001','11111','10001','11111'],
+    '成':['11111','00100','01110','10101','01110'],
+    '进':['10101','11111','10101','11011','10101'],
+    '行':['10101','10101','11111','10101','10101'],
+    '藏':['10101','11111','10101','11111','10101'],
+    '宝':['01110','10001','11111','10001','01110'],
+    '箱':['11111','10001','11111','10001','11111'],
+    '秘':['10101','11111','10101','11111','10001'],
+    '密':['10101','11111','10101','11011','10101'],
+    '地':['10101','11011','10101','10001','10001'],
+    '图':['01110','10001','10101','10001','01110'],
+    '村':['10101','11011','10101','10001','10101'],
+    '庄':['10101','10101','11111','10101','10101'],
+    '林':['10101','10101','11111','10101','10101'],
+    '山':['01110','10001','10001','10001','11111'],
+    '庙':['10001','11011','10101','10001','11111'],
+    '脚':['10001','11011','10101','10101','11011'],
+    '下':['11111','00100','00100','01010','01010'],
+    '竹':['10101','10101','11111','10101','10101'],
+    '境':['10101','11111','10101','11011','10101'],
+    '古':['01110','10001','11111','10001','01110'],
+    '深':['10101','11111','10101','10001','11111'],
+    '处':['10101','11111','10001','00100','01000'],
+    '李':['10101','11011','10101','10001','10001'],
+    '逍':['10101','11111','10101','11011','10101'],
+    '遥':['10101','11111','10101','11111','10001'],
+    '赵':['10101','11111','10101','10001','10001'],
+    '灵':['10101','11111','10101','11111','10101'],
+    '儿':['01110','00100','00100','00100','01110'],
+    '酒':['10001','11011','10101','10001','11111'],
+    '剑':['10001','11011','10101','10001','11111'],
+    '仙':['10101','10101','11111','10101','10101'],
+    '术':['10001','11111','10001','00100','11111'],
+    '疗':['10101','11011','10101','10001','11111'],
+    '伤':['10001','11011','10101','10001','10001'],
+    '雷':['10101','11111','10101','11111','10101'],
+    '神':['10101','11011','10101','10001','11111'],
+    '怒':['10001','11011','10101','11011','10001'],
+    '火':['00100','01110','11111','01110','10101'],
+    '炎':['00100','01110','11111','01110','00100'],
+    '斩':['10101','11111','10101','11011','10101'],
+    '龙':['11111','00100','01110','10101','01110'],
+    '波':['10101','11011','10101','10101','11011'],
+    '药':['10101','11111','10101','10001','10001'],
+    '草':['10101','10101','11111','10101','10101'],
+    '丹':['01110','10001','10001','10001','01110'],
+    '露':['10101','11111','10101','11011','10101'],
+    '水':['10001','01010','00100','01010','10001'],
+    '葫':['10001','11011','10101','10101','11011'],
+    '芦':['10101','11111','10101','10001','10001'],
+    '妖':['10001','11011','10101','11011','10001'],
+    '怪':['10101','11011','10101','11011','10101'],
+    '盗':['10101','11111','10101','11011','10101'],
+    '贼':['10001','11011','10101','10101','11011'],
+    '狼':['10001','11011','10101','11011','10101'],
+    '人':['00100','01110','10101','00100','01110'],
+    '虎':['10101','11111','10101','11011','10101'],
+    '蛇':['10001','11011','10101','10101','11011'],
+    '精':['10101','11011','10101','10001','11111'],
+    '狐':['10001','11011','10101','11011','10101'],
+    '狸':['10101','11111','10101','11011','10101'],
+    '首':['01110','10001','11111','10001','10001'],
+    '领':['10101','11111','10101','11011','10101'],
+    '最':['10101','11111','10101','11111','10001'],
+    '终':['10101','11011','10101','11111','10101'],
+    '评':['10101','11011','10101','10001','10001'],
+    '分':['10101','01010','00100','01010','10101'],
+    '总':['10101','11111','10101','00100','11111'],
+    '结':['10101','11111','10101','11011','10101'],
+    '局':['10101','11011','10101','10001','01110'],
+    '内':['01110','01000','01110','01001','01110'],
+    '存':['10101','11011','10101','10001','10001'],
+    '档':['10001','11011','10101','10001','11111'],
+    '读':['10101','11111','10101','11011','10101'],
+    '取':['10101','11011','10101','10001','10001'],
+    '菜':['10101','11011','10101','10101','11111'],
+    '单':['01110','00100','01110','00100','01110'],
+    '返':['10101','11111','10101','11011','10101'],
+    '回':['01110','10001','10001','10001','01110'],
+    '确':['10101','11011','10101','10001','11111'],
+    '认':['10101','11011','10101','10001','10001'],
+    '取':['10101','11011','10101','10001','10001'],
+    '消':['10101','11111','10101','11011','10101'],
+    '选':['10101','11111','10101','11011','10001'],
+    '择':['10101','11111','10101','11011','10101'],
+    '是':['10101','11111','10101','00100','01110'],
+    '否':['10101','11011','10101','10001','10001'],
+    '重':['10101','11111','10101','11111','10101'],
+    '试':['10101','11011','10101','10001','10001'],
+    '继':['10101','11111','10101','11011','10101'],
+    '续':['10101','11111','10101','11011','10001'],
+    '游':['10101','11011','10101','10101','11011'],
+    '戏':['10101','11011','10101','11111','10101'],
+    '开':['10101','11111','10001','00100','01110'],
+    '始':['10001','11011','10101','10001','10001'],
+};
+
+const AudioEngine = {
+    ctx: null,
+    bgmOscillators: [],
+    bgmGain: null,
+    sfxGain: null,
+    isUnlocked: false,
+    currentBGM: null,
+    volume: 0.3,
+
+    init() {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.bgmGain = this.ctx.createGain();
+        this.bgmGain.gain.value = this.volume * 0.5;
+        this.bgmGain.connect(this.ctx.destination);
+        this.sfxGain = this.ctx.createGain();
+        this.sfxGain.gain.value = this.volume;
+        this.sfxGain.connect(this.ctx.destination);
+    },
+
+    unlock() {
+        if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
+        this.isUnlocked = true;
+    },
+
+    pentatonicFreq(note, octave = 4) {
+        const ratios = { '宫': 1, '商': 9/8, '角': 5/4, '徵': 3/2, '羽': 27/16 };
+        const baseFreq = 261.63 * Math.pow(2, octave - 4);
+        return baseFreq * (ratios[note] || 1);
+    },
+
+    createFluteSound(freq, duration, startTime) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.3, startTime + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+        osc.connect(gain);
+        gain.connect(this.bgmGain);
+        osc.start(startTime);
+        osc.stop(startTime + duration + 0.1);
+        return osc;
+    },
+
+    createGuzhengSound(freq, duration, startTime) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.5, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+        osc.connect(gain);
+        gain.connect(this.bgmGain);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+        return osc;
+    },
+
+    createPipaSound(freq, duration, startTime) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.4, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration * 0.3);
+        osc.connect(gain);
+        gain.connect(this.bgmGain);
+        osc.start(startTime);
+        osc.stop(startTime + duration * 0.3 + 0.05);
+        return osc;
+    },
+
+    createDrumSound(freq, duration, startTime) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, startTime);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.5, startTime + duration);
+        gain.gain.setValueAtTime(0.3, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+        osc.connect(gain);
+        gain.connect(this.sfxGain);
+        osc.start(startTime);
+        osc.stop(startTime + duration + 0.05);
+        return osc;
+    },
+
+    playExploreBGM() {
+        this.stopBGM();
+        this.currentBGM = 'explore';
+        const melody = [
+            { note: '宫', dur: 0.5 }, { note: '商', dur: 0.5 }, { note: '角', dur: 1 },
+            { note: '徵', dur: 0.5 }, { note: '羽', dur: 0.5 }, { note: '宫', dur: 1 },
+            { note: '羽', dur: 0.5 }, { note: '徵', dur: 0.5 }, { note: '角', dur: 1 },
+            { note: '商', dur: 0.5 }, { note: '宫', dur: 0.5 }, { note: '商', dur: 1 },
+        ];
+        this.playMelodyLoop(melody, 'flute', 4);
+    },
+
+    playBattleBGM() {
+        this.stopBGM();
+        this.currentBGM = 'battle';
+        const melody = [
+            { note: '宫', dur: 0.25 }, { note: '徵', dur: 0.25 }, { note: '宫', dur: 0.25 }, { note: '徵', dur: 0.25 },
+            { note: '羽', dur: 0.25 }, { note: '徵', dur: 0.25 }, { note: '角', dur: 0.5 },
+            { note: '宫', dur: 0.25 }, { note: '商', dur: 0.25 }, { note: '角', dur: 0.25 }, { note: '徵', dur: 0.25 },
+            { note: '羽', dur: 0.5 }, { note: '宫', dur: 0.5 },
+        ];
+        this.playMelodyLoop(melody, 'pipa', 5);
+        this.playDrumBeat();
+    },
+
+    playVictoryBGM() {
+        this.stopBGM();
+        this.currentBGM = 'victory';
+        const melody = [
+            { note: '宫', dur: 0.5 }, { note: '角', dur: 0.5 }, { note: '徵', dur: 1 },
+            { note: '宫', dur: 0.5, octave: 5 }, { note: '羽', dur: 0.5 }, { note: '徵', dur: 1 },
+            { note: '角', dur: 0.5 }, { note: '商', dur: 0.5 }, { note: '宫', dur: 2 },
+        ];
+        this.playMelodyLoop(melody, 'guzheng', 4);
+    },
+
+    playMelodyLoop(melody, instrument, baseOctave) {
+        let time = this.ctx.currentTime;
+        const totalDur = melody.reduce((sum, m) => sum + m.dur, 0);
+        
+        const playNext = () => {
+            if (this.currentBGM !== (instrument === 'flute' ? 'explore' : 
+                instrument === 'pipa' ? 'battle' : 'victory')) return;
+            
+            melody.forEach((m) => {
+                const freq = this.pentatonicFreq(m.note, m.octave || baseOctave);
+                if (instrument === 'flute') {
+                    this.createFluteSound(freq, m.dur * 0.9, time);
+                } else if (instrument === 'guzheng') {
+                    this.createGuzhengSound(freq, m.dur * 0.9, time);
+                } else if (instrument === 'pipa') {
+                    this.createPipaSound(freq, m.dur, time);
+                }
+                time += m.dur;
+            });
+            
+            setTimeout(playNext, totalDur * 1000 - 100);
+        };
+        playNext();
+    },
+
+    playDrumBeat() {
+        if (this.currentBGM !== 'battle') return;
+        const time = this.ctx.currentTime;
+        this.createDrumSound(150, 0.1, time);
+        this.createDrumSound(100, 0.15, time + 0.25);
+        setTimeout(() => this.playDrumBeat(), 500);
+    },
+
+    stopBGM() {
+        this.currentBGM = null;
+    },
+
+    playSFX(type) {
+        if (!this.isUnlocked) return;
+        const time = this.ctx.currentTime;
+        
+        switch (type) {
+            case 'attack':
+                this.createPipaSound(440, 0.15, time);
+                break;
+            case 'hit':
+                this.createDrumSound(200, 0.1, time);
+                break;
+            case 'skill':
+                this.createFluteSound(660, 0.3, time);
+                this.createFluteSound(880, 0.3, time + 0.1);
+                break;
+            case 'heal':
+                this.createGuzhengSound(523, 0.4, time);
+                this.createGuzhengSound(659, 0.4, time + 0.1);
+                break;
+            case 'item':
+                this.createGuzhengSound(392, 0.2, time);
+                break;
+            case 'menu':
+                this.createFluteSound(523, 0.1, time);
+                break;
+            case 'victory':
+                this.playVictoryBGM();
+                break;
+            case 'levelup':
+                this.createFluteSound(523, 0.2, time);
+                this.createFluteSound(659, 0.2, time + 0.15);
+                this.createFluteSound(784, 0.3, time + 0.3);
+                break;
+        }
+    },
+
+    setVolume(level) {
+        this.volume = level;
+        if (this.bgmGain) this.bgmGain.gain.value = level * 0.5;
+        if (this.sfxGain) this.sfxGain.gain.value = level;
+    }
+};
+
+const Renderer = {
+    canvas: null,
+    ctx: null,
+    offscreenCanvas: null,
+    offscreenCtx: null,
+    animationFrame: 0,
+    tileCache: {},
+
+    init(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.ctx.imageSmoothingEnabled = false;
+        this.offscreenCanvas = document.createElement('canvas');
+        this.offscreenCanvas.width = CANVAS_WIDTH;
+        this.offscreenCanvas.height = CANVAS_HEIGHT;
+        this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+        this.offscreenCtx.imageSmoothingEnabled = false;
+    },
+
+    clear() {
+        this.offscreenCtx.fillStyle = COLORS.BLACK;
+        this.offscreenCtx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    },
+
+    present() {
+        this.ctx.drawImage(this.offscreenCanvas, 0, 0);
+    },
+
+    drawPixelText(text, x, y, color = COLORS.WHITE, size = 1) {
+        const charWidth = 6 * size;
+        const charHeight = 8 * size;
+        let posX = x;
+        
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i].toUpperCase();
+            const pattern = PIXEL_FONT[char] || PIXEL_FONT[' '];
+            
+            if (pattern) {
+                for (let row = 0; row < pattern.length; row++) {
+                    for (let col = 0; col < pattern[row].length; col++) {
+                        if (pattern[row][col] === '1') {
+                            this.offscreenCtx.fillStyle = color;
+                            this.offscreenCtx.fillRect(
+                                posX + col * size,
+                                y + row * size,
+                                size, size
+                            );
+                        }
+                    }
+                }
+            }
+            posX += charWidth;
+        }
+    },
+
+    getTextWidth(text, size = 1) {
+        return text.length * 6 * size;
+    },
+
+    drawBorder(x, y, width, height, style = 'chinese') {
+        this.offscreenCtx.fillStyle = COLORS.DARK_BROWN;
+        this.offscreenCtx.fillRect(x, y, width, height);
+        
+        this.offscreenCtx.fillStyle = COLORS.BROWN;
+        this.offscreenCtx.fillRect(x + 2, y + 2, width - 4, height - 4);
+        
+        if (style === 'chinese') {
+            this.offscreenCtx.fillStyle = COLORS.GOLD;
+            for (let i = 0; i < width; i += 8) {
+                this.offscreenCtx.fillRect(x + i, y, 4, 2);
+                this.offscreenCtx.fillRect(x + i, y + height - 2, 4, 2);
+            }
+            for (let i = 0; i < height; i += 8) {
+                this.offscreenCtx.fillRect(x, y + i, 2, 4);
+                this.offscreenCtx.fillRect(x + width - 2, y + i, 2, 4);
+            }
+            this.offscreenCtx.fillStyle = COLORS.GOLD;
+            this.offscreenCtx.fillRect(x, y, 8, 8);
+            this.offscreenCtx.fillRect(x + width - 8, y, 8, 8);
+            this.offscreenCtx.fillRect(x, y + height - 8, 8, 8);
+            this.offscreenCtx.fillRect(x + width - 8, y + height - 8, 8, 8);
+        }
+    },
+
+    drawDialogBox(text, x, y, width, height, speaker = null, emotion = 'normal') {
+        this.drawBorder(x, y, width, height);
+        this.offscreenCtx.fillStyle = COLORS.PEACH;
+        this.offscreenCtx.fillRect(x + 8, y + 8, width - 16, height - 16);
+        
+        if (speaker) {
+            this.drawBorder(x - 10, y - 30, 80, 28);
+            this.offscreenCtx.fillStyle = COLORS.PEACH;
+            this.offscreenCtx.fillRect(x - 6, y - 26, 72, 20);
+            this.drawPixelText(speaker, x - 2, y - 22, COLORS.RED, 1);
+        }
+        
+        const padding = 16;
+        const lineHeight = 16;
+        const maxWidth = width - padding * 2;
+        const words = text.split('');
+        let currentLine = '';
+        let lines = [];
+        
+        for (let word of words) {
+            const testLine = currentLine + word;
+            if (this.getTextWidth(testLine, 1) > maxWidth) {
+                lines.push(currentLine);
+                currentLine = word;
+            } else {
+                currentLine = testLine;
+            }
+        }
+        if (currentLine) lines.push(currentLine);
+        
+        lines.forEach((line, i) => {
+            this.drawPixelText(line, x + padding, y + padding + i * lineHeight, COLORS.BLACK, 1);
+        });
+    },
+
+    drawSprite(spriteId, x, y, frame = 0, direction = 'down') {
+        const sprites = {
+            player: this.drawPlayerSprite,
+            npc: this.drawNPCSprite,
+            enemy: this.drawEnemySprite,
+            chest: this.drawChestSprite,
+        };
+        
+        if (sprites[spriteId]) {
+            sprites[spriteId].call(this, x, y, frame, direction);
+        }
+    },
+
+    drawPlayerSprite(x, y, frame, direction) {
+        const colors = { body: COLORS.BLUE, hair: COLORS.BLACK, skin: COLORS.PEACH, sword: COLORS.GRAY };
+        
+        this.offscreenCtx.fillStyle = colors.hair;
+        this.offscreenCtx.fillRect(x + 10, y + 2, 12, 8);
+        
+        this.offscreenCtx.fillStyle = colors.skin;
+        this.offscreenCtx.fillRect(x + 10, y + 8, 12, 10);
+        
+        this.offscreenCtx.fillStyle = COLORS.BLACK;
+        if (direction === 'left') {
+            this.offscreenCtx.fillRect(x + 11, y + 11, 2, 2);
+        } else if (direction === 'right') {
+            this.offscreenCtx.fillRect(x + 19, y + 11, 2, 2);
+        } else {
+            this.offscreenCtx.fillRect(x + 12, y + 11, 2, 2);
+            this.offscreenCtx.fillRect(x + 18, y + 11, 2, 2);
+        }
+        
+        this.offscreenCtx.fillStyle = colors.body;
+        this.offscreenCtx.fillRect(x + 8, y + 18, 16, 14);
+        
+        this.offscreenCtx.fillStyle = COLORS.DARK_BROWN;
+        this.offscreenCtx.fillRect(x + 6, y + 20, 4, 10);
+        
+        const legOffset = Math.floor(frame / 8) % 2 === 0 ? 0 : 2;
+        this.offscreenCtx.fillStyle = COLORS.DARK_GRAY;
+        this.offscreenCtx.fillRect(x + 10, y + 30, 4, 6 + legOffset);
+        this.offscreenCtx.fillRect(x + 18, y + 30, 4, 6 - legOffset);
+        
+        this.offscreenCtx.fillStyle = colors.sword;
+        this.offscreenCtx.fillRect(x + 24, y + 16, 4, 16);
+        this.offscreenCtx.fillStyle = COLORS.BROWN;
+        this.offscreenCtx.fillRect(x + 23, y + 12, 6, 4);
+    },
+
+    drawNPCSprite(x, y, frame, type = 'normal') {
+        const colors = { robe: COLORS.GREEN, hair: COLORS.GRAY, skin: COLORS.PEACH };
+        
+        this.offscreenCtx.fillStyle = colors.hair;
+        this.offscreenCtx.fillRect(x + 10, y + 4, 12, 6);
+        
+        this.offscreenCtx.fillStyle = colors.skin;
+        this.offscreenCtx.fillRect(x + 10, y + 8, 12, 10);
+        
+        this.offscreenCtx.fillStyle = COLORS.BLACK;
+        this.offscreenCtx.fillRect(x + 12, y + 11, 2, 2);
+        this.offscreenCtx.fillRect(x + 18, y + 11, 2, 2);
+        
+        this.offscreenCtx.fillStyle = colors.robe;
+        this.offscreenCtx.fillRect(x + 8, y + 18, 16, 18);
+        
+        this.offscreenCtx.fillStyle = COLORS.WHITE;
+        this.offscreenCtx.fillRect(x + 13, y + 20, 6, 8);
+    },
+
+    drawEnemySprite(x, y, frame, enemyType) {
+        const colors = { 
+            wolf: { body: COLORS.GRAY, eyes: COLORS.RED },
+            snake: { body: COLORS.GREEN, eyes: COLORS.YELLOW },
+            bandit: { body: COLORS.DARK_BROWN, skin: COLORS.PEACH },
+            boss: { body: COLORS.PURPLE, eyes: COLORS.RED }
+        };
+        const c = colors[enemyType] || colors.wolf;
+        
+        if (enemyType === 'snake') {
+            const wave = Math.sin(frame * 0.2) * 3;
+            this.offscreenCtx.fillStyle = c.body;
+            for (let i = 0; i < 8; i++) {
+                const offsetY = Math.sin((frame * 0.2) + i * 0.5) * 2;
+                this.offscreenCtx.fillRect(x + i * 4, y + 20 + offsetY, 6, 8);
+            }
+            this.offscreenCtx.fillRect(x + 28, y + 16, 8, 12);
+            this.offscreenCtx.fillStyle = c.eyes;
+            this.offscreenCtx.fillRect(x + 30, y + 18, 2, 2);
+        } else if (enemyType === 'boss') {
+            this.offscreenCtx.fillStyle = c.body;
+            this.offscreenCtx.fillRect(x + 8, y + 4, 16, 12);
+            this.offscreenCtx.fillStyle = COLORS.BLACK;
+            this.offscreenCtx.fillRect(x + 4, y + 2, 4, 8);
+            this.offscreenCtx.fillRect(x + 24, y + 2, 4, 8);
+            this.offscreenCtx.fillStyle = c.eyes;
+            this.offscreenCtx.fillRect(x + 10, y + 8, 4, 4);
+            this.offscreenCtx.fillRect(x + 18, y + 8, 4, 4);
+            this.offscreenCtx.fillStyle = c.body;
+            this.offscreenCtx.fillRect(x + 4, y + 16, 24, 20);
+            this.offscreenCtx.fillStyle = COLORS.RED;
+            this.offscreenCtx.fillRect(x + 10, y + 24, 12, 4);
+        } else {
+            this.offscreenCtx.fillStyle = c.body;
+            this.offscreenCtx.fillRect(x + 8, y + 8, 16, 12);
+            this.offscreenCtx.fillStyle = c.eyes;
+            this.offscreenCtx.fillRect(x + 10, y + 12, 3, 3);
+            this.offscreenCtx.fillRect(x + 19, y + 12, 3, 3);
+            this.offscreenCtx.fillStyle = c.body;
+            this.offscreenCtx.fillRect(x + 6, y + 20, 20, 16);
+        }
+    },
+
+    drawChestSprite(x, y, frame, isOpen) {
+        this.offscreenCtx.fillStyle = COLORS.BROWN;
+        this.offscreenCtx.fillRect(x + 4, y + 12, 24, 16);
+        
+        if (isOpen) {
+            this.offscreenCtx.fillRect(x + 4, y + 2, 24, 10);
+            this.offscreenCtx.fillStyle = COLORS.GOLD;
+            this.offscreenCtx.fillRect(x + 8, y + 14, 16, 4);
+        } else {
+            this.offscreenCtx.fillStyle = COLORS.DARK_BROWN;
+            this.offscreenCtx.fillRect(x + 4, y + 8, 24, 6);
+        }
+        
+        this.offscreenCtx.fillStyle = COLORS.GOLD;
+        this.offscreenCtx.fillRect(x + 14, y + 16, 4, 6);
+    },
+
+    drawTile(tileType, x, y) {
+        const tiles = {
+            grass: () => {
+                this.offscreenCtx.fillStyle = COLORS.LIGHT_GREEN;
+                this.offscreenCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                this.offscreenCtx.fillStyle = COLORS.GREEN;
+                for (let i = 0; i < 4; i++) {
+                    this.offscreenCtx.fillRect(x + (i * 8) + 2, y + 16 + (i % 2) * 4, 2, 4);
+                }
+            },
+            water: () => {
+                this.offscreenCtx.fillStyle = COLORS.SKY_BLUE;
+                this.offscreenCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                this.offscreenCtx.fillStyle = COLORS.BLUE;
+                const wave = Math.sin(this.animationFrame * 0.1 + x * 0.1) * 2;
+                this.offscreenCtx.fillRect(x + 4, y + 10 + wave, 24, 2);
+                this.offscreenCtx.fillRect(x + 8, y + 20 - wave, 16, 2);
+            },
+            tree: () => {
+                this.offscreenCtx.fillStyle = COLORS.LIGHT_GREEN;
+                this.offscreenCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                this.offscreenCtx.fillStyle = COLORS.DARK_BROWN;
+                this.offscreenCtx.fillRect(x + 12, y + 20, 8, 12);
+                this.offscreenCtx.fillStyle = COLORS.GREEN;
+                this.offscreenCtx.fillRect(x + 4, y + 4, 24, 20);
+                this.offscreenCtx.fillStyle = COLORS.DARK_GREEN || COLORS.GREEN;
+                this.offscreenCtx.fillRect(x + 8, y + 2, 16, 8);
+            },
+            path: () => {
+                this.offscreenCtx.fillStyle = COLORS.BROWN;
+                this.offscreenCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                this.offscreenCtx.fillStyle = COLORS.DARK_BROWN;
+                this.offscreenCtx.fillRect(x + 4, y + 8, 6, 4);
+                this.offscreenCtx.fillRect(x + 20, y + 20, 6, 4);
+            },
+            wall: () => {
+                this.offscreenCtx.fillStyle = COLORS.GRAY;
+                this.offscreenCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                this.offscreenCtx.fillStyle = COLORS.DARK_GRAY;
+                this.offscreenCtx.fillRect(x, y + 14, TILE_SIZE, 4);
+                this.offscreenCtx.fillRect(x + 14, y, 4, TILE_SIZE);
+            },
+            floor: () => {
+                this.offscreenCtx.fillStyle = COLORS.PEACH;
+                this.offscreenCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                this.offscreenCtx.fillStyle = COLORS.BROWN;
+                this.offscreenCtx.fillRect(x, y, TILE_SIZE, 2);
+                this.offscreenCtx.fillRect(x, y, 2, TILE_SIZE);
+            },
+            mountain: () => {
+                this.offscreenCtx.fillStyle = COLORS.LIGHT_GREEN;
+                this.offscreenCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                this.offscreenCtx.fillStyle = COLORS.GRAY;
+                this.offscreenCtx.beginPath();
+                this.offscreenCtx.moveTo(x + 16, y + 4);
+                this.offscreenCtx.lineTo(x + 4, y + 28);
+                this.offscreenCtx.lineTo(x + 28, y + 28);
+                this.offscreenCtx.fill();
+                this.offscreenCtx.fillStyle = COLORS.WHITE;
+                this.offscreenCtx.fillRect(x + 12, y + 6, 8, 4);
+            },
+            bamboo: () => {
+                this.offscreenCtx.fillStyle = COLORS.LIGHT_GREEN;
+                this.offscreenCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                this.offscreenCtx.fillStyle = COLORS.GREEN;
+                this.offscreenCtx.fillRect(x + 8, y, 4, TILE_SIZE);
+                this.offscreenCtx.fillRect(x + 20, y + 8, 4, TILE_SIZE - 8);
+                this.offscreenCtx.fillStyle = COLORS.DARK_GREEN || COLORS.GREEN;
+                this.offscreenCtx.fillRect(x + 6, y + 10, 8, 2);
+                this.offscreenCtx.fillRect(x + 6, y + 22, 8, 2);
+            },
+        };
+        
+        (tiles[tileType] || tiles.grass)();
+    },
+
+    drawMap(mapData, playerX, playerY) {
+        const startX = Math.floor(playerX / TILE_SIZE) - 10;
+        const startY = Math.floor(playerY / TILE_SIZE) - 8;
+        const offsetX = CANVAS_WIDTH / 2 - playerX - TILE_SIZE / 2;
+        const offsetY = CANVAS_HEIGHT / 2 - playerY - TILE_SIZE / 2;
+        
+        for (let y = 0; y < mapData.height; y++) {
+            for (let x = 0; x < mapData.width; x++) {
+                const tileIndex = y * mapData.width + x;
+                const tileType = mapData.tiles[tileIndex];
+                const screenX = x * TILE_SIZE + offsetX;
+                const screenY = y * TILE_SIZE + offsetY;
+                
+                if (screenX > -TILE_SIZE && screenX < CANVAS_WIDTH &&
+                    screenY > -TILE_SIZE && screenY < CANVAS_HEIGHT) {
+                    this.drawTile(tileType, screenX, screenY);
+                }
+            }
+        }
+    },
+
+    drawHPBar(x, y, current, max, width = 100, height = 12) {
+        this.offscreenCtx.fillStyle = COLORS.DARK_GRAY;
+        this.offscreenCtx.fillRect(x, y, width, height);
+        
+        const ratio = current / max;
+        const color = ratio > 0.5 ? COLORS.GREEN : ratio > 0.25 ? COLORS.YELLOW : COLORS.RED;
+        this.offscreenCtx.fillStyle = color;
+        this.offscreenCtx.fillRect(x + 2, y + 2, (width - 4) * ratio, height - 4);
+        
+        this.offscreenCtx.fillStyle = COLORS.BLACK;
+        this.offscreenCtx.strokeStyle = COLORS.WHITE;
+        this.offscreenCtx.lineWidth = 1;
+        this.offscreenCtx.strokeRect(x, y, width, height);
+        
+        this.drawPixelText(`${current}/${max}`, x + width / 2 - 15, y + 2, COLORS.WHITE, 1);
+    },
+
+    drawMPBar(x, y, current, max, width = 100, height = 10) {
+        this.offscreenCtx.fillStyle = COLORS.DARK_GRAY;
+        this.offscreenCtx.fillRect(x, y, width, height);
+        
+        const ratio = current / max;
+        this.offscreenCtx.fillStyle = COLORS.BLUE;
+        this.offscreenCtx.fillRect(x + 2, y + 2, (width - 4) * ratio, height - 4);
+        
+        this.offscreenCtx.fillStyle = COLORS.BLACK;
+        this.offscreenCtx.strokeStyle = COLORS.WHITE;
+        this.offscreenCtx.lineWidth = 1;
+        this.offscreenCtx.strokeRect(x, y, width, height);
+    },
+
+    drawSkillEffect(effectType, x, y, progress) {
+        const ctx = this.offscreenCtx;
+        
+        switch (effectType) {
+            case 'fire':
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2 + progress * Math.PI;
+                    const dist = 20 + progress * 40;
+                    const px = x + Math.cos(angle) * dist;
+                    const py = y + Math.sin(angle) * dist - progress * 20;
+                    const size = 8 - progress * 6;
+                    ctx.fillStyle = i % 2 === 0 ? COLORS.RED : COLORS.YELLOW;
+                    ctx.fillRect(px - size/2, py - size/2, size, size);
+                }
+                break;
+                
+            case 'thunder':
+                ctx.fillStyle = COLORS.YELLOW;
+                const bolts = 3;
+                for (let i = 0; i < bolts; i++) {
+                    let bx = x - 30 + i * 30;
+                    let by = y - 60;
+                    for (let j = 0; j < 6; j++) {
+                        const w = 4 + Math.random() * 4;
+                        ctx.fillRect(bx, by, w, 10);
+                        bx += (Math.random() - 0.5) * 20;
+                        by += 10;
+                    }
+                }
+                break;
+                
+            case 'heal':
+                ctx.fillStyle = COLORS.LIGHT_GREEN;
+                for (let i = 0; i < 12; i++) {
+                    const angle = (i / 12) * Math.PI * 2;
+                    const dist = 30 * (1 - progress * 0.5);
+                    const px = x + Math.cos(angle) * dist;
+                    const py = y + Math.sin(angle) * dist - progress * 30;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                break;
+        }
+    }
+};
+
+const MAPS = {
+    village: {
+        name: '仙山脚下',
+        width: 20,
+        height: 15,
+        tileSize: 32,
+        tiles: [],
+        collision: [],
+        npcs: [
+            { x: 10, y: 7, id: 'elder', name: '村长', dialogs: ['欢迎来到仙山村！', '近来山中妖怪出没，请多加小心。', '村东的竹林里似乎藏着什么秘密...'] },
+            { x: 5, y: 10, id: 'merchant', name: '商人', dialogs: ['客官要买些什么？', '我这里有上好的草药和仙丹。'] }
+        ],
+        chests: [
+            { x: 15, y: 5, id: 'chest1', opened: false, item: { type: 'herb', name: '草药', count: 3 } },
+            { x: 3, y: 3, id: 'secret1', opened: false, item: { type: 'gold', name: '金币', count: 100 }, secret: true }
+        ],
+        encounters: [
+            { x: 18, y: 10, enemy: 'wolf', rate: 0.3 },
+            { x: 17, y: 12, enemy: 'bandit', rate: 0.2 }
+        ],
+        exits: [
+            { x: 19, y: 7, targetMap: 'bamboo', targetX: 1, targetY: 7 }
+        ]
+    },
+    bamboo: {
+        name: '竹林秘境',
+        width: 25,
+        height: 15,
+        tileSize: 32,
+        tiles: [],
+        collision: [],
+        npcs: [
+            { x: 12, y: 8, id: 'hermit', name: '隐者', dialogs: ['此竹林深处有古庙一座...', '庙中封印着上古妖物。', '你若要去，需先寻得符咒。'] }
+        ],
+        chests: [
+            { x: 20, y: 5, id: 'chest2', opened: false, item: { type: 'elixir', name: '仙丹', count: 1 } },
+            { x: 5, y: 12, id: 'secret2', opened: false, item: { type: 'talisman', name: '符咒', count: 1 }, secret: true }
+        ],
+        encounters: [
+            { x: 15, y: 7, enemy: 'snake', rate: 0.4 },
+            { x: 8, y: 10, enemy: 'wolf', rate: 0.3 }
+        ],
+        exits: [
+            { x: 0, y: 7, targetMap: 'village', targetX: 18, targetY: 7 },
+            { x: 24, y: 7, targetMap: 'temple', targetX: 1, targetY: 7 }
+        ]
+    },
+    temple: {
+        name: '古庙深处',
+        width: 15,
+        height: 12,
+        tileSize: 32,
+        tiles: [],
+        collision: [],
+        npcs: [
+            { x: 7, y: 5, id: 'ghost', name: '守护灵', dialogs: ['你终于来了...', '此妖物需勇者方能封印。', '准备好了便来祭坛吧。'] }
+        ],
+        chests: [
+            { x: 12, y: 9, id: 'chest3', opened: false, item: { type: 'elixir', name: '仙丹', count: 2 } }
+        ],
+        encounters: [
+            { x: 7, y: 8, enemy: 'boss', rate: 1.0, boss: true }
+        ],
+        exits: [
+            { x: 0, y: 7, targetMap: 'bamboo', targetX: 23, targetY: 7 }
+        ]
+    }
+};
+
+function generateMapData(mapId) {
+    const map = MAPS[mapId];
+    map.tiles = [];
+    map.collision = [];
+    
+    for (let y = 0; y < map.height; y++) {
+        for (let x = 0; x < map.width; x++) {
+            let tile = 'grass';
+            let collides = false;
+            
+            if (mapId === 'temple') {
+                tile = 'floor';
+                if (x === 0 || x === map.width - 1 || y === 0 || y === map.height - 1) {
+                    tile = 'wall';
+                    collides = true;
+                }
+            } else {
+                if (x === 0 || x === map.width - 1 || y === 0 || y === map.height - 1) {
+                    if (map.exits.some(e => e.x === x && e.y === y)) {
+                        tile = 'path';
+                    } else {
+                        tile = mapId === 'bamboo' ? 'bamboo' : 'tree';
+                        collides = true;
+                    }
+                } else {
+                    const rand = Math.random();
+                    if (mapId === 'bamboo') {
+                        if (rand < 0.3) tile = 'bamboo';
+                        else if (rand < 0.35) tile = 'tree';
+                        if (rand < 0.35) collides = true;
+                    } else {
+                        if (rand < 0.15) tile = 'tree';
+                        else if (rand < 0.2) tile = 'water';
+                        else if (rand < 0.25) tile = 'mountain';
+                        if (rand < 0.25) collides = true;
+                    }
+                }
+            }
+            
+            map.tiles.push(tile);
+            map.collision.push(collides);
+        }
+    }
+    return map;
+}
+
+const SKILLS = [
+    { id: 'fire', name: '火炎术', mpCost: 10, damage: 30, type: 'fire', desc: '召唤火焰攻击敌人' },
+    { id: 'thunder', name: '雷神怒', mpCost: 15, damage: 50, type: 'thunder', desc: '召唤雷电劈向敌人', level: 3 },
+    { id: 'heal', name: '治疗术', mpCost: 12, heal: 40, type: 'heal', desc: '恢复自身生命值', level: 2 }
+];
+
+const ENEMIES = {
+    wolf: { name: '野狼', hp: 50, maxHp: 50, attack: 12, defense: 3, speed: 8, exp: 20, gold: 10, type: 'wolf' },
+    snake: { name: '毒蛇', hp: 40, maxHp: 40, attack: 15, defense: 2, speed: 12, exp: 25, gold: 15, type: 'snake' },
+    bandit: { name: '山贼', hp: 80, maxHp: 80, attack: 18, defense: 5, speed: 6, exp: 35, gold: 30, type: 'bandit' },
+    boss: { name: '妖狐首领', hp: 200, maxHp: 200, attack: 25, defense: 10, speed: 10, exp: 100, gold: 200, type: 'boss' }
+};
+
+const QUESTS = {
+    main: {
+        id: 'main',
+        name: '封印妖狐',
+        type: 'main',
+        description: '前往古庙深处封印妖狐首领',
+        steps: [
+            { id: 'start', desc: '与村长对话接取任务', completed: false },
+            { id: 'talisman', desc: '在竹林中寻得符咒', completed: false },
+            { id: 'boss', desc: '击败妖狐首领', completed: false }
+        ],
+        rewards: { exp: 200, gold: 500, item: null }
+    },
+    side1: {
+        id: 'side1',
+        name: '收集草药',
+        type: 'side',
+        description: '为村民收集3份草药',
+        steps: [
+            { id: 'collect', desc: '收集3份草药', completed: false, target: 3, current: 0 }
+        ],
+        rewards: { exp: 100, gold: 200, item: null }
+    },
+    side2: {
+        id: 'side2',
+        name: '隐者的考验',
+        type: 'side',
+        description: '击败竹林中的所有敌人',
+        steps: [
+            { id: 'defeat', desc: '在竹林击败5只妖怪', completed: false, target: 5, current: 0 }
+        ],
+        rewards: { exp: 150, gold: 300, item: { type: 'elixir', name: '仙丹', count: 2 } }
+    }
+};
+
+const GameCore = {
+    state: null,
+    battleState: null,
+    dialogState: null,
+    menuSelection: 0,
+    battleSelection: 0,
+    skillSelection: 0,
+    showQuestLog: false,
+    lastSavePoint: { map: 'village', x: 5, y: 7 },
+
+    initGame(saveData = null) {
+        if (saveData) {
+            this.state = saveData;
+        } else {
+            this.state = {
+                scene: 'INTRO',
+                introIndex: 0,
+                introChar: 0,
+                player: {
+                    name: '李逍遥',
+                    level: 1,
+                    exp: 0,
+                    expToNext: 50,
+                    hp: 100,
+                    maxHp: 100,
+                    mp: 30,
+                    maxMp: 30,
+                    attack: 15,
+                    defense: 5,
+                    speed: 10,
+                    skills: ['fire'],
+                    inventory: [
+                        { type: 'herb', name: '草药', count: 2 },
+                        { type: 'elixir', name: '仙丹', count: 1 }
+                    ],
+                    gold: 50
+                },
+                currentMap: 'village',
+                playerPos: { x: 5 * 32, y: 7 * 32 },
+                playerDirection: 'down',
+                playerFrame: 0,
+                quests: { ...QUESTS },
+                battleRecords: [],
+                discoveredSecrets: 0,
+                totalSecrets: 2
+            };
+            this.state.quests = JSON.parse(JSON.stringify(QUESTS));
+        }
+        
+        if (!MAPS.village.tiles.length) {
+            Object.keys(MAPS).forEach(key => generateMapData(key));
+        }
+    },
+
+    update(deltaTime) {
+        Renderer.animationFrame++;
+        
+        switch (this.state.scene) {
+            case 'MENU':
+                this.updateMenu();
+                break;
+            case 'INTRO':
+                this.updateIntro();
+                break;
+            case 'MAP':
+                this.updateMap(deltaTime);
+                break;
+            case 'BATTLE':
+                this.updateBattle();
+                break;
+            case 'DIALOG':
+                this.updateDialog();
+                break;
+            case 'LEVELUP':
+            case 'EVALUATION':
+            case 'ENDING':
+                break;
+        }
+    },
+
+    updateMenu() {
+        if (Input.isKeyPressed('ArrowUp') || Input.isKeyPressed('KeyW')) {
+            this.menuSelection = (this.menuSelection - 1 + 2) % 2;
+            AudioEngine.playSFX('menu');
+        }
+        if (Input.isKeyPressed('ArrowDown') || Input.isKeyPressed('KeyS')) {
+            this.menuSelection = (this.menuSelection + 1) % 2;
+            AudioEngine.playSFX('menu');
+        }
+        if (Input.isKeyPressed('Space') || Input.isKeyPressed('Enter')) {
+            AudioEngine.playSFX('menu');
+            if (this.menuSelection === 0) {
+                this.initGame();
+            } else {
+                const saveData = this.loadGame();
+                if (saveData) {
+                    this.initGame(saveData);
+                    this.state.scene = 'MAP';
+                    AudioEngine.playExploreBGM();
+                }
+            }
+        }
+    },
+
+    updateIntro() {
+        const introTexts = [
+            { text: '远古时期，妖魔横行人间...', speaker: null },
+            { text: '一位仙侠手持神剑，将妖王封印于古庙之中。', speaker: null },
+            { text: '千年之后，封印之力渐弱...', speaker: null },
+            { text: '少年剑客李逍遥，踏上了修仙之路。', speaker: '旁白' }
+        ];
+        
+        if (this.state.introChar < introTexts[this.state.introIndex].text.length) {
+            this.state.introChar += 0.5;
+        } else if (Input.isKeyPressed('Space') || Input.isKeyPressed('Enter')) {
+            AudioEngine.playSFX('menu');
+            this.state.introIndex++;
+            this.state.introChar = 0;
+            if (this.state.introIndex >= introTexts.length) {
+                this.state.scene = 'MAP';
+                AudioEngine.playExploreBGM();
+            }
+        }
+    },
+
+    updateMap(deltaTime) {
+        const speed = 2;
+        let dx = 0, dy = 0;
+        
+        if (Input.isKeyDown('ArrowUp') || Input.isKeyDown('KeyW')) {
+            dy = -speed;
+            this.state.playerDirection = 'up';
+        }
+        if (Input.isKeyDown('ArrowDown') || Input.isKeyDown('KeyS')) {
+            dy = speed;
+            this.state.playerDirection = 'down';
+        }
+        if (Input.isKeyDown('ArrowLeft') || Input.isKeyDown('KeyA')) {
+            dx = -speed;
+            this.state.playerDirection = 'left';
+        }
+        if (Input.isKeyDown('ArrowRight') || Input.isKeyDown('KeyD')) {
+            dx = speed;
+            this.state.playerDirection = 'right';
+        }
+        
+        if (dx !== 0 || dy !== 0) {
+            this.state.playerFrame++;
+            const newX = this.state.playerPos.x + dx;
+            const newY = this.state.playerPos.y + dy;
+            
+            if (!this.checkCollision(newX, newY)) {
+                this.state.playerPos.x = newX;
+                this.state.playerPos.y = newY;
+            }
+            
+            this.checkEncounters();
+            this.checkExits();
+        }
+        
+        if (Input.isKeyPressed('Space') || Input.isKeyPressed('Enter')) {
+            this.checkInteraction();
+        }
+        
+        if (Input.isKeyPressed('KeyQ')) {
+            this.showQuestLog = !this.showQuestLog;
+        }
+        
+        if (Input.isKeyPressed('KeyM')) {
+            this.saveGame();
+        }
+        
+        if (Input.isKeyPressed('Escape')) {
+            this.state.scene = 'MENU';
+            AudioEngine.stopBGM();
+        }
+    },
+
+    checkCollision(x, y) {
+        const map = MAPS[this.state.currentMap];
+        const tileX = Math.floor(x / TILE_SIZE);
+        const tileY = Math.floor(y / TILE_SIZE);
+        const tileX2 = Math.floor((x + 24) / TILE_SIZE);
+        const tileY2 = Math.floor((y + 30) / TILE_SIZE);
+        
+        const tilesToCheck = [
+            [tileX, tileY], [tileX2, tileY],
+            [tileX, tileY2], [tileX2, tileY2]
+        ];
+        
+        for (const [tx, ty] of tilesToCheck) {
+            if (tx < 0 || tx >= map.width || ty < 0 || ty >= map.height) {
+                return true;
+            }
+            const index = ty * map.width + tx;
+            if (map.collision[index]) return true;
+        }
+        return false;
+    },
+
+    checkEncounters() {
+        const map = MAPS[this.state.currentMap];
+        const px = Math.floor(this.state.playerPos.x / TILE_SIZE);
+        const py = Math.floor(this.state.playerPos.y / TILE_SIZE);
+        
+        for (const enc of map.encounters) {
+            if (Math.abs(enc.x - px) < 2 && Math.abs(enc.y - py) < 2) {
+                if (Math.random() < enc.rate * 0.02) {
+                    if (enc.boss && !this.state.quests.main.steps[1].completed) {
+                        this.startDialog([{ text: '需要符咒才能挑战妖狐！', speaker: '系统' }]);
+                        return;
+                    }
+                    this.startBattle(ENEMIES[enc.enemy]);
+                }
+            }
+        }
+    },
+
+    checkExits() {
+        const map = MAPS[this.state.currentMap];
+        const px = Math.floor(this.state.playerPos.x / TILE_SIZE);
+        const py = Math.floor(this.state.playerPos.y / TILE_SIZE);
+        
+        for (const exit of map.exits) {
+            if (exit.x === px && exit.y === py) {
+                this.state.currentMap = exit.targetMap;
+                this.state.playerPos.x = exit.targetX * TILE_SIZE;
+                this.state.playerPos.y = exit.targetY * TILE_SIZE;
+                this.lastSavePoint = { map: exit.targetMap, x: exit.targetX, y: exit.targetY };
+                AudioEngine.playSFX('menu');
+            }
+        }
+    },
+
+    checkInteraction() {
+        const map = MAPS[this.state.currentMap];
+        const dir = this.state.playerDirection;
+        let px = Math.floor((this.state.playerPos.x + 16) / TILE_SIZE);
+        let py = Math.floor((this.state.playerPos.y + 16) / TILE_SIZE);
+        
+        if (dir === 'up') py--;
+        else if (dir === 'down') py++;
+        else if (dir === 'left') px--;
+        else if (dir === 'right') px++;
+        
+        for (const npc of map.npcs) {
+            if (npc.x === px && npc.y === py) {
+                this.handleNPCInteraction(npc);
+                return;
+            }
+        }
+        
+        for (const chest of map.chests) {
+            if (chest.x === px && chest.y === py && !chest.opened) {
+                this.openChest(chest);
+                return;
+            }
+        }
+    },
+
+    handleNPCInteraction(npc) {
+        AudioEngine.playSFX('menu');
+        
+        if (npc.id === 'elder') {
+            if (!this.state.quests.main.steps[0].completed) {
+                this.state.quests.main.steps[0].completed = true;
+                this.startDialog([
+                    { text: '年轻人，你愿意帮助我们吗？', speaker: '村长' },
+                    { text: '村东的竹林深处，古庙中的妖狐即将破封。', speaker: '村长' },
+                    { text: '你需先在竹林中寻得符咒，方能与之抗衡。', speaker: '村长' },
+                    { text: '主线任务已接取：封印妖狐', speaker: '系统' }
+                ]);
+            } else {
+                this.startDialog(npc.dialogs.map(d => ({ text: d, speaker: npc.name })));
+            }
+        } else if (npc.id === 'hermit') {
+            if (this.hasItem('talisman')) {
+                this.startDialog([
+                    { text: '你已寻得符咒，可以前往挑战了。', speaker: '隐者' },
+                    { text: '记住，勇者必胜！', speaker: '隐者' }
+                ]);
+            } else {
+                this.startDialog(npc.dialogs.map(d => ({ text: d, speaker: npc.name })));
+            }
+        } else {
+            this.startDialog(npc.dialogs.map(d => ({ text: d, speaker: npc.name })));
+        }
+    },
+
+    openChest(chest) {
+        chest.opened = true;
+        AudioEngine.playSFX('item');
+        
+        if (chest.item.type === 'gold') {
+            this.state.player.gold += chest.item.count;
+        } else {
+            this.addItem(chest.item.type, chest.item.name, chest.item.count);
+        }
+        
+        if (chest.secret) {
+            this.state.discoveredSecrets++;
+        }
+        
+        if (chest.item.type === 'talisman') {
+            this.state.quests.main.steps[1].completed = true;
+        }
+        
+        if (chest.item.type === 'herb') {
+            this.updateQuestStep('side1', 'collect', 1);
+        }
+        
+        this.startDialog([
+            { text: `获得了 ${chest.item.name} x${chest.item.count}！`, speaker: '系统' }
+        ]);
+    },
+
+    hasItem(type) {
+        return this.state.player.inventory.some(i => i.type === type && i.count > 0);
+    },
+
+    addItem(type, name, count = 1) {
+        const existing = this.state.player.inventory.find(i => i.type === type);
+        if (existing) {
+            existing.count += count;
+        } else {
+            this.state.player.inventory.push({ type, name, count });
+        }
+    },
+
+    useItem(type) {
+        const item = this.state.player.inventory.find(i => i.type === type && i.count > 0);
+        if (!item) return false;
+        
+        item.count--;
+        AudioEngine.playSFX('item');
+        
+        switch (type) {
+            case 'herb':
+                this.state.player.hp = Math.min(this.state.player.hp + 30, this.state.player.maxHp);
+                break;
+            case 'elixir':
+                this.state.player.hp = this.state.player.maxHp;
+                this.state.player.mp = this.state.player.maxMp;
+                break;
+        }
+        return true;
+    },
+
+    updateQuestStep(questId, stepId, amount) {
+        const quest = this.state.quests[questId];
+        if (!quest) return;
+        
+        const step = quest.steps.find(s => s.id === stepId);
+        if (!step || step.completed) return;
+        
+        if (step.target !== undefined) {
+            step.current = (step.current || 0) + amount;
+            if (step.current >= step.target) {
+                step.completed = true;
+                this.completeQuest(questId);
+            }
+        }
+    },
+
+    completeQuest(questId) {
+        const quest = this.state.quests[questId];
+        if (!quest || quest.completed) return;
+        
+        quest.completed = true;
+        this.state.player.exp += quest.rewards.exp;
+        this.state.player.gold += quest.rewards.gold;
+        
+        if (quest.rewards.item) {
+            this.addItem(quest.rewards.item.type, quest.rewards.item.name, quest.rewards.item.count);
+        }
+        
+        this.startDialog([
+            { text: `任务完成：${quest.name}`, speaker: '系统' },
+            { text: `获得 ${quest.rewards.exp} 经验，${quest.rewards.gold} 金币`, speaker: '系统' }
+        ]);
+        
+        this.checkLevelUp();
+    },
+
+    startBattle(enemyTemplate) {
+        AudioEngine.playBattleBGM();
+        this.state.scene = 'BATTLE';
+        this.battleState = {
+            enemy: { ...enemyTemplate },
+            turn: this.state.player.speed >= enemyTemplate.speed ? 'PLAYER' : 'ENEMY',
+            turnCount: 1,
+            playerDefending: false,
+            log: [`遭遇了 ${enemyTemplate.name}！`],
+            phase: 'SELECT',
+            animProgress: 0,
+            startHp: this.state.player.hp
+        };
+        this.battleSelection = 0;
+        this.skillSelection = 0;
+    },
+
+    updateBattle() {
+        if (this.battleState.phase === 'ANIM') {
+            this.battleState.animProgress += 0.05;
+            if (this.battleState.animProgress >= 1) {
+                this.battleState.phase = 'SELECT';
+                this.battleState.animProgress = 0;
+                this.checkBattleEnd();
+            }
+            return;
+        }
+        
+        if (this.battleState.turn === 'PLAYER' && this.battleState.phase === 'SELECT') {
+            if (Input.isKeyPressed('ArrowUp') || Input.isKeyPressed('KeyW')) {
+                this.battleSelection = (this.battleSelection - 1 + 5) % 5;
+                AudioEngine.playSFX('menu');
+            }
+            if (Input.isKeyPressed('ArrowDown') || Input.isKeyPressed('KeyS')) {
+                this.battleSelection = (this.battleSelection + 1) % 5;
+                AudioEngine.playSFX('menu');
+            }
+            
+            if (Input.isKeyPressed('Space') || Input.isKeyPressed('Enter')) {
+                this.executePlayerAction();
+            }
+            
+            if (Input.isKeyPressed('Escape')) {
+                if (this.battleSelection === 2) this.battleSelection = 0;
+            }
+        }
+        
+        if (this.battleState.turn === 'ENEMY') {
+            setTimeout(() => this.executeEnemyTurn(), 800);
+            this.battleState.turn = 'WAIT';
+        }
+    },
+
+    executePlayerAction() {
+        const actions = ['attack', 'defend', 'skill', 'item', 'run'];
+        const action = actions[this.battleSelection];
+        
+        switch (action) {
+            case 'attack':
+                this.playerAttack();
+                break;
+            case 'defend':
+                this.battleState.playerDefending = true;
+                this.battleState.log.push('你摆出了防御姿态。');
+                this.endPlayerTurn();
+                break;
+            case 'skill':
+                this.selectSkill();
+                return;
+            case 'item':
+                if (this.useItem('herb')) {
+                    this.battleState.log.push('使用了草药，恢复30HP！');
+                    this.endPlayerTurn();
+                } else {
+                    this.battleState.log.push('没有可用的物品！');
+                }
+                break;
+            case 'run':
+                if (Math.random() < 0.5) {
+                    this.battleState.log.push('逃跑成功！');
+                    this.endBattle('escape');
+                } else {
+                    this.battleState.log.push('逃跑失败！');
+                    this.endPlayerTurn();
+                }
+                break;
+        }
+    },
+
+    playerAttack() {
+        AudioEngine.playSFX('attack');
+        const damage = Math.max(1, this.state.player.attack - this.battleState.enemy.defense + Math.floor(Math.random() * 5));
+        this.battleState.enemy.hp -= damage;
+        this.battleState.log.push(`你造成了 ${damage} 点伤害！`);
+        this.battleState.phase = 'ANIM';
+        this.battleState.animProgress = 0;
+        this.endPlayerTurn();
+    },
+
+    selectSkill() {
+        const skills = this.state.player.skills.map(id => SKILLS.find(s => s.id === id)).filter(Boolean);
+        
+        if (this.battleSelection === 2) {
+            if (Input.isKeyPressed('ArrowLeft') || Input.isKeyPressed('KeyA')) {
+                this.skillSelection = (this.skillSelection - 1 + skills.length) % skills.length;
+                AudioEngine.playSFX('menu');
+            }
+            if (Input.isKeyPressed('ArrowRight') || Input.isKeyPressed('KeyD')) {
+                this.skillSelection = (this.skillSelection + 1) % skills.length;
+                AudioEngine.playSFX('menu');
+            }
+        }
+        
+        if (Input.isKeyPressed('Space') || Input.isKeyPressed('Enter')) {
+            const skill = skills[this.skillSelection];
+            if (this.state.player.mp >= skill.mpCost) {
+                this.state.player.mp -= skill.mpCost;
+                AudioEngine.playSFX('skill');
+                
+                if (skill.type === 'heal') {
+                    this.state.player.hp = Math.min(this.state.player.hp + skill.heal, this.state.player.maxHp);
+                    this.battleState.log.push(`使用${skill.name}，恢复${skill.heal}HP！`);
+                } else {
+                    const damage = skill.damage + Math.floor(this.state.player.attack * 0.5);
+                    this.battleState.enemy.hp -= damage;
+                    this.battleState.log.push(`使用${skill.name}，造成${damage}点伤害！`);
+                }
+                this.battleState.phase = 'ANIM';
+                this.endPlayerTurn();
+            } else {
+                this.battleState.log.push('MP不足！');
+            }
+        }
+    },
+
+    endPlayerTurn() {
+        this.battleState.turn = 'ENEMY';
+    },
+
+    executeEnemyTurn() {
+        const enemy = this.battleState.enemy;
+        const hpRatio = enemy.hp / enemy.maxHp;
+        
+        let action = 'attack';
+        if (hpRatio < 0.3 && Math.random() < 0.3) {
+            action = 'heavy';
+        }
+        
+        let damage;
+        if (action === 'heavy') {
+            damage = Math.max(1, enemy.attack * 1.5 - this.state.player.defense);
+            this.battleState.log.push(`${enemy.name}发动了猛攻！`);
+        } else {
+            damage = Math.max(1, enemy.attack - this.state.player.defense + Math.floor(Math.random() * 3));
+        }
+        
+        if (this.battleState.playerDefending) {
+            damage = Math.floor(damage * 0.5);
+            this.battleState.log.push('防御减轻了伤害！');
+        }
+        
+        AudioEngine.playSFX('hit');
+        this.state.player.hp -= damage;
+        this.battleState.log.push(`${enemy.name}造成了 ${damage} 点伤害！`);
+        
+        this.battleState.playerDefending = false;
+        this.battleState.turnCount++;
+        this.battleState.turn = 'PLAYER';
+        this.battleState.phase = 'ANIM';
+        
+        this.checkBattleEnd();
+    },
+
+    checkBattleEnd() {
+        if (this.battleState.enemy.hp <= 0) {
+            this.endBattle('win');
+        } else if (this.state.player.hp <= 0) {
+            this.endBattle('lose');
+        }
+    },
+
+    endBattle(result) {
+        setTimeout(() => {
+            if (result === 'win') {
+                AudioEngine.playVictoryBGM();
+                const expGain = this.battleState.enemy.exp;
+                const goldGain = this.battleState.enemy.gold;
+                
+                this.state.player.exp += expGain;
+                this.state.player.gold += goldGain;
+                
+                const hpRatio = this.state.player.hp / this.state.player.maxHp;
+                const turns = this.battleState.turnCount;
+                
+                let grade = 'B';
+                let bonusExp = 0;
+                if (hpRatio >= 0.8 && turns <= 3) {
+                    grade = 'S';
+                    bonusExp = Math.floor(expGain * 0.5);
+                } else if ((hpRatio >= 0.5 || turns <= 5)) {
+                    grade = 'A';
+                    bonusExp = Math.floor(expGain * 0.25);
+                }
+                
+                this.state.player.exp += bonusExp;
+                
+                this.state.battleRecords.push({
+                    enemy: this.battleState.enemy.name,
+                    grade,
+                    hpRatio,
+                    turns
+                });
+                
+                if (this.state.currentMap === 'bamboo') {
+                    this.updateQuestStep('side2', 'defeat', 1);
+                }
+                
+                if (this.battleState.enemy.type === 'boss') {
+                    this.state.quests.main.steps[2].completed = true;
+                    this.completeQuest('main');
+                    setTimeout(() => this.showEnding(), 3000);
+                }
+                
+                this.state.scene = 'EVALUATION';
+                this.battleState.result = { expGain, goldGain, bonusExp, grade, hpRatio, turns };
+                
+                this.checkLevelUp();
+            } else if (result === 'lose') {
+                this.showRetryDialog();
+            } else {
+                this.state.battleRecords.push({ grade: 'C', escaped: true });
+                this.state.scene = 'MAP';
+                AudioEngine.playExploreBGM();
+            }
+        }, 1000);
+    },
+
+    showRetryDialog() {
+        this.state.scene = 'DIALOG';
+        this.dialogState = {
+            texts: [{ text: '你被击败了...是否返回存档点重试？', speaker: '系统' }],
+            index: 0,
+            charIndex: 100,
+            onComplete: () => {
+                this.state.player.hp = Math.floor(this.state.player.maxHp * 0.5);
+                this.state.player.mp = Math.floor(this.state.player.maxMp * 0.5);
+                this.state.currentMap = this.lastSavePoint.map;
+                this.state.playerPos.x = this.lastSavePoint.x * TILE_SIZE;
+                this.state.playerPos.y = this.lastSavePoint.y * TILE_SIZE;
+                this.state.scene = 'MAP';
+                AudioEngine.playExploreBGM();
+            }
+        };
+    },
+
+    checkLevelUp() {
+        while (this.state.player.exp >= this.state.player.expToNext) {
+            this.state.player.exp -= this.state.player.expToNext;
+            this.state.player.level++;
+            this.state.player.expToNext = Math.floor(this.state.player.expToNext * 1.5);
+            
+            const hpGain = 15 + Math.floor(Math.random() * 10);
+            const mpGain = 5 + Math.floor(Math.random() * 5);
+            const atkGain = 2 + Math.floor(Math.random() * 2);
+            const defGain = 1 + Math.floor(Math.random() * 2);
+            
+            this.state.player.maxHp += hpGain;
+            this.state.player.hp = this.state.player.maxHp;
+            this.state.player.maxMp += mpGain;
+            this.state.player.mp = this.state.player.maxMp;
+            this.state.player.attack += atkGain;
+            this.state.player.defense += defGain;
+            
+            const newSkills = SKILLS.filter(s => s.level === this.state.player.level && 
+                !this.state.player.skills.includes(s.id));
+            newSkills.forEach(s => this.state.player.skills.push(s.id));
+            
+            AudioEngine.playSFX('levelup');
+            this.state.scene = 'LEVELUP';
+            this.state.levelUpData = {
+                level: this.state.player.level,
+                hpGain, mpGain, atkGain, defGain,
+                newSkills: newSkills.map(s => s.name)
+            };
+        }
+    },
+
+    startDialog(texts) {
+        this.state.scene = 'DIALOG';
+        this.dialogState = {
+            texts,
+            index: 0,
+            charIndex: 0
+        };
+    },
+
+    updateDialog() {
+        const text = this.dialogState.texts[this.dialogState.index];
+        
+        if (this.dialogState.charIndex < text.text.length) {
+            this.dialogState.charIndex += 0.5;
+        } else if (Input.isKeyPressed('Space') || Input.isKeyPressed('Enter')) {
+            AudioEngine.playSFX('menu');
+            this.dialogState.index++;
+            this.dialogState.charIndex = 0;
+            
+            if (this.dialogState.index >= this.dialogState.texts.length) {
+                if (this.dialogState.onComplete) {
+                    this.dialogState.onComplete();
+                } else {
+                    this.state.scene = 'MAP';
+                }
+            }
+        }
+    },
+
+    showEnding() {
+        const totalScore = this.calculateFinalScore();
+        let endingText = '';
+        let endingTitle = '';
+        
+        if (totalScore >= 90) {
+            endingTitle = 'S级结局：仙侠传说';
+            endingText = '你成功封印了妖狐，拯救了人间。你的名字将永远流传在仙侠传说之中！';
+        } else if (totalScore >= 70) {
+            endingTitle = 'A级结局：退隐江湖';
+            endingText = '你完成了使命，选择在深山中继续修行，追寻更高的武道境界。';
+        } else {
+            endingTitle = 'B级结局：平凡英雄';
+            endingText = '虽然历经艰辛，但你最终完成了任务，成为了村民心中的英雄。';
+        }
+        
+        this.state.scene = 'ENDING';
+        this.state.endingData = {
+            title: endingTitle,
+            text: endingText,
+            score: totalScore,
+            battleCount: this.state.battleRecords.length,
+            sCount: this.state.battleRecords.filter(r => r.grade === 'S').length,
+            secrets: this.state.discoveredSecrets
+        };
+    },
+
+    calculateFinalScore() {
+        const records = this.state.battleRecords.filter(r => !r.escaped);
+        const battleScore = records.length > 0 ? 
+            (records.filter(r => r.grade === 'S').length * 100 +
+             records.filter(r => r.grade === 'A').length * 75 +
+             records.filter(r => r.grade === 'B').length * 50) / records.length : 50;
+        
+        const completedQuests = Object.values(this.state.quests).filter(q => q.completed).length;
+        const totalQuests = Object.keys(this.state.quests).length;
+        const questScore = (completedQuests / totalQuests) * 100;
+        
+        const secretScore = (this.state.discoveredSecrets / this.state.totalSecrets) * 100;
+        
+        return Math.floor(battleScore * 0.6 + questScore * 0.25 + secretScore * 0.15);
+    },
+
+    saveGame() {
+        try {
+            const saveData = {
+                ...this.state,
+                maps: MAPS
+            };
+            localStorage.setItem('xianjian_save', JSON.stringify(saveData));
+            this.startDialog([{ text: '游戏已保存！', speaker: '系统' }]);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    },
+
+    loadGame() {
+        try {
+            const data = localStorage.getItem('xianjian_save');
+            if (data) {
+                const saveData = JSON.parse(data);
+                if (saveData.maps) {
+                    Object.assign(MAPS, saveData.maps);
+                }
+                return saveData;
+            }
+        } catch (e) {}
+        return null;
+    },
+
+    hasSaveData() {
+        return localStorage.getItem('xianjian_save') !== null;
+    }
+};
+
+const Input = {
+    keys: {},
+    pressedKeys: {},
+    touchDir: null,
+
+    init() {
+        window.addEventListener('keydown', (e) => {
+            if (!this.keys[e.code]) {
+                this.pressedKeys[e.code] = true;
+            }
+            this.keys[e.code] = true;
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            this.keys[e.code] = false;
+        });
+        
+        document.querySelectorAll('.touchBtn').forEach(btn => {
+            const dir = btn.dataset.dir;
+            if (dir) {
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.touchDir = dir;
+                    if (dir === 'action') {
+                        this.pressedKeys['Space'] = true;
+                    } else {
+                        const keyMap = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
+                        this.keys[keyMap[dir]] = true;
+                    }
+                });
+                btn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.touchDir = null;
+                    if (dir === 'action') {
+                        this.pressedKeys['Space'] = false;
+                    } else {
+                        const keyMap = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
+                        this.keys[keyMap[dir]] = false;
+                    }
+                });
+            }
+        });
+        
+        document.querySelectorAll('[data-action]').forEach(btn => {
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (btn.dataset.action === 'quest') {
+                    GameCore.showQuestLog = !GameCore.showQuestLog;
+                } else if (btn.dataset.action === 'menu') {
+                    GameCore.saveGame();
+                }
+            });
+        });
+    },
+
+    isKeyDown(code) {
+        return this.keys[code];
+    },
+
+    isKeyPressed(code) {
+        const pressed = this.pressedKeys[code];
+        this.pressedKeys[code] = false;
+        return pressed;
+    },
+
+    update() {
+        Object.keys(this.pressedKeys).forEach(k => {
+            if (!this.keys[k]) this.pressedKeys[k] = false;
+        });
+    }
+};
+
+function render() {
+    Renderer.clear();
+    const state = GameCore.state;
+    
+    if (!state) {
+        renderMenu();
+    } else {
+        switch (state.scene) {
+            case 'MENU':
+                renderMenu();
+                break;
+            case 'INTRO':
+                renderIntro();
+                break;
+            case 'MAP':
+                renderMapScene();
+                break;
+            case 'BATTLE':
+                renderBattle();
+                break;
+            case 'DIALOG':
+                renderMapScene();
+                renderDialog();
+                break;
+            case 'LEVELUP':
+                renderLevelUp();
+                break;
+            case 'EVALUATION':
+                renderEvaluation();
+                break;
+            case 'ENDING':
+                renderEnding();
+                break;
+        }
+    }
+    
+    Renderer.present();
+}
+
+function renderMenu() {
+    const ctx = Renderer.offscreenCtx;
+    
+    ctx.fillStyle = COLORS.BLACK;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    
+    for (let i = 0; i < 20; i++) {
+        const x = (i * 50 + Renderer.animationFrame * 0.3) % (CANVAS_WIDTH + 100) - 50;
+        const y = 100 + Math.sin(i + Renderer.animationFrame * 0.02) * 30;
+        ctx.fillStyle = COLORS.GOLD;
+        ctx.beginPath();
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    Renderer.drawPixelText('仙剑奇侠传', CANVAS_WIDTH/2 - 120, 100, COLORS.GOLD, 3);
+    Renderer.drawPixelText('像素版', CANVAS_WIDTH/2 - 40, 150, COLORS.YELLOW, 2);
+    
+    const hasSave = GameCore.hasSaveData ? GameCore.hasSaveData() : false;
+    const options = ['新游戏'];
+    if (hasSave) options.push('继续游戏');
+    
+    options.forEach((opt, i) => {
+        const y = 280 + i * 40;
+        const color = GameCore.menuSelection === i ? COLORS.GOLD : COLORS.WHITE;
+        if (GameCore.menuSelection === i) {
+            Renderer.drawPixelText('>', CANVAS_WIDTH/2 - 80, y, COLORS.RED, 2);
+        }
+        Renderer.drawPixelText(opt, CANVAS_WIDTH/2 - 50, y, color, 2);
+    });
+    
+    Renderer.drawPixelText('方向键选择，空格确认', CANVAS_WIDTH/2 - 100, 400, COLORS.GRAY, 1);
+}
+
+function renderIntro() {
+    const ctx = Renderer.offscreenCtx;
+    ctx.fillStyle = COLORS.BLACK;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    
+    const introTexts = [
+        { text: '远古时期，妖魔横行人间...', speaker: null },
+        { text: '一位仙侠手持神剑，将妖王封印于古庙之中。', speaker: null },
+        { text: '千年之后，封印之力渐弱...', speaker: null },
+        { text: '少年剑客李逍遥，踏上了修仙之路。', speaker: '旁白' }
+    ];
+    
+    const current = introTexts[GameCore.state.introIndex];
+    const displayText = current.text.substring(0, Math.floor(GameCore.state.introChar));
+    
+    Renderer.drawDialogBox(displayText, 50, 300, 540, 120, current.speaker);
+    
+    if (GameCore.state.introChar >= current.text.length) {
+        Renderer.drawPixelText('▼', 560, 400, COLORS.GOLD, 1);
+    }
+}
+
+function renderMapScene() {
+    const map = MAPS[GameCore.state.currentMap];
+    const px = GameCore.state.playerPos.x;
+    const py = GameCore.state.playerPos.y;
+    
+    Renderer.drawMap(map, px + 16, py + 16);
+    
+    const offsetX = CANVAS_WIDTH / 2 - px - TILE_SIZE / 2;
+    const offsetY = CANVAS_HEIGHT / 2 - py - TILE_SIZE / 2;
+    
+    map.npcs.forEach(npc => {
+        Renderer.drawSprite('npc', npc.x * TILE_SIZE + offsetX, npc.y * TILE_SIZE + offsetY);
+    });
+    
+    map.chests.forEach(chest => {
+        if (!chest.opened) {
+            Renderer.drawChestSprite(chest.x * TILE_SIZE + offsetX, chest.y * TILE_SIZE + offsetY, 0, false);
+        }
+    });
+    
+    Renderer.drawSprite('player', CANVAS_WIDTH / 2 - 16, CANVAS_HEIGHT / 2 - 20, 
+        GameCore.state.playerFrame, GameCore.state.playerDirection);
+    
+    Renderer.drawBorder(10, 10, 180, 80);
+    Renderer.drawPixelText(GameCore.state.player.name, 20, 18, COLORS.WHITE, 1);
+    Renderer.drawPixelText(`LV ${GameCore.state.player.level}`, 120, 18, COLORS.YELLOW, 1);
+    Renderer.drawHPBar(20, 35, GameCore.state.player.hp, GameCore.state.player.maxHp, 160);
+    Renderer.drawMPBar(20, 52, GameCore.state.player.mp, GameCore.state.player.maxMp, 160);
+    Renderer.drawPixelText(`金币:${GameCore.state.player.gold}`, 20, 68, COLORS.GOLD, 1);
+    
+    Renderer.drawBorder(CANVAS_WIDTH - 150, 10, 140, 30);
+    Renderer.drawPixelText(map.name, CANVAS_WIDTH - 140, 18, COLORS.WHITE, 1);
+    
+    if (GameCore.showQuestLog) {
+        renderQuestLog();
+    }
+    
+    Renderer.drawPixelText('Q-任务 M-保存 ESC-菜单', 10, CANVAS_HEIGHT - 20, COLORS.GRAY, 1);
+}
+
+function renderQuestLog() {
+    Renderer.drawBorder(400, 100, 220, 300);
+    Renderer.offscreenCtx.fillStyle = COLORS.PEACH;
+    Renderer.offscreenCtx.fillRect(408, 108, 204, 284);
+    
+    Renderer.drawPixelText('任务日志', 460, 115, COLORS.RED, 1);
+    
+    let y = 140;
+    Object.values(GameCore.state.quests).forEach(quest => {
+        const color = quest.completed ? COLORS.GRAY : (quest.type === 'main' ? COLORS.RED : COLORS.BLUE);
+        Renderer.drawPixelText(`${quest.completed ? '[完]' : '[进]'} ${quest.name}`, 415, y, color, 1);
+        y += 15;
+        
+        quest.steps.forEach(step => {
+            const stepText = step.target ? 
+                `${step.desc} (${step.current || 0}/${step.target})` : 
+                step.desc;
+            Renderer.drawPixelText(`  ${step.completed ? '√' : '○'} ${stepText.substring(0, 10)}`, 415, y, step.completed ? COLORS.GREEN : COLORS.GRAY, 1);
+            y += 12;
+        });
+        y += 10;
+    });
+}
+
+function renderBattle() {
+    const ctx = Renderer.offscreenCtx;
+    
+    ctx.fillStyle = COLORS.DARK_BROWN;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    
+    ctx.fillStyle = COLORS.BROWN;
+    ctx.fillRect(0, 300, CANVAS_WIDTH, 180);
+    
+    Renderer.drawEnemySprite(450, 150, Renderer.animationFrame, GameCore.battleState.enemy.type);
+    Renderer.drawPixelText(GameCore.battleState.enemy.name, 430, 120, COLORS.WHITE, 1);
+    Renderer.drawHPBar(420, 90, GameCore.battleState.enemy.hp, GameCore.battleState.enemy.maxHp, 100);
+    
+    Renderer.drawSprite('player', 100, 250, Renderer.animationFrame);
+    
+    Renderer.drawBorder(20, 350, 200, 100);
+    Renderer.drawPixelText(GameCore.state.player.name, 30, 360, COLORS.WHITE, 1);
+    Renderer.drawHPBar(30, 378, GameCore.state.player.hp, GameCore.state.player.maxHp, 180);
+    Renderer.drawMPBar(30, 396, GameCore.state.player.mp, GameCore.state.player.maxMp, 180);
+    
+    Renderer.drawBorder(250, 320, 370, 140);
+    const actions = ['攻击', '防御', '仙术', '物品', '逃跑'];
+    
+    if (GameCore.battleSelection === 2 && GameCore.battleState.phase === 'SELECT') {
+        const skills = GameCore.state.player.skills.map(id => SKILLS.find(s => s.id === id)).filter(Boolean);
+        skills.forEach((skill, i) => {
+            const color = i === GameCore.skillSelection ? COLORS.GOLD : COLORS.WHITE;
+            Renderer.drawPixelText(`${skill.name}(${skill.mpCost}MP)`, 260 + i * 120, 335, color, 1);
+        });
+        Renderer.drawPixelText('←→选择，空格确认，ESC返回', 260, 420, COLORS.GRAY, 1);
+    } else {
+        actions.forEach((action, i) => {
+            const x = 260 + (i % 3) * 100;
+            const y = 335 + Math.floor(i / 3) * 30;
+            const color = i === GameCore.battleSelection ? COLORS.GOLD : COLORS.WHITE;
+            if (i === GameCore.battleSelection) {
+                Renderer.drawPixelText('>', x - 15, y, COLORS.RED, 1);
+            }
+            Renderer.drawPixelText(action, x, y, color, 1);
+        });
+    }
+    
+    const log = GameCore.battleState.log.slice(-3);
+    log.forEach((msg, i) => {
+        Renderer.drawPixelText(msg.substring(0, 18), 260, 380 + i * 15, COLORS.WHITE, 1);
+    });
+    
+    if (GameCore.battleState.phase === 'ANIM' && GameCore.battleState.animProgress > 0) {
+        const lastLog = GameCore.battleState.log[GameCore.battleState.log.length - 1] || '';
+        if (lastLog.includes('火炎术')) {
+            Renderer.drawSkillEffect('fire', 480, 200, GameCore.battleState.animProgress);
+        } else if (lastLog.includes('雷神')) {
+            Renderer.drawSkillEffect('thunder', 480, 180, GameCore.battleState.animProgress);
+        } else if (lastLog.includes('治疗')) {
+            Renderer.drawSkillEffect('heal', 120, 280, GameCore.battleState.animProgress);
+        }
+    }
+}
+
+function renderDialog() {
+    const state = GameCore.dialogState;
+    const current = state.texts[state.index];
+    const displayText = current.text.substring(0, Math.floor(state.charIndex));
+    
+    Renderer.drawDialogBox(displayText, 50, 300, 540, 120, current.speaker);
+    
+    if (state.charIndex >= current.text.length) {
+        Renderer.drawPixelText('▼', 560, 400, COLORS.GOLD, 1);
+    }
+}
+
+function renderLevelUp() {
+    const ctx = Renderer.offscreenCtx;
+    ctx.fillStyle = COLORS.BLACK;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    
+    Renderer.drawBorder(120, 80, 400, 320);
+    ctx.fillStyle = COLORS.PEACH;
+    ctx.fillRect(130, 90, 380, 300);
+    
+    Renderer.drawPixelText('升级！', 270, 110, COLORS.RED, 2);
+    Renderer.drawPixelText(`等级 ${GameCore.state.levelUpData.level}`, 250, 150, COLORS.GOLD, 2);
+    
+    const data = GameCore.state.levelUpData;
+    Renderer.drawPixelText(`HP上限 +${data.hpGain}`, 200, 200, COLORS.GREEN, 1);
+    Renderer.drawPixelText(`MP上限 +${data.mpGain}`, 200, 225, COLORS.BLUE, 1);
+    Renderer.drawPixelText(`攻击力 +${data.atkGain}`, 200, 250, COLORS.RED, 1);
+    Renderer.drawPixelText(`防御力 +${data.defGain}`, 200, 275, COLORS.YELLOW, 1);
+    
+    if (data.newSkills.length > 0) {
+        Renderer.drawPixelText(`学会了：${data.newSkills.join('、')}`, 200, 310, COLORS.PURPLE, 1);
+    }
+    
+    Renderer.drawPixelText('按空格继续', 260, 360, COLORS.GRAY, 1);
+    
+    if (Input.isKeyPressed('Space') || Input.isKeyPressed('Enter')) {
+        GameCore.state.scene = 'MAP';
+        AudioEngine.playExploreBGM();
+    }
+}
+
+function renderEvaluation() {
+    const ctx = Renderer.offscreenCtx;
+    ctx.fillStyle = COLORS.BLACK;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    
+    Renderer.drawBorder(150, 80, 340, 320);
+    ctx.fillStyle = COLORS.PEACH;
+    ctx.fillRect(160, 90, 320, 300);
+    
+    const result = GameCore.battleState.result;
+    Renderer.drawPixelText('战斗结束！', 250, 110, COLORS.RED, 2);
+    
+    const gradeColors = { S: COLORS.GOLD, A: COLORS.PURPLE, B: COLORS.BLUE, C: COLORS.GRAY };
+    Renderer.drawPixelText(`评价：${result.grade}`, 260, 160, gradeColors[result.grade] || COLORS.WHITE, 2);
+    
+    Renderer.drawPixelText(`获得经验：${result.expGain}`, 180, 210, COLORS.WHITE, 1);
+    if (result.bonusExp > 0) {
+        Renderer.drawPixelText(`额外奖励：+${result.bonusExp}`, 180, 235, COLORS.YELLOW, 1);
+    }
+    Renderer.drawPixelText(`获得金币：${result.goldGain}`, 180, 260, COLORS.GOLD, 1);
+    Renderer.drawPixelText(`剩余HP：${Math.floor(result.hpRatio * 100)}%`, 180, 285, COLORS.GREEN, 1);
+    Renderer.drawPixelText(`回合数：${result.turns}`, 180, 310, COLORS.WHITE, 1);
+    
+    Renderer.drawPixelText('按空格继续', 250, 360, COLORS.GRAY, 1);
+    
+    if (Input.isKeyPressed('Space') || Input.isKeyPressed('Enter')) {
+        if (GameCore.state.scene !== 'ENDING') {
+            GameCore.state.scene = 'MAP';
+            AudioEngine.playExploreBGM();
+        }
+    }
+}
+
+function renderEnding() {
+    const ctx = Renderer.offscreenCtx;
+    ctx.fillStyle = COLORS.BLACK;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    
+    const data = GameCore.state.endingData;
+    
+    Renderer.drawBorder(80, 50, 480, 380);
+    ctx.fillStyle = COLORS.PEACH;
+    ctx.fillRect(90, 60, 460, 360);
+    
+    Renderer.drawPixelText(data.title, 200, 90, COLORS.GOLD, 2);
+    
+    Renderer.drawPixelText(data.text.substring(0, 20), 120, 140, COLORS.WHITE, 1);
+    Renderer.drawPixelText(data.text.substring(20), 120, 165, COLORS.WHITE, 1);
+    
+    Renderer.drawBorder(120, 200, 400, 160);
+    ctx.fillStyle = COLORS.BROWN;
+    ctx.fillRect(130, 210, 380, 140);
+    
+    Renderer.drawPixelText('最终评分', 270, 225, COLORS.YELLOW, 1);
+    Renderer.drawPixelText(`${data.score} 分`, 275, 255, COLORS.GOLD, 2);
+    
+    Renderer.drawPixelText(`战斗次数：${data.battleCount}`, 150, 300, COLORS.WHITE, 1);
+    Renderer.drawPixelText(`S级评价：${data.sCount}`, 280, 300, COLORS.GOLD, 1);
+    Renderer.drawPixelText(`发现秘密：${data.secrets}/${GameCore.state.totalSecrets}`, 150, 325, COLORS.WHITE, 1);
+    
+    Renderer.drawPixelText('感谢游玩！', 280, 380, COLORS.GRAY, 1);
+}
+
+let lastTime = 0;
+
+function gameLoop(timestamp) {
+    const deltaTime = timestamp - lastTime;
+    lastTime = timestamp;
+    
+    Input.update();
+    GameCore.update(deltaTime);
+    render();
+    
+    requestAnimationFrame(gameLoop);
+}
+
+function init() {
+    const canvas = document.getElementById('gameCanvas');
+    Renderer.init(canvas);
+    AudioEngine.init();
+    Input.init();
+    
+    function resizeCanvas() {
+        const container = document.getElementById('gameContainer');
+        const maxWidth = window.innerWidth - 40;
+        const maxHeight = window.innerHeight - 40;
+        const scale = Math.min(maxWidth / CANVAS_WIDTH, maxHeight / CANVAS_HEIGHT);
+        
+        canvas.style.width = `${CANVAS_WIDTH * scale}px`;
+        canvas.style.height = `${CANVAS_HEIGHT * scale}px`;
+        container.style.width = `${CANVAS_WIDTH * scale}px`;
+        container.style.height = `${CANVAS_HEIGHT * scale}px`;
+    }
+    
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    const prompt = document.getElementById('audioPrompt');
+    function unlockAudio() {
+        AudioEngine.unlock();
+        prompt.style.display = 'none';
+        
+        if (!GameCore.state) {
+            GameCore.state = { scene: 'MENU' };
+            GameCore.menuSelection = 0;
+        }
+        
+        prompt.removeEventListener('click', unlockAudio);
+    }
+    prompt.addEventListener('click', unlockAudio);
+    window.addEventListener('keydown', unlockAudio, { once: true });
+    
+    GameCore.initGame = GameCore.initGame.bind(GameCore);
+    GameCore.hasSaveData = GameCore.hasSaveData.bind(GameCore);
+    
+    requestAnimationFrame(gameLoop);
+}
+
+window.addEventListener('load', init);
+</script>
+</body>
+</html>

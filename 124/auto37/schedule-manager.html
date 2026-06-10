@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>都市日程与社交管理</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding: 20px 24px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f1f3f5;
+            color: #495057;
+        }
+
+        .btn-secondary:hover {
+            background: #e9ecef;
+        }
+
+        .btn-danger {
+            background: #fee;
+            color: #e74c3c;
+        }
+
+        .btn-danger:hover {
+            background: #fdd;
+        }
+
+        .view-switcher {
+            display: flex;
+            background: #f1f3f5;
+            border-radius: 10px;
+            padding: 4px;
+        }
+
+        .view-btn {
+            padding: 8px 20px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #6c757d;
+            transition: all 0.3s ease;
+        }
+
+        .view-btn.active {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 24px;
+        }
+
+        .calendar-section {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+            padding: 24px;
+            min-height: 600px;
+        }
+
+        .date-navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .date-nav-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: #f1f3f5;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .date-nav-btn:hover {
+            background: #e9ecef;
+        }
+
+        .current-date {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        /* 日视图样式 */
+        .day-view {
+            position: relative;
+            overflow-y: auto;
+            max-height: 70vh;
+        }
+
+        .time-slot {
+            display: flex;
+            border-bottom: 1px solid #f1f3f5;
+            min-height: 60px;
+            position: relative;
+        }
+
+        .time-label {
+            width: 70px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #adb5bd;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .time-events {
+            flex: 1;
+            position: relative;
+        }
+
+        .event-card {
+            position: absolute;
+            left: 8px;
+            right: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .event-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 10;
+        }
+
+        .event-card.normal {
+            background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
+            border-left: 4px solid #667eea;
+        }
+
+        .event-card.conflict {
+            background: linear-gradient(135deg, #ff6b6b30 0%, #ee5a5a30 100%);
+            border-left: 4px solid #ff6b6b;
+            animation: conflict-pulse 2s infinite;
+        }
+
+        @keyframes conflict-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.4); }
+            50% { box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.2); }
+        }
+
+        .event-card.conflict::before {
+            content: '⚠️ 时间冲突';
+            position: absolute;
+            top: 4px;
+            right: 8px;
+            font-size: 10px;
+            color: #ff6b6b;
+            font-weight: 600;
+        }
+
+        .event-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+
+        .event-meta {
+            font-size: 11px;
+            color: #6c757d;
+        }
+
+        /* 周视图样式 */
+        .week-view {
+            display: none;
+        }
+
+        .week-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 12px;
+        }
+
+        .week-day {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 12px;
+            min-height: 500px;
+        }
+
+        .week-day-header {
+            text-align: center;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .week-day.today .week-day-header {
+            border-bottom-color: #667eea;
+        }
+
+        .week-day-name {
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 4px;
+        }
+
+        .week-day-date {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .week-day.today .week-day-date {
+            color: #667eea;
+        }
+
+        .week-event {
+            background: white;
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 3px solid #667eea;
+        }
+
+        .week-event:hover {
+            transform: translateX(2px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .week-event.conflict {
+            border-left-color: #ff6b6b;
+            background: linear-gradient(135deg, #fff5f5 0%, #ffeaea 100%);
+        }
+
+        .week-event.conflict::after {
+            content: '⚠️';
+            float: right;
+        }
+
+        .week-event-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .week-event-time {
+            font-size: 10px;
+            color: #6c757d;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .contacts-panel {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+            padding: 20px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .contacts-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 8px;
+        }
+
+        .contact-item:hover {
+            background: #f8f9fa;
+        }
+
+        .contact-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 16px;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .contact-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .contact-name {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 2px;
+        }
+
+        .contact-relationship {
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .contact-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .contact-item:hover .contact-actions {
+            opacity: 1;
+        }
+
+        .contact-action-btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: #f1f3f5;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .contact-action-btn:hover {
+            background: #e9ecef;
+        }
+
+        /* 弹窗样式 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 20px;
+            padding: 28px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: #f1f3f5;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .modal-close:hover {
+            background: #e9ecef;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+
+        .conflict-warning {
+            background: linear-gradient(135deg, #fff5f5 0%, #ffeaea 100%);
+            border: 2px solid #ff6b6b;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .conflict-warning.active {
+            display: block;
+        }
+
+        .conflict-warning-title {
+            color: #e74c3c;
+            font-weight: 600;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .conflict-warning-list {
+            font-size: 13px;
+            color: #c0392b;
+            padding-left: 28px;
+        }
+
+        /* Toast 提醒 */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .toast {
+            background: white;
+            border-radius: 12px;
+            padding: 16px 20px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            min-width: 320px;
+            animation: slide-in 0.3s ease;
+        }
+
+        @keyframes slide-in {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+
+        .toast-message {
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        .toast-close {
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 20px;
+            color: #adb5bd;
+            flex-shrink: 0;
+        }
+
+        /* 详情弹窗 */
+        .detail-item {
+            display: flex;
+            margin-bottom: 16px;
+        }
+
+        .detail-label {
+            width: 80px;
+            color: #6c757d;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .detail-value {
+            flex: 1;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        .detail-value.deleted {
+            color: #adb5bd;
+            font-style: italic;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #adb5bd;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f3f5;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #ced4da;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #adb5bd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 都市日程管理</h1>
+            <div class="header-controls">
+                <div class="view-switcher">
+                    <button class="view-btn active" data-view="day">日视图</button>
+                    <button class="view-btn" data-view="week">周视图</button>
+                </div>
+                <button class="btn btn-primary" id="addEventBtn">➕ 添加日程</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="calendar-section">
+                <div class="date-navigation">
+                    <button class="date-nav-btn" id="prevDate">‹</button>
+                    <span class="current-date" id="currentDateDisplay"></span>
+                    <button class="date-nav-btn" id="nextDate">›</button>
+                </div>
+
+                <div class="day-view" id="dayView"></div>
+
+                <div class="week-view" id="weekView">
+                    <div class="week-grid" id="weekGrid"></div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="contacts-panel">
+                    <div class="panel-header">
+                        <span class="panel-title">👥 联系人</span>
+                        <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" id="addContactBtn">+ 添加</button>
+                    </div>
+                    <div class="contacts-list" id="contactsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="eventModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title" id="eventModalTitle">添加日程</span>
+                <button class="modal-close" data-modal="eventModal">×</button>
+            </div>
+            <div class="conflict-warning" id="conflictWarning">
+                <div class="conflict-warning-title">⚠️ 检测到时间冲突</div>
+                <ul class="conflict-warning-list" id="conflictList"></ul>
+            </div>
+            <form id="eventForm">
+                <input type="hidden" id="eventId">
+                <div class="form-group">
+                    <label class="form-label">日程标题</label>
+                    <input type="text" class="form-input" id="eventTitle" required placeholder="请输入日程标题">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">开始时间</label>
+                        <input type="datetime-local" class="form-input" id="eventStartTime" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">结束时间</label>
+                        <input type="datetime-local" class="form-input" id="eventEndTime" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">地点</label>
+                    <input type="text" class="form-input" id="eventLocation" placeholder="请输入地点">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">关联联系人</label>
+                    <select class="form-input" id="eventContactId">
+                        <option value="">不关联联系人</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">备注</label>
+                    <textarea class="form-input form-textarea" id="eventNotes" placeholder="请输入备注信息"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-modal="eventModal">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="contactModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title" id="contactModalTitle">添加联系人</span>
+                <button class="modal-close" data-modal="contactModal">×</button>
+            </div>
+            <form id="contactForm">
+                <input type="hidden" id="contactId">
+                <div class="form-group">
+                    <label class="form-label">姓名</label>
+                    <input type="text" class="form-input" id="contactName" required placeholder="请输入姓名">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">关系</label>
+                    <select class="form-input" id="contactRelationship">
+                        <option value="同事">同事</option>
+                        <option value="朋友">朋友</option>
+                        <option value="家人">家人</option>
+                        <option value="客户">客户</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">电话</label>
+                    <input type="tel" class="form-input" id="contactPhone" placeholder="请输入电话号码">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">备注</label>
+                    <textarea class="form-input form-textarea" id="contactRemark" placeholder="请输入备注信息"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-modal="contactModal">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="eventDetailModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">日程详情</span>
+                <button class="modal-close" data-modal="eventDetailModal">×</button>
+            </div>
+            <div id="eventDetailContent"></div>
+            <div class="form-actions">
+                <button class="btn btn-danger" id="deleteEventBtn">删除</button>
+                <button class="btn btn-primary" id="editEventBtn">编辑</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ==================== 数据存储模块 ====================
+        const Storage = (function() {
+            const EVENTS_KEY = 'schedule_events';
+            const CONTACTS_KEY = 'schedule_contacts';
+
+            return {
+                saveEvents(events) {
+                    localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
+                },
+                loadEvents() {
+                    const data = localStorage.getItem(EVENTS_KEY);
+                    return data ? JSON.parse(data) : [];
+                },
+                saveContacts(contacts) {
+                    localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts));
+                },
+                loadContacts() {
+                    const data = localStorage.getItem(CONTACTS_KEY);
+                    return data ? JSON.parse(data) : [];
+                }
+            };
+        })();
+
+        // ==================== 联系人管理模块 ====================
+        const ContactManager = (function() {
+            let contacts = [];
+            let nextId = 1;
+
+            function init() {
+                contacts = Storage.loadContacts();
+                if (contacts.length > 0) {
+                    nextId = Math.max(...contacts.map(c => c.id)) + 1;
+                }
+            }
+
+            function addContact(contactObj) {
+                const contact = {
+                    id: nextId++,
+                    name: contactObj.name,
+                    relationship: contactObj.relationship || '其他',
+                    phone: contactObj.phone || '',
+                    remark: contactObj.remark || ''
+                };
+                contacts.push(contact);
+                Storage.saveContacts(contacts);
+                return contact;
+            }
+
+            function removeContact(id) {
+                contacts = contacts.filter(c => c.id !== id);
+                Storage.saveContacts(contacts);
+                return true;
+            }
+
+            function updateContact(id, newData) {
+                const index = contacts.findIndex(c => c.id === id);
+                if (index === -1) return null;
+                contacts[index] = { ...contacts[index], ...newData, id };
+                Storage.saveContacts(contacts);
+                return contacts[index];
+            }
+
+            function getContactById(id) {
+                return contacts.find(c => c.id === id) || null;
+            }
+
+            function getAllContacts() {
+                return [...contacts];
+            }
+
+            init();
+
+            return {
+                addContact,
+                removeContact,
+                updateContact,
+                getContactById,
+                getAllContacts
+            };
+        })();
+
+        // ==================== 日程管理模块 ====================
+        const EventScheduler = (function() {
+            let events = [];
+            let nextId = 1;
+
+            function init() {
+                events = Storage.loadEvents();
+                if (events.length > 0) {
+                    nextId = Math.max(...events.map(e => e.id)) + 1;
+                }
+            }
+
+            function isSameDay(date1, date2) {
+                const d1 = new Date(date1);
+                const d2 = new Date(date2);
+                return d1.getFullYear() === d2.getFullYear() &&
+                       d1.getMonth() === d2.getMonth() &&
+                       d1.getDate() === d2.getDate();
+            }
+
+            function getConflicts(eventObj, excludeId = null) {
+                const startTime = new Date(eventObj.startTime).getTime();
+                const endTime = new Date(eventObj.endTime).getTime();
+                
+                return events.filter(e => {
+                    if (excludeId !== null && e.id === excludeId) return false;
+                    if (!isSameDay(e.startTime, eventObj.startTime)) return false;
+                    const eStart = new Date(e.startTime).getTime();
+                    const eEnd = new Date(e.endTime).getTime();
+                    return (startTime < eEnd && endTime > eStart);
+                });
+            }
+
+            function addEvent(eventObj) {
+                const event = {
+                    id: nextId++,
+                    title: eventObj.title,
+                    startTime: eventObj.startTime,
+                    endTime: eventObj.endTime,
+                    location: eventObj.location || '',
+                    contactId: eventObj.contactId || null,
+                    notes: eventObj.notes || ''
+                };
+                events.push(event);
+                Storage.saveEvents(events);
+                return event;
+            }
+
+            function removeEvent(id) {
+                events = events.filter(e => e.id !== id);
+                Storage.saveEvents(events);
+                return true;
+            }
+
+            function updateEvent(id, newData) {
+                const index = events.findIndex(e => e.id === id);
+                if (index === -1) return null;
+                events[index] = { ...events[index], ...newData, id };
+                Storage.saveEvents(events);
+                return events[index];
+            }
+
+            function getEventsByDate(date) {
+                return events.filter(e => isSameDay(e.startTime, date));
+            }
+
+            function getEventsByWeek(date) {
+                const d = new Date(date);
+                const day = d.getDay();
+                const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+                const monday = new Date(d.setDate(diff));
+                monday.setHours(0, 0, 0, 0);
+                
+                const weekEvents = [];
+                for (let i = 0; i < 7; i++) {
+                    const current = new Date(monday);
+                    current.setDate(monday.getDate() + i);
+                    weekEvents.push({
+                        date: current,
+                        events: getEventsByDate(current)
+                    });
+                }
+                return weekEvents;
+            }
+
+            function getAllEvents() {
+                return [...events];
+            }
+
+            function hasConflict(eventId) {
+                const event = events.find(e => e.id === eventId);
+                if (!event) return false;
+                return getConflicts(event, eventId).length > 0;
+            }
+
+            init();
+
+            return {
+                addEvent,
+                removeEvent,
+                updateEvent,
+                getEventsByDate,
+                getEventsByWeek,
+                getConflicts,
+                getAllEvents,
+                hasConflict
+            };
+        })();
+
+        // ==================== 提醒模块 ====================
+        const Reminder = (function() {
+            let notifiedEvents = new Set();
+
+            function showToast(title, message) {
+                const container = document.getElementById('toastContainer');
+                const toast = document.createElement('div');
+                toast.className = 'toast';
+                toast.innerHTML = `
+                    <div class="toast-icon">⏰</div>
+                    <div class="toast-content">
+                        <div class="toast-title">${title}</div>
+                        <div class="toast-message">${message}</div>
+                    </div>
+                    <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+                `;
+                container.appendChild(toast);
+                setTimeout(() => toast.remove(), 5000);
+            }
+
+            function requestNotificationPermission() {
+                if ('Notification' in window && Notification.permission === 'default') {
+                    Notification.requestPermission();
+                }
+            }
+
+            function checkReminders() {
+                const now = new Date().getTime();
+                const events = EventScheduler.getAllEvents();
+
+                events.forEach(event => {
+                    if (notifiedEvents.has(event.id)) return;
+                    
+                    const startTime = new Date(event.startTime).getTime();
+                    const diffMinutes = (startTime - now) / (1000 * 60);
+
+                    if (diffMinutes > 0 && diffMinutes <= 5) {
+                        const title = '日程提醒';
+                        const message = `${event.title} 将在5分钟后开始`;
+
+                        if ('Notification' in window && Notification.permission === 'granted') {
+                            new Notification(title, {
+                                body: message,
+                                icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📅</text></svg>'
+                            });
+                        } else {
+                            showToast(title, message);
+                        }
+
+                        notifiedEvents.add(event.id);
+                    }
+                });
+            }
+
+            function start() {
+                requestNotificationPermission();
+                setInterval(checkReminders, 30000);
+                checkReminders();
+            }
+
+            return { start };
+        })();
+
+        // ==================== UI渲染模块 ====================
+        const UI = (function() {
+            let currentView = 'day';
+            let currentDate = new Date();
+            let currentEditingEventId = null;
+
+            function formatDate(date) {
+                const d = new Date(date);
+                return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+            }
+
+            function formatTime(date) {
+                const d = new Date(date);
+                return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+            }
+
+            function formatDateTimeLocal(date) {
+                const d = new Date(date);
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const hours = String(d.getHours()).padStart(2, '0');
+                const minutes = String(d.getMinutes()).padStart(2, '0');
+                return `${year}-${month}-${day}T${hours}:${minutes}`;
+            }
+
+            function renderDayView() {
+                const container = document.getElementById('dayView');
+                const events = EventScheduler.getEventsByDate(currentDate);
+                
+                let html = '';
+                for (let hour = 0; hour < 24; hour++) {
+                    html += `
+                        <div class="time-slot" data-hour="${hour}">
+                            <div class="time-label">${String(hour).padStart(2, '0')}:00</div>
+                            <div class="time-events"></div>
+                        </div>
+                    `;
+                }
+                container.innerHTML = html;
+
+                events.forEach(event => {
+                    const startTime = new Date(event.startTime);
+                    const endTime = new Date(event.endTime);
+                    const startHour = startTime.getHours() + startTime.getMinutes() / 60;
+                    const duration = (endTime - startTime) / (1000 * 60 * 60);
+                    const top = startHour * 60;
+                    const height = duration * 60;
+
+                    const hasConflict = EventScheduler.hasConflict(event.id);
+                    const contact = event.contactId ? ContactManager.getContactById(parseInt(event.contactId)) : null;
+
+                    const eventEl = document.createElement('div');
+                    eventEl.className = `event-card ${hasConflict ? 'conflict' : 'normal'}`;
+                    eventEl.style.top = `${top}px`;
+                    eventEl.style.height = `${Math.max(height - 4, 30)}px`;
+                    eventEl.dataset.eventId = event.id;
+                    eventEl.innerHTML = `
+                        <div class="event-title">${event.title}</div>
+                        <div class="event-meta">
+                            ${formatTime(event.startTime)} - ${formatTime(event.endTime)}
+                            ${event.location ? `| ${event.location}` : ''}
+                            ${contact ? `| 👤 ${contact.name}` : ''}
+                        </div>
+                    `;
+                    eventEl.addEventListener('click', () => showEventDetail(event.id));
+
+                    const hourSlot = container.querySelector(`[data-hour="${Math.floor(startHour)}"] .time-events`);
+                    if (hourSlot) {
+                        hourSlot.appendChild(eventEl);
+                    }
+                });
+            }
+
+            function renderWeekView() {
+                const container = document.getElementById('weekGrid');
+                const weekData = EventScheduler.getEventsByWeek(currentDate);
+                const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+                const today = new Date();
+
+                let html = '';
+                weekData.forEach((day, index) => {
+                    const isToday = isSameDay(day.date, today);
+                    html += `
+                        <div class="week-day ${isToday ? 'today' : ''}">
+                            <div class="week-day-header">
+                                <div class="week-day-name">${dayNames[index]}</div>
+                                <div class="week-day-date">${day.date.getDate()}</div>
+                            </div>
+                            <div class="week-day-events">
+                    `;
+
+                    if (day.events.length === 0) {
+                        html += `<div class="empty-state" style="padding: 20px 0; font-size: 12px;">暂无日程</div>`;
+                    } else {
+                        day.events.forEach(event => {
+                            const hasConflict = EventScheduler.hasConflict(event.id);
+                            html += `
+                                <div class="week-event ${hasConflict ? 'conflict' : ''}" data-event-id="${event.id}">
+                                    <div class="week-event-title">${event.title}</div>
+                                    <div class="week-event-time">${formatTime(event.startTime)}</div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
+
+                container.querySelectorAll('.week-event').forEach(el => {
+                    el.addEventListener('click', () => {
+                        showEventDetail(parseInt(el.dataset.eventId));
+                    });
+                });
+            }
+
+            function isSameDay(date1, date2) {
+                return date1.getFullYear() === date2.getFullYear() &&
+                       date1.getMonth() === date2.getMonth() &&
+                       date1.getDate() === date2.getDate();
+            }
+
+            function renderContacts() {
+                const container = document.getElementById('contactsList');
+                const contacts = ContactManager.getAllContacts();
+
+                if (contacts.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">👥</div>
+                            <div>暂无联系人</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = '';
+                contacts.forEach(contact => {
+                    html += `
+                        <div class="contact-item" data-contact-id="${contact.id}">
+                            <div class="contact-avatar">${contact.name.charAt(0)}</div>
+                            <div class="contact-info">
+                                <div class="contact-name">${contact.name}</div>
+                                <div class="contact-relationship">${contact.relationship} ${contact.phone ? '| ' + contact.phone : ''}</div>
+                            </div>
+                            <div class="contact-actions">
+                                <button class="contact-action-btn" data-action="edit" title="编辑">✏️</button>
+                                <button class="contact-action-btn" data-action="delete" title="删除">🗑️</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+
+                container.querySelectorAll('.contact-action-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const contactId = parseInt(btn.closest('.contact-item').dataset.contactId);
+                        if (btn.dataset.action === 'edit') {
+                            editContact(contactId);
+                        } else if (btn.dataset.action === 'delete') {
+                            deleteContact(contactId);
+                        }
+                    });
+                });
+            }
+
+            function updateContactSelect() {
+                const select = document.getElementById('eventContactId');
+                const contacts = ContactManager.getAllContacts();
+                let html = '<option value="">不关联联系人</option>';
+                contacts.forEach(contact => {
+                    html += `<option value="${contact.id}">${contact.name} (${contact.relationship})</option>`;
+                });
+                select.innerHTML = html;
+            }
+
+            function showEventModal(eventId = null) {
+                const modal = document.getElementById('eventModal');
+                const form = document.getElementById('eventForm');
+                const title = document.getElementById('eventModalTitle');
+                const warning = document.getElementById('conflictWarning');
+                
+                warning.classList.remove('active');
+                form.reset();
+                currentEditingEventId = eventId;
+
+                if (eventId) {
+                    title.textContent = '编辑日程';
+                    const events = EventScheduler.getAllEvents();
+                    const event = events.find(e => e.id === eventId);
+                    if (event) {
+                        document.getElementById('eventId').value = event.id;
+                        document.getElementById('eventTitle').value = event.title;
+                        document.getElementById('eventStartTime').value = formatDateTimeLocal(event.startTime);
+                        document.getElementById('eventEndTime').value = formatDateTimeLocal(event.endTime);
+                        document.getElementById('eventLocation').value = event.location || '';
+                        document.getElementById('eventContactId').value = event.contactId || '';
+                        document.getElementById('eventNotes').value = event.notes || '';
+                        checkConflict();
+                    }
+                } else {
+                    title.textContent = '添加日程';
+                    document.getElementById('eventId').value = '';
+                    const now = new Date();
+                    now.setMinutes(Math.ceil(now.getMinutes() / 30) * 30);
+                    const end = new Date(now.getTime() + 60 * 60 * 1000);
+                    document.getElementById('eventStartTime').value = formatDateTimeLocal(now);
+                    document.getElementById('eventEndTime').value = formatDateTimeLocal(end);
+                }
+
+                updateContactSelect();
+                modal.classList.add('active');
+            }
+
+            function showEventDetail(eventId) {
+                const modal = document.getElementById('eventDetailModal');
+                const content = document.getElementById('eventDetailContent');
+                const events = EventScheduler.getAllEvents();
+                const event = events.find(e => e.id === eventId);
+                
+                if (!event) return;
+
+                const contact = event.contactId ? ContactManager.getContactById(parseInt(event.contactId)) : null;
+                const hasConflict = EventScheduler.hasConflict(eventId);
+
+                content.innerHTML = `
+                    ${hasConflict ? '<div class="conflict-warning active"><div class="conflict-warning-title">⚠️ 此日程存在时间冲突</div></div>' : ''}
+                    <div class="detail-item">
+                        <span class="detail-label">标题</span>
+                        <span class="detail-value">${event.title}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">时间</span>
+                        <span class="detail-value">${formatDate(event.startTime)} ${formatTime(event.startTime)} - ${formatTime(event.endTime)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">地点</span>
+                        <span class="detail-value">${event.location || '未设置'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">联系人</span>
+                        <span class="detail-value ${contact ? '' : 'deleted'}">${contact ? contact.name + ' (' + contact.relationship + ')' : '未关联或已删除'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">备注</span>
+                        <span class="detail-value">${event.notes || '无'}</span>
+                    </div>
+                `;
+
+                document.getElementById('editEventBtn').onclick = () => {
+                    modal.classList.remove('active');
+                    setTimeout(() => showEventModal(eventId), 200);
+                };
+
+                document.getElementById('deleteEventBtn').onclick = () => {
+                    if (confirm('确定要删除这个日程吗？')) {
+                        EventScheduler.removeEvent(eventId);
+                        modal.classList.remove('active');
+                        renderCurrentView();
+                    }
+                };
+
+                modal.classList.add('active');
+            }
+
+            function showContactModal(contactId = null) {
+                const modal = document.getElementById('contactModal');
+                const form = document.getElementById('contactForm');
+                const title = document.getElementById('contactModalTitle');
+                
+                form.reset();
+
+                if (contactId) {
+                    title.textContent = '编辑联系人';
+                    const contact = ContactManager.getContactById(contactId);
+                    if (contact) {
+                        document.getElementById('contactId').value = contact.id;
+                        document.getElementById('contactName').value = contact.name;
+                        document.getElementById('contactRelationship').value = contact.relationship;
+                        document.getElementById('contactPhone').value = contact.phone || '';
+                        document.getElementById('contactRemark').value = contact.remark || '';
+                    }
+                } else {
+                    title.textContent = '添加联系人';
+                    document.getElementById('contactId').value = '';
+                }
+
+                modal.classList.add('active');
+            }
+
+            function editContact(contactId) {
+                showContactModal(contactId);
+            }
+
+            function deleteContact(contactId) {
+                if (confirm('确定要删除这个联系人吗？关联的日程不会被删除。')) {
+                    ContactManager.removeContact(contactId);
+                    renderContacts();
+                    renderCurrentView();
+                }
+            }
+
+            function checkConflict() {
+                const startTime = document.getElementById('eventStartTime').value;
+                const endTime = document.getElementById('eventEndTime').value;
+                
+                if (!startTime || !endTime) return;
+
+                const eventObj = {
+                    startTime: new Date(startTime).toISOString(),
+                    endTime: new Date(endTime).toISOString()
+                };
+
+                const conflicts = EventScheduler.getConflicts(eventObj, currentEditingEventId);
+                const warning = document.getElementById('conflictWarning');
+                const list = document.getElementById('conflictList');
+
+                if (conflicts.length > 0) {
+                    warning.classList.add('active');
+                    list.innerHTML = conflicts.map(c => 
+                        `<li>${c.title} (${formatTime(c.startTime)} - ${formatTime(c.endTime)})</li>`
+                    ).join('');
+                } else {
+                    warning.classList.remove('active');
+                }
+            }
+
+            function renderCurrentView() {
+                document.getElementById('currentDateDisplay').textContent = 
+                    currentView === 'day' ? formatDate(currentDate) : 
+                    `${formatDate(getWeekStart(currentDate))} - ${formatDate(getWeekEnd(currentDate))}`;
+
+                if (currentView === 'day') {
+                    document.getElementById('dayView').style.display = 'block';
+                    document.getElementById('weekView').style.display = 'none';
+                    renderDayView();
+                } else {
+                    document.getElementById('dayView').style.display = 'none';
+                    document.getElementById('weekView').style.display = 'block';
+                    renderWeekView();
+                }
+            }
+
+            function getWeekStart(date) {
+                const d = new Date(date);
+                const day = d.getDay();
+                const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+                return new Date(d.setDate(diff));
+            }
+
+            function getWeekEnd(date) {
+                const start = getWeekStart(date);
+                return new Date(start.setDate(start.getDate() + 6));
+            }
+
+            function initEvents() {
+                document.querySelectorAll('.view-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        currentView = btn.dataset.view;
+                        renderCurrentView();
+                    });
+                });
+
+                document.getElementById('prevDate').addEventListener('click', () => {
+                    if (currentView === 'day') {
+                        currentDate.setDate(currentDate.getDate() - 1);
+                    } else {
+                        currentDate.setDate(currentDate.getDate() - 7);
+                    }
+                    renderCurrentView();
+                });
+
+                document.getElementById('nextDate').addEventListener('click', () => {
+                    if (currentView === 'day') {
+                        currentDate.setDate(currentDate.getDate() + 1);
+                    } else {
+                        currentDate.setDate(currentDate.getDate() + 7);
+                    }
+                    renderCurrentView();
+                });
+
+                document.getElementById('addEventBtn').addEventListener('click', () => showEventModal());
+                document.getElementById('addContactBtn').addEventListener('click', () => showContactModal());
+
+                document.querySelectorAll('.modal-close, .btn-secondary[data-modal]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.getElementById(btn.dataset.modal).classList.remove('active');
+                    });
+                });
+
+                document.querySelectorAll('.modal-overlay').forEach(overlay => {
+                    overlay.addEventListener('click', (e) => {
+                        if (e.target === overlay) {
+                            overlay.classList.remove('active');
+                        }
+                    });
+                });
+
+                document.getElementById('eventForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    
+                    const eventData = {
+                        title: document.getElementById('eventTitle').value,
+                        startTime: new Date(document.getElementById('eventStartTime').value).toISOString(),
+                        endTime: new Date(document.getElementById('eventEndTime').value).toISOString(),
+                        location: document.getElementById('eventLocation').value,
+                        contactId: document.getElementById('eventContactId').value || null,
+                        notes: document.getElementById('eventNotes').value
+                    };
+
+                    const eventId = document.getElementById('eventId').value;
+                    if (eventId) {
+                        EventScheduler.updateEvent(parseInt(eventId), eventData);
+                    } else {
+                        EventScheduler.addEvent(eventData);
+                    }
+
+                    document.getElementById('eventModal').classList.remove('active');
+                    renderCurrentView();
+                });
+
+                document.getElementById('contactForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    
+                    const contactData = {
+                        name: document.getElementById('contactName').value,
+                        relationship: document.getElementById('contactRelationship').value,
+                        phone: document.getElementById('contactPhone').value,
+                        remark: document.getElementById('contactRemark').value
+                    };
+
+                    const contactId = document.getElementById('contactId').value;
+                    if (contactId) {
+                        ContactManager.updateContact(parseInt(contactId), contactData);
+                    } else {
+                        ContactManager.addContact(contactData);
+                    }
+
+                    document.getElementById('contactModal').classList.remove('active');
+                    renderContacts();
+                    updateContactSelect();
+                });
+
+                document.getElementById('eventStartTime').addEventListener('change', checkConflict);
+                document.getElementById('eventEndTime').addEventListener('change', checkConflict);
+            }
+
+            function init() {
+                initEvents();
+                renderContacts();
+                renderCurrentView();
+                Reminder.start();
+            }
+
+            return { init };
+        })();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            UI.init();
+        });
+    </script>
+</body>
+</html>

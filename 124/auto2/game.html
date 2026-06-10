@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>沙盒开放世界</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #000; font-family: 'Microsoft YaHei', sans-serif; }
+        canvas { display: block; }
+        
+        .ui-panel {
+            position: absolute;
+            background: rgba(20, 20, 30, 0.9);
+            border: 2px solid #5a5;
+            border-radius: 8px;
+            padding: 15px;
+            color: #fff;
+            z-index: 100;
+        }
+        
+        #status-bar {
+            top: 10px;
+            left: 10px;
+            padding: 10px;
+            min-width: 200px;
+        }
+        
+        .stat-row {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        
+        .stat-label {
+            width: 50px;
+            font-size: 12px;
+        }
+        
+        .stat-bar {
+            flex: 1;
+            height: 14px;
+            background: #333;
+            border-radius: 7px;
+            overflow: hidden;
+            margin: 0 8px;
+        }
+        
+        .stat-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+        
+        .health-fill { background: linear-gradient(90deg, #f55, #f88); }
+        .hunger-fill { background: linear-gradient(90deg, #fa5, #fc8); }
+        
+        .stat-value {
+            font-size: 12px;
+            width: 40px;
+            text-align: right;
+        }
+        
+        #fps-counter {
+            top: 10px;
+            right: 10px;
+            padding: 8px 12px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+        
+        #inventory-panel {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            min-width: 300px;
+            display: none;
+        }
+        
+        #inventory-panel h3 {
+            text-align: center;
+            margin-bottom: 15px;
+            color: #5f5;
+        }
+        
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        
+        .inventory-slot {
+            width: 60px;
+            height: 60px;
+            background: rgba(50, 50, 70, 0.8);
+            border: 2px solid #666;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .inventory-icon {
+            font-size: 28px;
+        }
+        
+        .inventory-count {
+            position: absolute;
+            bottom: 2px;
+            right: 5px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 1px 1px 2px #000;
+        }
+        
+        #build-panel {
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            padding: 10px;
+        }
+        
+        .build-items {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .build-item {
+            width: 70px;
+            height: 80px;
+            background: rgba(50, 50, 70, 0.8);
+            border: 2px solid #666;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .build-item:hover {
+            border-color: #5f5;
+            background: rgba(70, 70, 90, 0.9);
+        }
+        
+        .build-item.selected {
+            border-color: #ff0;
+            box-shadow: 0 0 10px #ff0;
+        }
+        
+        .build-icon {
+            font-size: 30px;
+        }
+        
+        .build-name {
+            font-size: 11px;
+            margin-top: 4px;
+        }
+        
+        .build-cost {
+            font-size: 10px;
+            color: #fa5;
+        }
+        
+        #controls-hint {
+            bottom: 10px;
+            left: 10px;
+            padding: 8px 12px;
+            font-size: 11px;
+            opacity: 0.8;
+        }
+        
+        #game-over {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none;
+            padding: 30px 50px;
+            z-index: 500;
+        }
+        
+        #game-over h2 {
+            color: #f55;
+            margin-bottom: 20px;
+            font-size: 32px;
+        }
+        
+        #game-over p {
+            margin-bottom: 20px;
+            color: #aaa;
+        }
+        
+        .restart-btn {
+            padding: 10px 30px;
+            background: #5a5;
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .restart-btn:hover {
+            background: #6b6;
+        }
+        
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+        
+        #interaction-hint {
+            position: absolute;
+            bottom: 220px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 5px;
+            font-size: 14px;
+            display: none;
+            z-index: 100;
+            pointer-events: none;
+            text-align: center;
+            max-width: 80%;
+        }
+        
+        #toast-hint {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(200, 50, 50, 0.9);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            display: none;
+            z-index: 200;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        
+        #toast-hint.success {
+            background: rgba(50, 180, 80, 0.9);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="night-overlay" class="overlay"></div>
+    
+    <div id="status-bar" class="ui-panel">
+        <div class="stat-row">
+            <span class="stat-label">❤️ 生命</span>
+            <div class="stat-bar">
+                <div id="health-bar" class="stat-fill health-fill" style="width: 100%"></div>
+            </div>
+            <span id="health-value" class="stat-value">100</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">🍖 饱食</span>
+            <div class="stat-bar">
+                <div id="hunger-bar" class="stat-fill hunger-fill" style="width: 100%"></div>
+            </div>
+            <span id="hunger-value" class="stat-value">100</span>
+        </div>
+    </div>
+    
+    <div id="fps-counter" class="ui-panel">FPS: 60</div>
+    
+    <div id="controls-hint" class="ui-panel">
+        WASD移动 | E采集 | B建造 | I背包 | ESC关闭
+    </div>
+    
+    <div id="interaction-hint"></div>
+    
+    <div id="toast-hint"></div>
+    
+    <div id="inventory-panel" class="ui-panel">
+        <h3>🎒 背包</h3>
+        <div class="inventory-grid" id="inventory-grid"></div>
+    </div>
+    
+    <div id="build-panel" class="ui-panel">
+        <div class="build-items" id="build-items"></div>
+    </div>
+    
+    <div id="game-over" class="ui-panel">
+        <h2>游戏结束</h2>
+        <p>你饿死了...</p>
+        <button class="restart-btn" onclick="location.reload()">重新开始</button>
+    </div>
+
+    <script>
+        // ==================== 常量配置 ====================
+        const CONFIG = {
+            TILE_SIZE: 32,
+            CHUNK_SIZE: 16,
+            CHUNK_PIXELS: 16 * 32,
+            PLAYER_SPEED: 150,
+            CAMERA_LERP: 0.1,
+            HUNGER_DECAY: 0.5,
+            HUNGER_DAMAGE: 2,
+            DAY_LENGTH: 240,
+            COLLECT_RANGE: 2 * 32,
+            COLLECT_COOLDOWN: 0.5,
+            BERRY_HUNGER_RESTORE: 10,
+            WOOD_WALL_COST: 2
+        };
+
+        // ==================== 噪声与随机 ====================
+        class SeededRandom {
+            constructor(seed) {
+                this.seed = seed;
+            }
+            
+            next() {
+                this.seed = (this.seed * 9301 + 49297) % 233280;
+                return this.seed / 233280;
+            }
+            
+            range(min, max) {
+                return min + this.next() * (max - min);
+            }
+            
+            int(min, max) {
+                return Math.floor(this.range(min, max + 1));
+            }
+        }
+
+        function simpleNoise2D(x, y, seed) {
+            const hash = x * 374761393 + y * 668265263 + seed;
+            let n = (hash ^ (hash << 13)) * 1274126177;
+            n = n ^ (n << 13);
+            n = n * 1274126177;
+            n = n ^ (n >> 16);
+            return (n & 0xfffffff) / 0xfffffff;
+        }
+
+        function smoothNoise(x, y, seed) {
+            const x0 = Math.floor(x);
+            const y0 = Math.floor(y);
+            const fx = x - x0;
+            const fy = y - y0;
+            
+            const v00 = simpleNoise2D(x0, y0, seed);
+            const v10 = simpleNoise2D(x0 + 1, y0, seed);
+            const v01 = simpleNoise2D(x0, y0 + 1, seed);
+            const v11 = simpleNoise2D(x0 + 1, y0 + 1, seed);
+            
+            const sx = fx * fx * (3 - 2 * fx);
+            const sy = fy * fy * (3 - 2 * fy);
+            
+            return v00 * (1 - sx) * (1 - sy) +
+                   v10 * sx * (1 - sy) +
+                   v01 * (1 - sx) * sy +
+                   v11 * sx * sy;
+        }
+
+        // ==================== 地图生成 ====================
+        const TERRAIN = { GRASS: 0, WATER: 1, FOREST: 2 };
+        
+        class World {
+            constructor() {
+                this.seed = Math.floor(Math.random() * 1000000);
+                this.chunks = new Map();
+                this.pendingChunks = [];
+                this.loadedChunks = new Set();
+            }
+            
+            getChunkKey(cx, cy) {
+                return `${cx},${cy}`;
+            }
+            
+            generateTerrain(cx, cy, x, y) {
+                const worldX = cx * CONFIG.CHUNK_SIZE + x;
+                const worldY = cy * CONFIG.CHUNK_SIZE + y;
+                
+                const scale = 0.08;
+                const elevation = smoothNoise(worldX * scale, worldY * scale, this.seed);
+                const moisture = smoothNoise(worldX * scale + 1000, worldY * scale + 1000, this.seed + 500);
+                
+                if (elevation < 0.35) return TERRAIN.WATER;
+                if (moisture > 0.55 && elevation > 0.5) return TERRAIN.FOREST;
+                return TERRAIN.GRASS;
+            }
+            
+            generateChunk(cx, cy) {
+                const key = this.getChunkKey(cx, cy);
+                if (this.chunks.has(key)) return this.chunks.get(key);
+                
+                const chunk = {
+                    cx, cy,
+                    tiles: [],
+                    objects: [],
+                    decorations: [],
+                    generated: false
+                };
+                
+                for (let y = 0; y < CONFIG.CHUNK_SIZE; y++) {
+                    chunk.tiles[y] = [];
+                    for (let x = 0; x < CONFIG.CHUNK_SIZE; x++) {
+                        chunk.tiles[y][x] = this.generateTerrain(cx, cy, x, y);
+                    }
+                }
+                
+                const rand = new SeededRandom(cx * 10000 + cy + this.seed);
+                
+                const berryCount = rand.int(2, 4);
+                for (let i = 0; i < berryCount; i++) {
+                    const bx = rand.int(0, CONFIG.CHUNK_SIZE - 1);
+                    const by = rand.int(0, CONFIG.CHUNK_SIZE - 1);
+                    if (chunk.tiles[by][bx] === TERRAIN.GRASS || chunk.tiles[by][bx] === TERRAIN.FOREST) {
+                        chunk.objects.push({
+                            type: 'berry',
+                            x: cx * CONFIG.CHUNK_SIZE + bx,
+                            y: cy * CONFIG.CHUNK_SIZE + by,
+                            collected: false
+                        });
+                    }
+                }
+                
+                for (let y = 0; y < CONFIG.CHUNK_SIZE; y++) {
+                    for (let x = 0; x < CONFIG.CHUNK_SIZE; x++) {
+                        if (chunk.tiles[y][x] === TERRAIN.FOREST && rand.next() > 0.4) {
+                            chunk.objects.push({
+                                type: 'tree',
+                                x: cx * CONFIG.CHUNK_SIZE + x,
+                                y: cy * CONFIG.CHUNK_SIZE + y,
+                                cut: false
+                            });
+                        }
+                    }
+                }
+                
+                for (let y = 0; y < CONFIG.CHUNK_SIZE; y++) {
+                    for (let x = 0; x < CONFIG.CHUNK_SIZE; x++) {
+                        if (chunk.tiles[y][x] === TERRAIN.GRASS && rand.next() < 0.3) {
+                            chunk.decorations.push({
+                                type: rand.next() < 0.5 ? 'grass' : 'flower',
+                                x: cx * CONFIG.CHUNK_SIZE + x,
+                                y: cy * CONFIG.CHUNK_SIZE + y,
+                                variant: rand.int(0, 2)
+                            });
+                        }
+                    }
+                }
+                
+                chunk.generated = true;
+                this.chunks.set(key, chunk);
+                this.loadedChunks.add(key);
+                return chunk;
+            }
+            
+            getTile(worldX, worldY) {
+                const cx = Math.floor(worldX / CONFIG.CHUNK_SIZE);
+                const cy = Math.floor(worldY / CONFIG.CHUNK_SIZE);
+                const tx = ((worldX % CONFIG.CHUNK_SIZE) + CONFIG.CHUNK_SIZE) % CONFIG.CHUNK_SIZE;
+                const ty = ((worldY % CONFIG.CHUNK_SIZE) + CONFIG.CHUNK_SIZE) % CONFIG.CHUNK_SIZE;
+                
+                const key = this.getChunkKey(cx, cy);
+                const chunk = this.chunks.get(key);
+                if (!chunk) return TERRAIN.GRASS;
+                return chunk.tiles[ty][tx];
+            }
+            
+            isWalkable(worldX, worldY) {
+                const tile = this.getTile(Math.floor(worldX / CONFIG.TILE_SIZE), Math.floor(worldY / CONFIG.TILE_SIZE));
+                if (tile === TERRAIN.WATER) return false;
+                
+                for (const chunk of this.chunks.values()) {
+                    for (const obj of chunk.objects) {
+                        if (obj.type === 'tree' && !obj.cut) {
+                            const objX = obj.x * CONFIG.TILE_SIZE;
+                            const objY = obj.y * CONFIG.TILE_SIZE;
+                            if (worldX >= objX && worldX < objX + CONFIG.TILE_SIZE &&
+                                worldY >= objY && worldY < objY + CONFIG.TILE_SIZE) {
+                                return false;
+                            }
+                        }
+                        if (obj.type === 'wall') {
+                            const objX = obj.x * CONFIG.TILE_SIZE;
+                            const objY = obj.y * CONFIG.TILE_SIZE;
+                            if (worldX >= objX && worldX < objX + CONFIG.TILE_SIZE &&
+                                worldY >= objY && worldY < objY + CONFIG.TILE_SIZE) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                return true;
+            }
+            
+            updateChunks(playerX, playerY) {
+                const pcx = Math.floor(playerX / CONFIG.CHUNK_PIXELS);
+                const pcy = Math.floor(playerY / CONFIG.CHUNK_PIXELS);
+                
+                const needed = new Set();
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        needed.add(this.getChunkKey(pcx + dx, pcy + dy));
+                    }
+                }
+                
+                for (const key of needed) {
+                    if (!this.chunks.has(key)) {
+                        const [cx, cy] = key.split(',').map(Number);
+                        this.pendingChunks.push({ cx, cy, priority: Math.abs(cx - pcx) + Math.abs(cy - pcy) });
+                    }
+                }
+                
+                this.pendingChunks.sort((a, b) => a.priority - b.priority);
+                
+                for (const key of this.chunks.keys()) {
+                    if (!needed.has(key)) {
+                        this.chunks.delete(key);
+                        this.loadedChunks.delete(key);
+                    }
+                }
+            }
+            
+            processPendingChunks(maxPerFrame = 1) {
+                let processed = 0;
+                while (this.pendingChunks.length > 0 && processed < maxPerFrame) {
+                    const { cx, cy } = this.pendingChunks.shift();
+                    this.generateChunk(cx, cy);
+                    processed++;
+                }
+            }
+        }
+
+        // ==================== 玩家 ====================
+        class Player {
+            constructor() {
+                this.x = 0;
+                this.y = 0;
+                this.vx = 0;
+                this.vy = 0;
+                this.health = 100;
+                this.hunger = 100;
+                this.inventory = { wood: 0, berry: 0 };
+                this.collectCooldown = 0;
+                this.facingX = 1;
+                this.facingY = 0;
+            }
+            
+            update(dt, keys, world) {
+                this.vx = 0;
+                this.vy = 0;
+                
+                if (keys['w'] || keys['W']) { this.vy = -1; this.facingX = 0; this.facingY = -1; }
+                if (keys['s'] || keys['S']) { this.vy = 1; this.facingX = 0; this.facingY = 1; }
+                if (keys['a'] || keys['A']) { this.vx = -1; this.facingX = -1; this.facingY = 0; }
+                if (keys['d'] || keys['D']) { this.vx = 1; this.facingX = 1; this.facingY = 0; }
+                
+                if (this.vx !== 0 && this.vy !== 0) {
+                    const len = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                    this.vx /= len;
+                    this.vy /= len;
+                }
+                
+                const speed = CONFIG.PLAYER_SPEED * dt;
+                const newX = this.x + this.vx * speed;
+                const newY = this.y + this.vy * speed;
+                
+                if (world.isWalkable(newX, this.y)) this.x = newX;
+                if (world.isWalkable(this.x, newY)) this.y = newY;
+                
+                this.hunger = Math.max(0, this.hunger - CONFIG.HUNGER_DECAY * dt);
+                
+                if (this.hunger <= 0) {
+                    this.health = Math.max(0, this.health - CONFIG.HUNGER_DAMAGE * dt);
+                }
+                
+                if (this.collectCooldown > 0) {
+                    this.collectCooldown -= dt;
+                }
+            }
+            
+            getFrontTile() {
+                const tileX = Math.floor(this.x / CONFIG.TILE_SIZE) + this.facingX;
+                const tileY = Math.floor(this.y / CONFIG.TILE_SIZE) + this.facingY;
+                return { x: tileX, y: tileY };
+            }
+        }
+
+        // ==================== 摄像机 ====================
+        class Camera {
+            constructor() {
+                this.x = 0;
+                this.y = 0;
+            }
+            
+            follow(target, dt) {
+                const targetX = target.x - canvas.width / 2;
+                const targetY = target.y - canvas.height / 2;
+                this.x += (targetX - this.x) * CONFIG.CAMERA_LERP;
+                this.y += (targetY - this.y) * CONFIG.CAMERA_LERP;
+            }
+        }
+
+        // ==================== 粒子系统 ====================
+        class ParticleSystem {
+            constructor() {
+                this.particles = [];
+            }
+            
+            spawnLeaf(x, y) {
+                this.particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 20,
+                    vy: 20 + Math.random() * 20,
+                    life: 2 + Math.random() * 2,
+                    maxLife: 4,
+                    size: 4 + Math.random() * 4,
+                    rotation: Math.random() * Math.PI * 2,
+                    rotSpeed: (Math.random() - 0.5) * 4
+                });
+            }
+            
+            update(dt) {
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx * dt;
+                    p.y += p.vy * dt;
+                    p.rotation += p.rotSpeed * dt;
+                    p.life -= dt;
+                    
+                    if (p.life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+            }
+            
+            draw(ctx, camera) {
+                for (const p of this.particles) {
+                    const alpha = p.life / p.maxLife;
+                    ctx.save();
+                    ctx.translate(p.x - camera.x, p.y - camera.y);
+                    ctx.rotate(p.rotation);
+                    ctx.fillStyle = `rgba(100, 180, 80, ${alpha})`;
+                    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+                    ctx.restore();
+                }
+            }
+        }
+
+        // ==================== 渲染器 ====================
+        class Renderer {
+            constructor() {
+                this.dayTime = 0;
+            }
+            
+            getTerrainColor(terrain) {
+                switch (terrain) {
+                    case TERRAIN.WATER: return '#4488cc';
+                    case TERRAIN.FOREST: return '#3a7a3a';
+                    default: return '#5a9a5a';
+                }
+            }
+            
+            drawTile(ctx, worldX, worldY, terrain, camera) {
+                const screenX = worldX * CONFIG.TILE_SIZE - camera.x;
+                const screenY = worldY * CONFIG.TILE_SIZE - camera.y;
+                
+                if (screenX < -CONFIG.TILE_SIZE || screenX > canvas.width ||
+                    screenY < -CONFIG.TILE_SIZE || screenY > canvas.height) {
+                    return;
+                }
+                
+                ctx.fillStyle = this.getTerrainColor(terrain);
+                ctx.fillRect(screenX, screenY, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+                
+                if (terrain === TERRAIN.GRASS) {
+                    const detail = (Math.sin(worldX * 0.5) + Math.cos(worldY * 0.5)) * 10;
+                    ctx.fillStyle = `rgba(80, ${140 + detail}, 80, 0.3)`;
+                    ctx.fillRect(screenX, screenY, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+                }
+                
+                if (terrain === TERRAIN.WATER) {
+                    const wave = Math.sin(Date.now() / 500 + worldX * 0.3) * 0.1 + 0.9;
+                    ctx.fillStyle = `rgba(100, 150, 255, ${wave * 0.3})`;
+                    ctx.fillRect(screenX, screenY, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+                }
+            }
+            
+            drawObject(ctx, obj, camera, time) {
+                const screenX = obj.x * CONFIG.TILE_SIZE - camera.x;
+                const screenY = obj.y * CONFIG.TILE_SIZE - camera.y;
+                
+                if (screenX < -CONFIG.TILE_SIZE * 2 || screenX > canvas.width + CONFIG.TILE_SIZE ||
+                    screenY < -CONFIG.TILE_SIZE * 2 || screenY > canvas.height + CONFIG.TILE_SIZE) {
+                    return;
+                }
+                
+                if (obj.type === 'tree' && !obj.cut) {
+                    ctx.fillStyle = '#654321';
+                    ctx.fillRect(screenX + 12, screenY + 16, 8, 16);
+                    
+                    ctx.fillStyle = '#228B22';
+                    ctx.beginPath();
+                    ctx.arc(screenX + 16, screenY + 10, 14, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#2E8B2E';
+                    ctx.beginPath();
+                    ctx.arc(screenX + 12, screenY + 6, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                if (obj.type === 'tree' && obj.cut) {
+                    ctx.fillStyle = '#5a3a1a';
+                    ctx.beginPath();
+                    ctx.ellipse(screenX + 16, screenY + 24, 10, 6, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                if (obj.type === 'berry' && !obj.collected) {
+                    const bounce = Math.sin(time / 200 + obj.x) * 2;
+                    ctx.fillStyle = '#3a7a3a';
+                    ctx.beginPath();
+                    ctx.arc(screenX + 16, screenY + 20 + bounce, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#cc3333';
+                    for (let i = 0; i < 5; i++) {
+                        const bx = screenX + 10 + (i % 3) * 6;
+                        const by = screenY + 14 + Math.floor(i / 3) * 6 + bounce;
+                        ctx.beginPath();
+                        ctx.arc(bx, by, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                
+                if (obj.type === 'wall') {
+                    ctx.fillStyle = '#8B4513';
+                    ctx.fillRect(screenX + 2, screenY + 2, CONFIG.TILE_SIZE - 4, CONFIG.TILE_SIZE - 4);
+                    ctx.fillStyle = '#6B3503';
+                    ctx.fillRect(screenX + 4, screenY + 8, CONFIG.TILE_SIZE - 8, 3);
+                    ctx.fillRect(screenX + 4, screenY + 20, CONFIG.TILE_SIZE - 8, 3);
+                }
+            }
+            
+            drawPlayer(ctx, player, camera) {
+                const screenX = player.x - camera.x;
+                const screenY = player.y - camera.y;
+                
+                ctx.fillStyle = '#4488ff';
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, 14, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = '#2266dd';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(screenX - 4, screenY - 3, 4, 0, Math.PI * 2);
+                ctx.arc(screenX + 4, screenY - 3, 4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(screenX - 3 + player.facingX * 2, screenY - 3 + player.facingY * 2, 2, 0, Math.PI * 2);
+                ctx.arc(screenX + 5 + player.facingX * 2, screenY - 3 + player.facingY * 2, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            drawDayNight(overlay, time) {
+                const cycleProgress = (time % CONFIG.DAY_LENGTH) / CONFIG.DAY_LENGTH;
+                let darkness = 0;
+                
+                if (cycleProgress < 0.25) {
+                    darkness = 0.4 * (1 - cycleProgress * 4);
+                } else if (cycleProgress < 0.5) {
+                    darkness = 0;
+                } else if (cycleProgress < 0.75) {
+                    darkness = 0.4 * ((cycleProgress - 0.5) * 4);
+                } else {
+                    darkness = 0.4;
+                }
+                
+                overlay.style.backgroundColor = `rgba(0, 0, 30, ${darkness})`;
+            }
+            
+            drawBuildPreview(ctx, player, camera, ui, world) {
+                if (!ui.buildOpen || !ui.selectedBuild) return;
+                
+                const front = player.getFrontTile();
+                const screenX = front.x * CONFIG.TILE_SIZE - camera.x;
+                const screenY = front.y * CONFIG.TILE_SIZE - camera.y;
+                
+                const canWalk = world.isWalkable(front.x * CONFIG.TILE_SIZE + 1, front.y * CONFIG.TILE_SIZE + 1);
+                const hasWood = player.inventory.wood >= CONFIG.WOOD_WALL_COST;
+                const canBuild = canWalk && hasWood;
+                
+                if (canBuild) {
+                    ctx.fillStyle = 'rgba(0, 255, 100, 0.35)';
+                    ctx.strokeStyle = 'rgba(0, 255, 100, 0.9)';
+                } else {
+                    ctx.fillStyle = 'rgba(255, 80, 80, 0.35)';
+                    ctx.strokeStyle = 'rgba(255, 80, 80, 0.9)';
+                }
+                
+                ctx.fillRect(screenX, screenY, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+                ctx.lineWidth = 2;
+                ctx.strokeRect(screenX + 1, screenY + 1, CONFIG.TILE_SIZE - 2, CONFIG.TILE_SIZE - 2);
+                
+                if (ui.selectedBuild === 'wall') {
+                    ctx.fillStyle = canBuild ? 'rgba(180, 120, 60, 0.6)' : 'rgba(120, 80, 40, 0.5)';
+                    ctx.fillRect(screenX + 4, screenY + 4, CONFIG.TILE_SIZE - 8, CONFIG.TILE_SIZE - 8);
+                    ctx.strokeStyle = 'rgba(80, 50, 20, 0.8)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(screenX + 4, screenY + 4, CONFIG.TILE_SIZE - 8, CONFIG.TILE_SIZE - 8);
+                }
+            }
+            
+            render(ctx, world, player, camera, particles, time, ui) {
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                for (const chunk of world.chunks.values()) {
+                    for (let y = 0; y < CONFIG.CHUNK_SIZE; y++) {
+                        for (let x = 0; x < CONFIG.CHUNK_SIZE; x++) {
+                            const worldX = chunk.cx * CONFIG.CHUNK_SIZE + x;
+                            const worldY = chunk.cy * CONFIG.CHUNK_SIZE + y;
+                            this.drawTile(ctx, worldX, worldY, chunk.tiles[y][x], camera);
+                        }
+                    }
+                    
+                    for (const obj of chunk.objects) {
+                        this.drawObject(ctx, obj, camera, time);
+                    }
+                }
+                
+                this.drawBuildPreview(ctx, player, camera, ui, world);
+                particles.draw(ctx, camera);
+                this.drawPlayer(ctx, player, camera);
+            }
+        }
+
+        // ==================== UI管理器 ====================
+        class UIManager {
+            constructor() {
+                this.inventoryOpen = false;
+                this.buildOpen = false;
+                this.selectedBuild = null;
+                this.initBuildPanel();
+            }
+            
+            updateStatus(player) {
+                document.getElementById('health-bar').style.width = `${player.health}%`;
+                document.getElementById('health-value').textContent = Math.floor(player.health);
+                document.getElementById('hunger-bar').style.width = `${player.hunger}%`;
+                document.getElementById('hunger-value').textContent = Math.floor(player.hunger);
+            }
+            
+            updateFPS(fps) {
+                document.getElementById('fps-counter').textContent = `FPS: ${Math.round(fps)}`;
+            }
+            
+            toggleInventory(player) {
+                this.inventoryOpen = !this.inventoryOpen;
+                const panel = document.getElementById('inventory-panel');
+                panel.style.display = this.inventoryOpen ? 'block' : 'none';
+                
+                if (this.inventoryOpen) {
+                    this.updateInventory(player);
+                }
+            }
+            
+            updateInventory(player) {
+                const grid = document.getElementById('inventory-grid');
+                grid.innerHTML = '';
+                
+                const items = [
+                    { name: 'wood', icon: '🪵', label: '木材', count: player.inventory.wood },
+                    { name: 'berry', icon: '🫐', label: '浆果', count: player.inventory.berry }
+                ];
+                
+                for (const item of items) {
+                    const slot = document.createElement('div');
+                    slot.className = 'inventory-slot';
+                    slot.innerHTML = `
+                        <span class="inventory-icon">${item.icon}</span>
+                        <span class="inventory-count">${item.count}</span>
+                    `;
+                    grid.appendChild(slot);
+                }
+            }
+            
+            initBuildPanel() {
+                const container = document.getElementById('build-items');
+                const wallItem = document.createElement('div');
+                wallItem.className = 'build-item';
+                wallItem.innerHTML = `
+                    <span class="build-icon">🧱</span>
+                    <span class="build-name">木墙</span>
+                    <span class="build-cost">2 木材</span>
+                `;
+                wallItem.onclick = () => {
+                    this.selectedBuild = 'wall';
+                    document.querySelectorAll('.build-item').forEach(el => el.classList.remove('selected'));
+                    wallItem.classList.add('selected');
+                };
+                container.appendChild(wallItem);
+            }
+            
+            toggleBuildPanel() {
+                this.buildOpen = !this.buildOpen;
+                const panel = document.getElementById('build-panel');
+                panel.style.display = this.buildOpen ? 'block' : 'none';
+                if (!this.buildOpen) {
+                    this.selectedBuild = null;
+                    document.querySelectorAll('.build-item').forEach(el => el.classList.remove('selected'));
+                }
+            }
+            
+            closeAll() {
+                if (this.inventoryOpen) this.toggleInventory();
+                if (this.buildOpen) this.toggleBuildPanel();
+            }
+            
+            isUIBlocked() {
+                return this.inventoryOpen || this.buildOpen;
+            }
+            
+            isBuildOpen() {
+                return this.buildOpen;
+            }
+            
+            isInventoryOpen() {
+                return this.inventoryOpen;
+            }
+            
+            showInteractionHint(text) {
+                const hint = document.getElementById('interaction-hint');
+                hint.textContent = text;
+                hint.style.display = text ? 'block' : 'none';
+            }
+            
+            showToast(text, isSuccess = false) {
+                const toast = document.getElementById('toast-hint');
+                toast.textContent = text;
+                toast.className = isSuccess ? 'success' : '';
+                toast.style.display = 'block';
+                requestAnimationFrame(() => {
+                    toast.style.opacity = '1';
+                });
+                clearTimeout(this._toastTimeout);
+                this._toastTimeout = setTimeout(() => {
+                    toast.style.opacity = '0';
+                    setTimeout(() => {
+                        toast.style.display = 'none';
+                    }, 300);
+                }, 1500);
+            }
+            
+            showGameOver() {
+                this.closeAll();
+                this.showInteractionHint('');
+                document.getElementById('game-over').style.display = 'block';
+            }
+        }
+
+        // ==================== 游戏主类 ====================
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.resize();
+                
+                this.world = new World();
+                this.player = new Player();
+                this.camera = new Camera();
+                this.renderer = new Renderer();
+                this.particles = new ParticleSystem();
+                this.ui = new UIManager();
+                
+                this.keys = {};
+                this.lastTime = 0;
+                this.gameTime = 0;
+                this.fps = 60;
+                this.frameCount = 0;
+                this.fpsTime = 0;
+                this.gameOver = false;
+                
+                this.setupInput();
+                this.findSpawnPoint();
+                this.spawnInitialChunks();
+            }
+            
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            }
+            
+            findSpawnPoint() {
+                let attempts = 0;
+                while (attempts < 1000) {
+                    const testX = Math.random() * 200 - 100;
+                    const testY = Math.random() * 200 - 100;
+                    if (this.world.isWalkable(testX * CONFIG.TILE_SIZE, testY * CONFIG.TILE_SIZE)) {
+                        this.player.x = testX * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+                        this.player.y = testY * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+                        break;
+                    }
+                    attempts++;
+                }
+            }
+            
+            spawnInitialChunks() {
+                const pcx = Math.floor(this.player.x / CONFIG.CHUNK_PIXELS);
+                const pcy = Math.floor(this.player.y / CONFIG.CHUNK_PIXELS);
+                
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        this.world.generateChunk(pcx + dx, pcy + dy);
+                    }
+                }
+            }
+            
+            setupInput() {
+                window.addEventListener('resize', () => this.resize());
+                
+                window.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                    
+                    if (e.key === 'Escape') {
+                        this.ui.closeAll();
+                        return;
+                    }
+                    
+                    if (e.key === 'i' || e.key === 'I') {
+                        if (this.ui.buildOpen) this.ui.toggleBuildPanel();
+                        this.ui.toggleInventory(this.player);
+                        return;
+                    }
+                    
+                    if (e.key === 'b' || e.key === 'B') {
+                        if (this.ui.inventoryOpen) this.ui.toggleInventory(this.player);
+                        this.ui.toggleBuildPanel();
+                        return;
+                    }
+                    
+                    if ((e.key === 'e' || e.key === 'E') && !this.ui.isUIBlocked()) {
+                        this.tryInteract();
+                    }
+                    
+                    if ((e.key === ' ' || e.key === 'Enter') && this.ui.selectedBuild) {
+                        this.tryBuild();
+                    }
+                });
+                
+                window.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+                
+                this.canvas.addEventListener('click', () => {
+                    if (this.ui.selectedBuild) {
+                        this.tryBuild();
+                    }
+                });
+            }
+            
+            tryInteract() {
+                if (this.player.collectCooldown > 0) return;
+                
+                const playerTileX = Math.floor(this.player.x / CONFIG.TILE_SIZE);
+                const playerTileY = Math.floor(this.player.y / CONFIG.TILE_SIZE);
+                
+                for (const chunk of this.world.chunks.values()) {
+                    for (const obj of chunk.objects) {
+                        const dist = Math.sqrt(
+                            Math.pow((obj.x - playerTileX) * CONFIG.TILE_SIZE, 2) +
+                            Math.pow((obj.y - playerTileY) * CONFIG.TILE_SIZE, 2)
+                        );
+                        
+                        if (dist <= CONFIG.COLLECT_RANGE) {
+                            if (obj.type === 'berry' && !obj.collected) {
+                                obj.collected = true;
+                                this.player.inventory.berry++;
+                                this.player.hunger = Math.min(100, this.player.hunger + CONFIG.BERRY_HUNGER_RESTORE);
+                                this.player.collectCooldown = CONFIG.COLLECT_COOLDOWN;
+                                this.ui.updateInventory(this.player);
+                                return;
+                            }
+                            
+                            if (obj.type === 'tree' && !obj.cut) {
+                                obj.cut = true;
+                                this.player.inventory.wood++;
+                                this.player.collectCooldown = CONFIG.COLLECT_COOLDOWN;
+                                this.ui.updateInventory(this.player);
+                                
+                                for (let i = 0; i < 5; i++) {
+                                    this.particles.spawnLeaf(
+                                        obj.x * CONFIG.TILE_SIZE + 16,
+                                        obj.y * CONFIG.TILE_SIZE + 10
+                                    );
+                                }
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            tryBuild() {
+                if (!this.ui.selectedBuild) {
+                    this.ui.showToast('请先选择要建造的物品（点击建造面板）');
+                    return;
+                }
+                if (this.player.inventory.wood < CONFIG.WOOD_WALL_COST) {
+                    this.ui.showToast(`木材不足！需要 ${CONFIG.WOOD_WALL_COST} 木材`);
+                    return;
+                }
+                
+                const front = this.player.getFrontTile();
+                
+                if (!this.world.isWalkable(front.x * CONFIG.TILE_SIZE + 1, front.y * CONFIG.TILE_SIZE + 1)) {
+                    this.ui.showToast('该位置无法建造（有障碍物）');
+                    return;
+                }
+                
+                const cx = Math.floor(front.x / CONFIG.CHUNK_SIZE);
+                const cy = Math.floor(front.y / CONFIG.CHUNK_SIZE);
+                const key = this.world.getChunkKey(cx, cy);
+                const chunk = this.world.chunks.get(key);
+                
+                if (chunk) {
+                    chunk.objects.push({
+                        type: 'wall',
+                        x: front.x,
+                        y: front.y
+                    });
+                    this.player.inventory.wood -= CONFIG.WOOD_WALL_COST;
+                    this.ui.updateInventory(this.player);
+                    this.ui.showToast('建造成功！', true);
+                }
+            }
+            
+            checkInteractionHint() {
+                if (this.ui.buildOpen) {
+                    if (this.ui.selectedBuild) {
+                        const front = this.player.getFrontTile();
+                        const canWalk = this.world.isWalkable(front.x * CONFIG.TILE_SIZE + 1, front.y * CONFIG.TILE_SIZE + 1);
+                        const hasWood = this.player.inventory.wood >= CONFIG.WOOD_WALL_COST;
+                        if (!hasWood) {
+                            this.ui.showInteractionHint(`建造木墙需要 ${CONFIG.WOOD_WALL_COST} 木材（当前：${this.player.inventory.wood}）`);
+                        } else if (!canWalk) {
+                            this.ui.showInteractionHint('前方有障碍物，无法建造');
+                        } else {
+                            this.ui.showInteractionHint('按 空格/回车 或 点击画布 建造木墙');
+                        }
+                    } else {
+                        this.ui.showInteractionHint('请点击下方建造面板选择要建造的物品');
+                    }
+                    return;
+                }
+                
+                const playerTileX = Math.floor(this.player.x / CONFIG.TILE_SIZE);
+                const playerTileY = Math.floor(this.player.y / CONFIG.TILE_SIZE);
+                
+                let nearest = null;
+                let nearestDist = Infinity;
+                
+                for (const chunk of this.world.chunks.values()) {
+                    for (const obj of chunk.objects) {
+                        const dist = Math.sqrt(
+                            Math.pow((obj.x - playerTileX) * CONFIG.TILE_SIZE, 2) +
+                            Math.pow((obj.y - playerTileY) * CONFIG.TILE_SIZE, 2)
+                        );
+                        
+                        if (dist <= CONFIG.COLLECT_RANGE && dist < nearestDist) {
+                            if (obj.type === 'berry' && !obj.collected) {
+                                nearest = '按 E 采集浆果';
+                                nearestDist = dist;
+                            }
+                            if (obj.type === 'tree' && !obj.cut) {
+                                nearest = '按 E 砍伐树木';
+                                nearestDist = dist;
+                            }
+                        }
+                    }
+                }
+                
+                this.ui.showInteractionHint(nearest || '');
+            }
+            
+            update(dt) {
+                if (this.gameOver) return;
+                
+                this.frameCount++;
+                this.fpsTime += dt;
+                if (this.fpsTime >= 1) {
+                    this.fps = this.frameCount / this.fpsTime;
+                    this.frameCount = 0;
+                    this.fpsTime = 0;
+                }
+                
+                if (!this.ui.isInventoryOpen()) {
+                    this.player.update(dt, this.keys, this.world);
+                }
+                
+                this.camera.follow(this.player, dt);
+                this.world.updateChunks(this.player.x, this.player.y);
+                this.world.processPendingChunks(1);
+                this.particles.update(dt);
+                this.checkInteractionHint();
+                
+                this.ui.updateStatus(this.player);
+                this.ui.updateFPS(this.fps);
+                
+                if (Math.random() < 0.002) {
+                    const cx = Math.floor(this.player.x / CONFIG.CHUNK_PIXELS);
+                    const cy = Math.floor(this.player.y / CONFIG.CHUNK_PIXELS);
+                    this.particles.spawnLeaf(
+                        this.player.x + (Math.random() - 0.5) * 400,
+                        this.player.y - 300 + Math.random() * 100
+                    );
+                }
+                
+                if (this.player.health <= 0) {
+                    this.gameOver = true;
+                    this.ui.showGameOver();
+                }
+            }
+            
+            render() {
+                this.renderer.render(this.ctx, this.world, this.player, this.camera, this.particles, this.gameTime, this.ui);
+                this.renderer.drawDayNight(document.getElementById('night-overlay'), this.gameTime);
+            }
+            
+            loop(timestamp) {
+                const dt = Math.min((timestamp - this.lastTime) / 1000, 0.1);
+                this.lastTime = timestamp;
+                this.gameTime += dt;
+                
+                this.update(dt);
+                this.render();
+                
+                requestAnimationFrame((t) => this.loop(t));
+            }
+            
+            start() {
+                this.lastTime = performance.now();
+                requestAnimationFrame((t) => this.loop(t));
+            }
+        }
+
+        // ==================== 启动游戏 ====================
+        const canvas = document.getElementById('gameCanvas');
+        const game = new Game();
+        game.start();
+    </script>
+</body>
+</html>

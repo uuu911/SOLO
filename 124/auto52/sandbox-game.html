@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>沙盒开放世界</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #000; font-family: Arial, sans-serif; }
+        canvas { display: block; }
+        #hud {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 14px;
+            text-shadow: 1px 1px 2px black;
+            z-index: 100;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #buildPanel {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            display: none;
+            z-index: 100;
+        }
+        #buildPanel.active { display: block; }
+        .build-item {
+            display: inline-block;
+            padding: 10px 15px;
+            margin: 0 5px;
+            border: 2px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            min-width: 80px;
+        }
+        .build-item:hover, .build-item.selected {
+            border-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.3);
+        }
+        .build-item.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        #instructions {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            color: white;
+            font-size: 12px;
+            text-shadow: 1px 1px 2px black;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="hud">
+        <div>🪵 木材: <span id="woodCount">0</span>/99</div>
+        <div>🪨 石材: <span id="stoneCount">0</span>/99</div>
+        <div>🍖 食物: <span id="foodCount">0</span>/99</div>
+        <div id="timeDisplay">☀️ 白天</div>
+        <div id="fpsDisplay">FPS: 60</div>
+    </div>
+    <div id="buildPanel">
+        <div style="margin-bottom: 10px; font-weight: bold;">建造面板 (按数字键选择)</div>
+        <div class="build-item" data-type="woodWall" data-key="1">
+            <div>木板墙</div>
+            <div style="font-size: 10px;">🪵x2</div>
+        </div>
+        <div class="build-item" data-type="stoneWall" data-key="2">
+            <div>石墙</div>
+            <div style="font-size: 10px;">🪨x3</div>
+        </div>
+        <div class="build-item" data-type="woodFloor" data-key="3">
+            <div>木地板</div>
+            <div style="font-size: 10px;">🪵x1</div>
+        </div>
+        <div class="build-item" data-type="campfire" data-key="4">
+            <div>篝火</div>
+            <div style="font-size: 10px;">🪵x3</div>
+        </div>
+    </div>
+    <div id="instructions">
+        WASD - 移动 | 空格 - 采集<br>
+        B - 建造面板 | 鼠标点击 - 放置建筑
+    </div>
+
+    <script>
+        // 噪声生成器
+        class SimplexNoise {
+            constructor(seed = Math.random()) {
+                this.p = new Uint8Array(256);
+                this.perm = new Uint8Array(512);
+                for (let i = 0; i < 256; i++) this.p[i] = i;
+                let n, q;
+                for (let i = 255; i > 0; i--) {
+                    seed = (seed * 16807) % 2147483647;
+                    n = seed % (i + 1);
+                    q = this.p[i];
+                    this.p[i] = this.p[n];
+                    this.p[n] = q;
+                }
+                for (let i = 0; i < 512; i++) this.perm[i] = this.p[i & 255];
+            }
+            noise2D(x, y) {
+                const F2 = 0.5 * (Math.sqrt(3) - 1), G2 = (3 - Math.sqrt(3)) / 6;
+                let s = (x + y) * F2;
+                let i = Math.floor(x + s), j = Math.floor(y + s);
+                let t = (i + j) * G2;
+                let X0 = i - t, Y0 = j - t;
+                let x0 = x - X0, y0 = y - Y0;
+                let i1, j1;
+                if (x0 > y0) { i1 = 1; j1 = 0; }
+                else { i1 = 0; j1 = 1; }
+                let x1 = x0 - i1 + G2, y1 = y0 - j1 + G2;
+                let x2 = x0 - 1 + 2 * G2, y2 = y0 - 1 + 2 * G2;
+                let ii = i & 255, jj = j & 255;
+                let n0, n1, n2;
+                let t0 = 0.5 - x0 * x0 - y0 * y0;
+                if (t0 < 0) n0 = 0;
+                else { t0 *= t0; n0 = t0 * t0 * this.grad(this.perm[ii + this.perm[jj]], x0, y0); }
+                let t1 = 0.5 - x1 * x1 - y1 * y1;
+                if (t1 < 0) n1 = 0;
+                else { t1 *= t1; n1 = t1 * t1 * this.grad(this.perm[ii + i1 + this.perm[jj + j1]], x1, y1); }
+                let t2 = 0.5 - x2 * x2 - y2 * y2;
+                if (t2 < 0) n2 = 0;
+                else { t2 *= t2; n2 = t2 * t2 * this.grad(this.perm[ii + 1 + this.perm[jj + 1]], x2, y2); }
+                return 70 * (n0 + n1 + n2);
+            }
+            grad(hash, x, y) {
+                let h = hash & 7;
+                let u = h < 4 ? x : y;
+                let v = h < 4 ? y : x;
+                return ((h & 1) ? -u : u) + ((h & 2) ? -2 * v : 2 * v);
+            }
+        }
+
+        // 地形生成器模块
+        class TerrainGenerator {
+            constructor(seed, width = 200, height = 200) {
+                this.seed = seed;
+                this.width = width;
+                this.height = height;
+                this.noise = new SimplexNoise(seed);
+                this.tiles = [];
+                this.generate();
+            }
+
+            generate() {
+                for (let y = 0; y < this.height; y++) {
+                    this.tiles[y] = [];
+                    for (let x = 0; x < this.width; x++) {
+                        let elevation = this.noise.noise2D(x * 0.05, y * 0.05) * 0.5 +
+                                       this.noise.noise2D(x * 0.1, y * 0.1) * 0.3 +
+                                       this.noise.noise2D(x * 0.02, y * 0.02) * 0.2;
+                        let moisture = this.noise.noise2D(x * 0.03 + 100, y * 0.03 + 100);
+                        
+                        let type;
+                        if (elevation < -0.3) type = 'water';
+                        else if (elevation < -0.1) type = 'sand';
+                        else if (elevation > 0.4) type = 'hill';
+                        else if (moisture > 0.2 && elevation < 0.3) type = 'forest';
+                        else type = 'grass';
+                        
+                        this.tiles[y][x] = { type, decoration: Math.random() };
+                    }
+                }
+            }
+
+            getTile(x, y) {
+                if (x < 0 || x >= this.width || y < 0 || y >= this.height) return { type: 'water' };
+                return this.tiles[y][x];
+            }
+
+            isWalkable(x, y) {
+                const tile = this.getTile(Math.floor(x), Math.floor(y));
+                return tile.type !== 'water' && tile.type !== 'hill';
+            }
+        }
+
+        // 玩家模块
+        class Player {
+            constructor(game) {
+                this.game = game;
+                this.x = 100;
+                this.y = 100;
+                this.size = 0.6;
+                this.speed = 5;
+                this.resources = { wood: 0, stone: 0, food: 0 };
+                this.maxResource = 99;
+                this.direction = 0;
+            }
+
+            update(dt, keys) {
+                let dx = 0, dy = 0;
+                if (keys['w'] || keys['W'] || keys['ArrowUp']) dy -= 1;
+                if (keys['s'] || keys['S'] || keys['ArrowDown']) dy += 1;
+                if (keys['a'] || keys['A'] || keys['ArrowLeft']) dx -= 1;
+                if (keys['d'] || keys['D'] || keys['ArrowRight']) dx += 1;
+
+                if (dx !== 0 || dy !== 0) {
+                    const len = Math.sqrt(dx * dx + dy * dy);
+                    dx /= len; dy /= len;
+                    const newX = this.x + dx * this.speed * dt;
+                    const newY = this.y + dy * this.speed * dt;
+                    
+                    if (this.canMoveTo(newX, newY)) {
+                        this.x = newX;
+                        this.y = newY;
+                    } else if (this.canMoveTo(newX, this.y)) {
+                        this.x = newX;
+                    } else if (this.canMoveTo(this.x, newY)) {
+                        this.y = newY;
+                    }
+                    
+                    if (dx !== 0) this.direction = dx > 0 ? 0 : Math.PI;
+                }
+            }
+
+            canMoveTo(x, y) {
+                if (!this.game.terrain.isWalkable(x, y)) return false;
+                return !this.game.buildingManager.hasCollision(x, y, this.size);
+            }
+
+            addResource(type, amount) {
+                this.resources[type] = Math.min(this.maxResource, this.resources[type] + amount);
+                this.game.uiManager.updateHUD();
+            }
+
+            hasResources(costs) {
+                for (let type in costs) {
+                    if (this.resources[type] < costs[type]) return false;
+                }
+                return true;
+            }
+
+            consumeResources(costs) {
+                for (let type in costs) {
+                    this.resources[type] -= costs[type];
+                }
+                this.game.uiManager.updateHUD();
+            }
+
+            render(ctx, camera) {
+                const screenX = (this.x - camera.x) * camera.tileSize + camera.offsetX;
+                const screenY = (this.y - camera.y) * camera.tileSize + camera.offsetY;
+                const size = this.size * camera.tileSize;
+
+                ctx.fillStyle = '#4CAF50';
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, size / 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#8B4513';
+                const eyeOffset = size / 5;
+                ctx.beginPath();
+                ctx.arc(screenX + eyeOffset, screenY - eyeOffset / 2, size / 6, 0, Math.PI * 2);
+                ctx.arc(screenX + eyeOffset, screenY + eyeOffset / 2, size / 6, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // 建筑管理模块
+        class BuildingManager {
+            constructor(game) {
+                this.game = game;
+                this.buildings = [];
+                this.types = {
+                    woodWall: { cost: { wood: 2 }, solid: true, color: '#8B4513' },
+                    stoneWall: { cost: { stone: 3 }, solid: true, color: '#808080' },
+                    woodFloor: { cost: { wood: 1 }, solid: false, color: '#A0522D' },
+                    campfire: { cost: { wood: 3 }, solid: false, color: '#FF4500', animated: true }
+                };
+                this.selectedType = null;
+            }
+
+            canPlace(x, y, type) {
+                const def = this.types[type];
+                if (!def) return false;
+                if (!this.game.player.hasResources(def.cost)) return false;
+                if (!this.game.terrain.isWalkable(x, y)) return false;
+                if (this.hasCollision(x, y, 0.8)) return false;
+                return true;
+            }
+
+            place(x, y, type) {
+                if (!this.canPlace(x, y, type)) return false;
+                const def = this.types[type];
+                this.game.player.consumeResources(def.cost);
+                this.buildings.push({ x: Math.floor(x), y: Math.floor(y), type });
+                return true;
+            }
+
+            hasCollision(x, y, size) {
+                const margin = size / 2;
+                for (let b of this.buildings) {
+                    const def = this.types[b.type];
+                    if (!def.solid) continue;
+                    if (Math.abs(x - b.x - 0.5) < margin + 0.5 &&
+                        Math.abs(y - b.y - 0.5) < margin + 0.5) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            render(ctx, camera) {
+                for (let b of this.buildings) {
+                    const screenX = (b.x - camera.x) * camera.tileSize + camera.offsetX;
+                    const screenY = (b.y - camera.y) * camera.tileSize + camera.offsetY;
+                    const size = camera.tileSize;
+                    const def = this.types[b.type];
+
+                    ctx.fillStyle = def.color;
+                    ctx.fillRect(screenX - size / 2, screenY - size / 2, size, size);
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(screenX - size / 2, screenY - size / 2, size, size);
+
+                    if (b.type === 'campfire') {
+                        const flicker = Math.sin(Date.now() * 0.01) * 0.3 + 0.7;
+                        ctx.fillStyle = `rgba(255, 200, 50, ${flicker * 0.5})`;
+                        ctx.beginPath();
+                        ctx.arc(screenX, screenY, size * 0.8, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+
+            renderPreview(ctx, camera, worldX, worldY) {
+                if (!this.selectedType) return;
+                const screenX = (worldX - camera.x) * camera.tileSize + camera.offsetX;
+                const screenY = (worldY - camera.y) * camera.tileSize + camera.offsetY;
+                const size = camera.tileSize;
+                const def = this.types[this.selectedType];
+                const canPlace = this.canPlace(worldX, worldY, this.selectedType);
+
+                ctx.globalAlpha = 0.6;
+                ctx.fillStyle = canPlace ? def.color : '#FF0000';
+                ctx.fillRect(screenX - size / 2, screenY - size / 2, size, size);
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        // 资源管理模块
+        class ResourceManager {
+            constructor(game) {
+                this.game = game;
+                this.resources = [];
+                this.respawnTime = 60000;
+            }
+
+            generate() {
+                for (let y = 0; y < this.game.terrain.height; y++) {
+                    for (let x = 0; x < this.game.terrain.width; x++) {
+                        const tile = this.game.terrain.getTile(x, y);
+                        if (tile.type === 'forest' && Math.random() < 0.4) {
+                            this.resources.push({ x, y, type: 'tree', active: true });
+                        } else if (tile.type === 'hill' && Math.random() < 0.3) {
+                            this.resources.push({ x, y, type: 'rock', active: true });
+                        }
+                    }
+                }
+            }
+
+            getNearby(x, y, radius = 1.5) {
+                return this.resources.filter(r => {
+                    if (!r.active) return false;
+                    const dist = Math.sqrt((r.x + 0.5 - x) ** 2 + (r.y + 0.5 - y) ** 2);
+                    return dist < radius;
+                });
+            }
+
+            collect(resource) {
+                if (!resource.active) return;
+                resource.active = false;
+                resource.respawnAt = Date.now() + this.respawnTime;
+
+                if (resource.type === 'tree') {
+                    this.game.player.addResource('wood', 3);
+                } else if (resource.type === 'rock') {
+                    this.game.player.addResource('stone', 2);
+                }
+            }
+
+            update() {
+                const now = Date.now();
+                for (let r of this.resources) {
+                    if (!r.active && r.respawnAt && now > r.respawnAt) {
+                        r.active = true;
+                    }
+                }
+            }
+
+            render(ctx, camera, time) {
+                for (let r of this.resources) {
+                    if (!r.active) continue;
+                    const screenX = (r.x - camera.x) * camera.tileSize + camera.offsetX;
+                    const screenY = (r.y - camera.y) * camera.tileSize + camera.offsetY;
+
+                    if (r.type === 'tree') {
+                        const sway = Math.sin(time * 2 + r.x * 0.5) * 2;
+                        ctx.fillStyle = '#8B4513';
+                        ctx.fillRect(screenX - 3, screenY, 6, camera.tileSize * 0.6);
+                        ctx.fillStyle = '#228B22';
+                        ctx.beginPath();
+                        ctx.arc(screenX + sway, screenY - camera.tileSize * 0.2, camera.tileSize * 0.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else if (r.type === 'rock') {
+                        ctx.fillStyle = '#696969';
+                        ctx.beginPath();
+                        ctx.ellipse(screenX, screenY, camera.tileSize * 0.4, camera.tileSize * 0.3, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#808080';
+                        ctx.beginPath();
+                        ctx.ellipse(screenX - 3, screenY - 3, camera.tileSize * 0.25, camera.tileSize * 0.2, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+
+        // 动物管理模块
+        class AnimalManager {
+            constructor(game) {
+                this.game = game;
+                this.animals = [];
+                this.types = {
+                    rabbit: { speed: 3, fleeDistance: 4, color: '#D2B48C', size: 0.3, food: 1 },
+                    deer: { speed: 4, fleeDistance: 6, color: '#8B4513', size: 0.5, food: 3 }
+                };
+            }
+
+            generate() {
+                let rabbitCount = 0, deerCount = 0;
+                for (let y = 0; y < this.game.terrain.height; y++) {
+                    for (let x = 0; x < this.game.terrain.width; x++) {
+                        const tile = this.game.terrain.getTile(x, y);
+                        if (tile.type === 'grass' || tile.type === 'forest') {
+                            if (Math.random() < 0.02) {
+                                const type = Math.random() < 0.6 ? 'rabbit' : 'deer';
+                                if (x > 90 && x < 110 && y > 90 && y < 110) {
+                                    if (type === 'rabbit') rabbitCount++;
+                                    else deerCount++;
+                                }
+                                this.animals.push({
+                                    x: x + Math.random(),
+                                    y: y + Math.random(),
+                                    type,
+                                    vx: 0,
+                                    vy: 0,
+                                    changeTargetTime: 0,
+                                    alive: true
+                                });
+                            }
+                        }
+                    }
+                }
+
+                while (rabbitCount < 3) {
+                    this.animals.push({
+                        x: 100 + (Math.random() - 0.5) * 10,
+                        y: 100 + (Math.random() - 0.5) * 10,
+                        type: 'rabbit',
+                        vx: 0, vy: 0,
+                        changeTargetTime: 0,
+                        alive: true
+                    });
+                    rabbitCount++;
+                }
+                while (deerCount < 3) {
+                    this.animals.push({
+                        x: 100 + (Math.random() - 0.5) * 10,
+                        y: 100 + (Math.random() - 0.5) * 10,
+                        type: 'deer',
+                        vx: 0, vy: 0,
+                        changeTargetTime: 0,
+                        alive: true
+                    });
+                    deerCount++;
+                }
+            }
+
+            update(dt, isNight) {
+                const now = Date.now();
+                for (let a of this.animals) {
+                    if (!a.alive) continue;
+                    const def = this.types[a.type];
+                    const toPlayer = { x: this.game.player.x - a.x, y: this.game.player.y - a.y };
+                    const distToPlayer = Math.sqrt(toPlayer.x ** 2 + toPlayer.y ** 2);
+                    const speedMult = isNight ? 0.2 : 1;
+
+                    if (distToPlayer < def.fleeDistance) {
+                        const len = Math.sqrt(toPlayer.x ** 2 + toPlayer.y ** 2);
+                        a.vx = -(toPlayer.x / len) * def.speed * speedMult;
+                        a.vy = -(toPlayer.y / len) * def.speed * speedMult;
+                    } else if (now > a.changeTargetTime) {
+                        if (Math.random() < 0.3) {
+                            const angle = Math.random() * Math.PI * 2;
+                            a.vx = Math.cos(angle) * def.speed * 0.3 * speedMult;
+                            a.vy = Math.sin(angle) * def.speed * 0.3 * speedMult;
+                        } else {
+                            a.vx = 0;
+                            a.vy = 0;
+                        }
+                        a.changeTargetTime = now + Math.random() * 2000 + 1000;
+                    }
+
+                    const newX = a.x + a.vx * dt;
+                    const newY = a.y + a.vy * dt;
+                    if (this.game.terrain.isWalkable(newX, newY) &&
+                        !this.game.buildingManager.hasCollision(newX, newY, def.size)) {
+                        a.x = newX;
+                        a.y = newY;
+                    }
+                }
+            }
+
+            huntNearby() {
+                for (let a of this.animals) {
+                    if (!a.alive) continue;
+                    const dist = Math.sqrt((a.x - this.game.player.x) ** 2 + (a.y - this.game.player.y) ** 2);
+                    if (dist < 1.5) {
+                        a.alive = false;
+                        const def = this.types[a.type];
+                        this.game.player.addResource('food', def.food);
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            render(ctx, camera) {
+                for (let a of this.animals) {
+                    if (!a.alive) continue;
+                    const screenX = (a.x - camera.x) * camera.tileSize + camera.offsetX;
+                    const screenY = (a.y - camera.y) * camera.tileSize + camera.offsetY;
+                    const def = this.types[a.type];
+                    const size = def.size * camera.tileSize;
+
+                    ctx.fillStyle = def.color;
+                    ctx.beginPath();
+                    ctx.ellipse(screenX, screenY, size, size * 0.7, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    if (a.type === 'deer') {
+                        ctx.fillStyle = '#654321';
+                        ctx.beginPath();
+                        ctx.moveTo(screenX - size * 0.5, screenY - size * 0.5);
+                        ctx.lineTo(screenX - size * 0.7, screenY - size);
+                        ctx.lineTo(screenX - size * 0.4, screenY - size * 0.6);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.moveTo(screenX + size * 0.5, screenY - size * 0.5);
+                        ctx.lineTo(screenX + size * 0.7, screenY - size);
+                        ctx.lineTo(screenX + size * 0.4, screenY - size * 0.6);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+
+        // 时间管理模块
+        class TimeManager {
+            constructor() {
+                this.cycleDuration = 120000;
+                this.startTime = Date.now();
+            }
+
+            getPhase() {
+                const elapsed = (Date.now() - this.startTime) % this.cycleDuration;
+                const t = elapsed / this.cycleDuration;
+                return t;
+            }
+
+            isNight() {
+                const t = this.getPhase();
+                return t > 0.5;
+            }
+
+            getLightColor() {
+                const t = this.getPhase();
+                let r, g, b, a;
+                
+                if (t < 0.25) {
+                    const blend = t / 0.25;
+                    r = 255; g = 200 + blend * 55; b = 150 + blend * 105;
+                    a = 0.3 - blend * 0.3;
+                } else if (t < 0.5) {
+                    r = 255; g = 255; b = 255;
+                    a = 0;
+                } else if (t < 0.75) {
+                    const blend = (t - 0.5) / 0.25;
+                    r = 255 - blend * 155; g = 255 - blend * 205; b = 255 - blend * 155;
+                    a = blend * 0.4;
+                } else {
+                    const blend = (t - 0.75) / 0.25;
+                    r = 100 + blend * 155; g = 50 + blend * 150; b = 100 + blend * 155;
+                    a = 0.4 - blend * 0.4;
+                }
+
+                return { r, g, b, a };
+            }
+        }
+
+        // UI管理模块
+        class UIManager {
+            constructor(game) {
+                this.game = game;
+                this.buildPanelActive = false;
+                this.setupEvents();
+            }
+
+            setupEvents() {
+                document.querySelectorAll('.build-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const type = item.dataset.type;
+                        this.selectBuilding(type);
+                    });
+                });
+            }
+
+            updateHUD() {
+                document.getElementById('woodCount').textContent = this.game.player.resources.wood;
+                document.getElementById('stoneCount').textContent = this.game.player.resources.stone;
+                document.getElementById('foodCount').textContent = this.game.player.resources.food;
+                document.getElementById('timeDisplay').textContent = this.game.time.isNight() ? '🌙 夜晚' : '☀️ 白天';
+            }
+
+            updateBuildPanel() {
+                document.querySelectorAll('.build-item').forEach(item => {
+                    const type = item.dataset.type;
+                    const def = this.game.buildingManager.types[type];
+                    const canAfford = this.game.player.hasResources(def.cost);
+                    item.classList.toggle('disabled', !canAfford);
+                    item.classList.toggle('selected', this.game.buildingManager.selectedType === type);
+                });
+            }
+
+            toggleBuildPanel() {
+                this.buildPanelActive = !this.buildPanelActive;
+                document.getElementById('buildPanel').classList.toggle('active', this.buildPanelActive);
+                if (!this.buildPanelActive) {
+                    this.game.buildingManager.selectedType = null;
+                }
+            }
+
+            selectBuilding(type) {
+                if (!this.buildPanelActive) return;
+                this.game.buildingManager.selectedType = this.game.buildingManager.selectedType === type ? null : type;
+                this.updateBuildPanel();
+            }
+
+            showMessage(text) {
+                const hud = document.getElementById('hud');
+                const msg = document.createElement('div');
+                msg.textContent = text;
+                msg.style.color = '#FFD700';
+                hud.appendChild(msg);
+                setTimeout(() => msg.remove(), 2000);
+            }
+        }
+
+        // 主游戏类
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.keys = {};
+                this.mouseX = 0;
+                this.mouseY = 0;
+                this.fps = 60;
+                this.frameCount = 0;
+                this.lastFpsUpdate = 0;
+                this.isPaused = false;
+                this.particles = [];
+
+                this.init();
+            }
+
+            init() {
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                window.addEventListener('keydown', e => this.onKeyDown(e));
+                window.addEventListener('keyup', e => this.onKeyUp(e));
+                this.canvas.addEventListener('mousemove', e => this.onMouseMove(e));
+                this.canvas.addEventListener('click', () => this.onClick());
+                window.addEventListener('blur', () => this.isPaused = true);
+                window.addEventListener('focus', () => this.isPaused = false);
+
+                this.load();
+
+                requestAnimationFrame(t => this.gameLoop(t));
+                setInterval(() => this.save(), 5000);
+            }
+
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+                this.camera = {
+                    x: 0, y: 0,
+                    tileSize: 32,
+                    offsetX: this.canvas.width / 2,
+                    offsetY: this.canvas.height / 2,
+                    tilesX: Math.ceil(this.canvas.width / 32) + 4,
+                    tilesY: Math.ceil(this.canvas.height / 32) + 4
+                };
+            }
+
+            load() {
+                const save = localStorage.getItem('sandboxSave');
+                let seed;
+
+                if (save) {
+                    const data = JSON.parse(save);
+                    seed = data.seed;
+                    this.terrain = new TerrainGenerator(seed);
+                    this.time = new TimeManager();
+                    this.time.startTime = data.timeStart;
+                    
+                    this.player = new Player(this);
+                    this.player.x = data.playerX;
+                    this.player.y = data.playerY;
+                    this.player.resources = data.resources;
+
+                    this.buildingManager = new BuildingManager(this);
+                    this.buildingManager.buildings = data.buildings || [];
+
+                    this.resourceManager = new ResourceManager(this);
+                    this.resourceManager.generate();
+                    if (data.resourcesState) {
+                        data.resourcesState.forEach((s, i) => {
+                            if (this.resourceManager.resources[i]) {
+                                this.resourceManager.resources[i].active = s.active;
+                                this.resourceManager.resources[i].respawnAt = s.respawnAt;
+                            }
+                        });
+                    }
+
+                    this.animalManager = new AnimalManager(this);
+                    this.animalManager.animals = data.animals || [];
+                } else {
+                    seed = Date.now();
+                    this.terrain = new TerrainGenerator(seed);
+                    this.time = new TimeManager();
+                    this.player = new Player(this);
+                    this.buildingManager = new BuildingManager(this);
+                    this.resourceManager = new ResourceManager(this);
+                    this.resourceManager.generate();
+                    this.animalManager = new AnimalManager(this);
+                    this.animalManager.generate();
+                }
+
+                this.uiManager = new UIManager(this);
+                this.uiManager.updateHUD();
+            }
+
+            save() {
+                const data = {
+                    seed: this.terrain.seed,
+                    timeStart: this.time.startTime,
+                    playerX: this.player.x,
+                    playerY: this.player.y,
+                    resources: this.player.resources,
+                    buildings: this.buildingManager.buildings,
+                    resourcesState: this.resourceManager.resources.map(r => ({
+                        active: r.active,
+                        respawnAt: r.respawnAt
+                    })),
+                    animals: this.animalManager.animals
+                };
+                localStorage.setItem('sandboxSave', JSON.stringify(data));
+            }
+
+            onKeyDown(e) {
+                this.keys[e.key] = true;
+                if (e.key === 'b' || e.key === 'B') {
+                    this.uiManager.toggleBuildPanel();
+                }
+                if (e.key === ' ') {
+                    e.preventDefault();
+                    this.tryCollect();
+                }
+                if (this.uiManager.buildPanelActive) {
+                    const keyMap = { '1': 'woodWall', '2': 'stoneWall', '3': 'woodFloor', '4': 'campfire' };
+                    if (keyMap[e.key]) {
+                        this.uiManager.selectBuilding(keyMap[e.key]);
+                    }
+                }
+            }
+
+            onKeyUp(e) {
+                this.keys[e.key] = false;
+            }
+
+            onMouseMove(e) {
+                this.mouseX = e.clientX;
+                this.mouseY = e.clientY;
+            }
+
+            onClick() {
+                if (this.uiManager.buildPanelActive && this.buildingManager.selectedType) {
+                    const worldPos = this.screenToWorld(this.mouseX, this.mouseY);
+                    const placed = this.buildingManager.place(worldPos.x, worldPos.y, this.buildingManager.selectedType);
+                    if (placed) {
+                        this.uiManager.showMessage('建筑放置成功！');
+                    } else {
+                        this.uiManager.showMessage('无法放置在此位置！');
+                    }
+                    this.uiManager.updateBuildPanel();
+                }
+            }
+
+            screenToWorld(sx, sy) {
+                return {
+                    x: Math.floor((sx - this.camera.offsetX) / this.camera.tileSize + this.camera.x) + 0.5,
+                    y: Math.floor((sy - this.camera.offsetY) / this.camera.tileSize + this.camera.y) + 0.5
+                };
+            }
+
+            tryCollect() {
+                const nearby = this.resourceManager.getNearby(this.player.x, this.player.y);
+                let collected = false;
+                for (let r of nearby) {
+                    this.resourceManager.collect(r);
+                    collected = true;
+                }
+                if (this.animalManager.huntNearby()) {
+                    collected = true;
+                }
+                if (collected) {
+                    this.uiManager.showMessage('采集成功！');
+                }
+            }
+
+            update(dt) {
+                if (this.isPaused) return;
+
+                this.player.update(dt, this.keys);
+                
+                const targetX = this.player.x - this.camera.tilesX / 2;
+                const targetY = this.player.y - this.camera.tilesY / 2;
+                this.camera.x += (targetX - this.camera.x) * 0.1;
+                this.camera.y += (targetY - this.camera.y) * 0.1;
+
+                this.resourceManager.update();
+                this.animalManager.update(dt, this.time.isNight());
+                this.updateParticles(dt);
+            }
+
+            updateParticles(dt) {
+                if (Math.random() < 0.02 && !this.time.isNight()) {
+                    this.particles.push({
+                        x: this.camera.x + Math.random() * this.camera.tilesX,
+                        y: this.camera.y + Math.random() * this.camera.tilesY,
+                        vx: (Math.random() - 0.5) * 0.5,
+                        vy: Math.random() * 0.5 + 0.2,
+                        life: 3,
+                        type: Math.random() < 0.7 ? 'leaf' : 'bird'
+                    });
+                }
+
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx * dt;
+                    p.y += p.vy * dt;
+                    p.life -= dt;
+                    if (p.life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+            }
+
+            render(time) {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                const startX = Math.floor(this.camera.x);
+                const startY = Math.floor(this.camera.y);
+
+                for (let y = startY - 1; y < startY + this.camera.tilesY + 1; y++) {
+                    for (let x = startX - 1; x < startX + this.camera.tilesX + 1; x++) {
+                        const tile = this.terrain.getTile(x, y);
+                        const screenX = (x - this.camera.x) * this.camera.tileSize + this.camera.offsetX;
+                        const screenY = (y - this.camera.y) * this.camera.tileSize + this.camera.offsetY;
+
+                        let color;
+                        switch (tile.type) {
+                            case 'water':
+                                const wave = Math.sin(time * 2 + x * 0.5 + y * 0.3) * 10;
+                                color = `rgb(${30 + wave}, ${100 + wave}, ${180 + wave})`;
+                                break;
+                            case 'sand':
+                                color = '#F4D03F';
+                                break;
+                            case 'grass':
+                                const sway = Math.sin(time * 1.5 + x * 0.3) * 10;
+                                color = `rgb(${76 + sway}, ${175 - sway / 2}, ${80 + sway / 2})`;
+                                break;
+                            case 'forest':
+                                color = '#2E7D32';
+                                break;
+                            case 'hill':
+                                color = '#795548';
+                                break;
+                            default:
+                                color = '#228B22';
+                        }
+
+                        this.ctx.fillStyle = color;
+                        this.ctx.fillRect(screenX - this.camera.tileSize / 2, screenY - this.camera.tileSize / 2,
+                                         this.camera.tileSize, this.camera.tileSize);
+                    }
+                }
+
+                for (let p of this.particles) {
+                    const screenX = (p.x - this.camera.x) * this.camera.tileSize + this.camera.offsetX;
+                    const screenY = (p.y - this.camera.y) * this.camera.tileSize + this.camera.offsetY;
+                    
+                    if (p.type === 'leaf') {
+                        this.ctx.fillStyle = '#90EE90';
+                        this.ctx.beginPath();
+                        this.ctx.ellipse(screenX, screenY, 3, 2, p.life, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    } else {
+                        this.ctx.fillStyle = '#333';
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(screenX, screenY);
+                        this.ctx.lineTo(screenX - 5, screenY - 2);
+                        this.ctx.lineTo(screenX, screenY - 1);
+                        this.ctx.lineTo(screenX + 5, screenY - 2);
+                        this.ctx.closePath();
+                        this.ctx.fill();
+                    }
+                }
+
+                this.buildingManager.render(this.ctx, this.camera);
+                this.resourceManager.render(this.ctx, this.camera, time);
+                this.animalManager.render(this.ctx, this.camera);
+                this.player.render(this.ctx, this.camera);
+
+                if (this.uiManager.buildPanelActive && this.buildingManager.selectedType) {
+                    const worldPos = this.screenToWorld(this.mouseX, this.mouseY);
+                    this.buildingManager.renderPreview(this.ctx, this.camera, worldPos.x, worldPos.y);
+                }
+
+                const light = this.time.getLightColor();
+                if (light.a > 0) {
+                    this.ctx.fillStyle = `rgba(${light.r}, ${light.g}, ${light.b}, ${light.a})`;
+                    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                }
+
+                this.frameCount++;
+                if (time - this.lastFpsUpdate > 1000) {
+                    this.fps = this.frameCount;
+                    this.frameCount = 0;
+                    this.lastFpsUpdate = time;
+                    document.getElementById('fpsDisplay').textContent = `FPS: ${this.fps}`;
+                    this.uiManager.updateHUD();
+                }
+            }
+
+            gameLoop(time) {
+                const dt = 1 / 60;
+                this.update(dt);
+                this.render(time);
+                requestAnimationFrame(t => this.gameLoop(t));
+            }
+        }
+
+        window.onload = () => new Game();
+    </script>
+</body>
+</html>

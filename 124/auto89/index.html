@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>颜色蔓延 - Flood It</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+      color: #fff;
+    }
+
+    .game-container {
+      width: 100%;
+      max-width: 520px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 20px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      margin-bottom: 10px;
+      background: linear-gradient(45deg, #E74C3C, #3498DB, #2ECC71, #F1C40F);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stats-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding: 10px 15px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .stat-label {
+      font-size: 0.85rem;
+      opacity: 0.7;
+    }
+
+    .stat-value {
+      font-size: 1.1rem;
+      font-weight: bold;
+    }
+
+    .current-color-preview {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.5);
+    }
+
+    .controls-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    select, button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    select {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      flex: 1;
+      min-width: 100px;
+    }
+
+    select option {
+      background: #1a1a2e;
+      color: #fff;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      font-weight: 500;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.25);
+      box-shadow: none;
+    }
+
+    .btn-mute.active {
+      background: #E74C3C;
+    }
+
+    .canvas-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 15px;
+    }
+
+    #gameCanvas {
+      border-radius: 12px;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .color-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    .color-btn {
+      width: 45px;
+      height: 45px;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .color-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    }
+
+    .color-btn:active {
+      transform: scale(0.95);
+    }
+
+    .color-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .modal-overlay.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      padding: 30px;
+      border-radius: 20px;
+      text-align: center;
+      transform: scale(0.8);
+      transition: transform 0.3s ease;
+      max-width: 90%;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-overlay.show .modal {
+      transform: scale(1);
+    }
+
+    .modal h2 {
+      font-size: 1.8rem;
+      margin-bottom: 15px;
+    }
+
+    .perfect-badge {
+      display: inline-block;
+      background: linear-gradient(45deg, #FFD700, #FFA500);
+      color: #1a1a2e;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-weight: bold;
+      margin-bottom: 15px;
+    }
+
+    .modal-stats {
+      margin-bottom: 20px;
+    }
+
+    .modal-stats p {
+      margin: 8px 0;
+      font-size: 1.1rem;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 400px) {
+      .game-container {
+        padding: 15px;
+      }
+
+      .header h1 {
+        font-size: 1.4rem;
+      }
+
+      .color-btn {
+        width: 38px;
+        height: 38px;
+      }
+
+      .stats-bar {
+        padding: 8px 10px;
+      }
+
+      .stat-value {
+        font-size: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <div class="header">
+      <h1>🎨 颜色蔓延</h1>
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat-item">
+        <span class="stat-label">关卡:</span>
+        <span class="stat-value" id="levelDisplay">1</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">步数:</span>
+        <span class="stat-value" id="stepsDisplay">0 / 15</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">当前:</span>
+        <div class="current-color-preview" id="currentColorPreview"></div>
+      </div>
+    </div>
+
+    <div class="controls-row">
+      <select id="levelSelect">
+        <option value="1">关卡 1 - 入门 (6×6)</option>
+        <option value="2">关卡 2 - 初级 (8×8)</option>
+        <option value="3">关卡 3 - 中级 (10×10)</option>
+        <option value="4">关卡 4 - 高级 (10×10)</option>
+        <option value="5">关卡 5 - 专家 (12×12)</option>
+      </select>
+      <button class="btn btn-secondary" id="muteBtn">🔊</button>
+    </div>
+
+    <div class="canvas-container">
+      <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div class="color-buttons" id="colorButtons"></div>
+
+    <div class="action-buttons">
+      <button class="btn" id="hintBtn">💡 提示</button>
+      <button class="btn btn-secondary" id="undoBtn">↩️ 撤销</button>
+      <button class="btn btn-secondary" id="resetBtn">🔄 重置</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="winModal">
+    <div class="modal">
+      <h2>🎉 恭喜通关！</h2>
+      <div class="perfect-badge" id="perfectBadge" style="display: none;">⭐ 完美通关 ⭐</div>
+      <div class="modal-stats">
+        <p>使用步数: <strong id="finalSteps">0</strong></p>
+        <p>目标步数: <strong id="targetSteps">0</strong></p>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn" id="nextLevelBtn">下一关</button>
+        <button class="btn btn-secondary" id="replayBtn">重玩</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const Levels = {
+  levels: [
+    {
+      id: 1,
+      name: "入门",
+      size: 6,
+      colors: 4,
+      maxSteps: 15,
+      layout: null
+    },
+    {
+      id: 2,
+      name: "初级",
+      size: 8,
+      colors: 5,
+      maxSteps: 20,
+      layout: null
+    },
+    {
+      id: 3,
+      name: "中级",
+      size: 10,
+      colors: 5,
+      maxSteps: 25,
+      layout: null
+    },
+    {
+      id: 4,
+      name: "高级",
+      size: 10,
+      colors: 6,
+      maxSteps: 28,
+      layout: null
+    },
+    {
+      id: 5,
+      name: "专家",
+      size: 12,
+      colors: 6,
+      maxSteps: 35,
+      layout: null
+    }
+  ],
+
+  getLevel(id) {
+    return this.levels.find(l => l.id === id);
+  },
+
+  getAllLevels() {
+    return this.levels;
+  },
+
+  generateLayout(size, numColors) {
+    const layout = [];
+    for (let i = 0; i < size; i++) {
+      const row = [];
+      for (let j = 0; j < size; j++) {
+        row.push(Math.floor(Math.random() * numColors));
+      }
+      layout.push(row);
+    }
+    return layout;
+  }
+};
+
+  </script>
+
+  <script>
+    const Game = {
+  state: {
+    currentLevel: 1,
+    grid: [],
+    gridSize: 6,
+    numColors: 4,
+    maxSteps: 15,
+    steps: 0,
+    history: [],
+    connectedRegion: new Set(),
+    isMuted: false,
+    isWon: false
+  },
+
+  colorPalette: [
+    '#E74C3C',
+    '#3498DB',
+    '#2ECC71',
+    '#F1C40F',
+    '#9B59B6',
+    '#E67E22'
+  ],
+
+  init(levelId = 1) {
+    const level = Levels.getLevel(levelId);
+    this.state.currentLevel = levelId;
+    this.state.gridSize = level.size;
+    this.state.numColors = level.colors;
+    this.state.maxSteps = level.maxSteps;
+    this.state.steps = 0;
+    this.state.history = [];
+    this.state.isWon = false;
+    
+    if (level.layout) {
+      this.state.grid = JSON.parse(JSON.stringify(level.layout));
+    } else {
+      this.state.grid = Levels.generateLayout(level.size, level.colors);
+    }
+    
+    this.updateConnectedRegion();
+  },
+
+  getConnectedRegion(startRow = 0, startCol = 0, targetColor = null) {
+    const region = new Set();
+    const grid = this.state.grid;
+    const size = this.state.gridSize;
+    const startColor = targetColor !== null ? targetColor : grid[startRow][startCol];
+    
+    const queue = [[startRow, startCol]];
+    const visited = new Set();
+    const key = (r, c) => `${r},${c}`;
+    
+    while (queue.length > 0) {
+      const [row, col] = queue.shift();
+      const k = key(row, col);
+      
+      if (visited.has(k)) continue;
+      if (row < 0 || row >= size || col < 0 || col >= size) continue;
+      if (grid[row][col] !== startColor) continue;
+      
+      visited.add(k);
+      region.add(k);
+      
+      queue.push([row - 1, col]);
+      queue.push([row + 1, col]);
+      queue.push([row, col - 1]);
+      queue.push([row, col + 1]);
+    }
+    
+    return region;
+  },
+
+  updateConnectedRegion() {
+    this.state.connectedRegion = this.getConnectedRegion();
+  },
+
+  flood(colorIndex) {
+    if (this.state.isWon) return null;
+    if (this.state.steps >= this.state.maxSteps) return null;
+    
+    const currentColor = this.state.grid[0][0];
+    if (colorIndex === currentColor) return null;
+    
+    this.saveHistory();
+    
+    const region = this.state.connectedRegion;
+    const newCells = [];
+    
+    region.forEach(key => {
+      const [row, col] = key.split(',').map(Number);
+      this.state.grid[row][col] = colorIndex;
+    });
+    
+    this.updateConnectedRegion();
+    
+    region.forEach(key => {
+      const [row, col] = key.split(',').map(Number);
+      const neighbors = [
+        [row - 1, col], [row + 1, col],
+        [row, col - 1], [row, col + 1]
+      ];
+      neighbors.forEach(([nr, nc]) => {
+        if (nr >= 0 && nr < this.state.gridSize && 
+            nc >= 0 && nc < this.state.gridSize) {
+          const nkey = `${nr},${nc}`;
+          if (!region.has(nkey) && this.state.grid[nr][nc] === colorIndex) {
+            newCells.push(nkey);
+          }
+        }
+      });
+    });
+    
+    this.state.steps++;
+    
+    const won = this.checkWin();
+    if (won) {
+      this.state.isWon = true;
+    }
+    
+    return {
+      newCells,
+      won,
+      perfect: won && this.state.steps <= this.state.maxSteps
+    };
+  },
+
+  checkWin() {
+    const firstColor = this.state.grid[0][0];
+    for (let row = 0; row < this.state.gridSize; row++) {
+      for (let col = 0; col < this.state.gridSize; col++) {
+        if (this.state.grid[row][col] !== firstColor) {
+          return false;
+        }
+      }
+    }
+    return true;
+  },
+
+  saveHistory() {
+    if (this.state.history.length >= 3) {
+      this.state.history.shift();
+    }
+    this.state.history.push({
+      grid: JSON.parse(JSON.stringify(this.state.grid)),
+      steps: this.state.steps
+    });
+  },
+
+  undo() {
+    if (this.state.history.length === 0) return false;
+    
+    const prevState = this.state.history.pop();
+    this.state.grid = prevState.grid;
+    this.state.steps = prevState.steps;
+    this.state.isWon = false;
+    this.updateConnectedRegion();
+    
+    return true;
+  },
+
+  reset() {
+    this.init(this.state.currentLevel);
+  },
+
+  getHint() {
+    const currentColor = this.state.grid[0][0];
+    const colorCounts = {};
+    
+    for (let i = 0; i < this.state.numColors; i++) {
+      if (i === currentColor) continue;
+      colorCounts[i] = 0;
+      
+      const tempGrid = JSON.parse(JSON.stringify(this.state.grid));
+      this.state.connectedRegion.forEach(key => {
+        const [row, col] = key.split(',').map(Number);
+        tempGrid[row][col] = i;
+      });
+      
+      const tempRegion = this.getConnectedRegion(0, 0, i);
+      colorCounts[i] = tempRegion.size;
+    }
+    
+    let bestColor = -1;
+    let maxCount = -1;
+    
+    for (const [color, count] of Object.entries(colorCounts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        bestColor = parseInt(color);
+      }
+    }
+    
+    return bestColor;
+  },
+
+  getState() {
+    return { ...this.state };
+  },
+
+  getColor(index) {
+    return this.colorPalette[index];
+  },
+
+  toggleMute() {
+    this.state.isMuted = !this.state.isMuted;
+    return this.state.isMuted;
+  }
+};
+
+  </script>
+
+  <script>
+    const Renderer = {
+  canvas: null,
+  ctx: null,
+  cellSize: 0,
+  padding: 10,
+  animatingCells: new Map(),
+  animationFrame: null,
+
+  init(canvasId) {
+    this.canvas = document.getElementById(canvasId);
+    this.ctx = this.canvas.getContext('2d');
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+  },
+
+  resize() {
+    const container = this.canvas.parentElement;
+    const maxWidth = Math.min(container.clientWidth - 20, 500);
+    const size = maxWidth;
+    
+    this.canvas.width = size;
+    this.canvas.height = size;
+    
+    const state = Game.getState();
+    this.cellSize = (size - this.padding * 2) / state.gridSize;
+    
+    this.render();
+  },
+
+  render() {
+    const state = Game.getState();
+    const ctx = this.ctx;
+    const size = this.canvas.width;
+    
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, size, size);
+    
+    for (let row = 0; row < state.gridSize; row++) {
+      for (let col = 0; col < state.gridSize; col++) {
+        const colorIndex = state.grid[row][col];
+        const x = this.padding + col * this.cellSize;
+        const y = this.padding + row * this.cellSize;
+        const key = `${row},${col}`;
+        
+        let scale = 1;
+        if (this.animatingCells.has(key)) {
+          scale = this.animatingCells.get(key);
+        }
+        
+        const cellPadding = 2;
+        const actualSize = (this.cellSize - cellPadding * 2) * scale;
+        const offset = (this.cellSize - actualSize) / 2;
+        
+        ctx.fillStyle = Game.getColor(colorIndex);
+        ctx.beginPath();
+        ctx.roundRect(
+          x + offset,
+          y + offset,
+          actualSize,
+          actualSize,
+          4
+        );
+        ctx.fill();
+      }
+    }
+  },
+
+  animateNewCells(cells) {
+    this.animatingCells.clear();
+    cells.forEach(key => {
+      this.animatingCells.set(key, 0.5);
+    });
+    
+    const animate = () => {
+      let allDone = true;
+      this.animatingCells.forEach((scale, key) => {
+        if (scale < 1) {
+          const newScale = Math.min(scale + 0.08, 1);
+          this.animatingCells.set(key, newScale);
+          allDone = false;
+        }
+      });
+      
+      this.render();
+      
+      if (!allDone) {
+        this.animationFrame = requestAnimationFrame(animate);
+      } else {
+        this.animatingCells.clear();
+      }
+    };
+    
+    if (this.animationFrame) {
+      cancelAnimationFrame(this.animationFrame);
+    }
+    animate();
+  },
+
+  highlightHint(colorIndex) {
+    const buttons = document.querySelectorAll('.color-btn');
+    buttons.forEach((btn, index) => {
+      if (index === colorIndex) {
+        btn.style.transform = 'scale(1.2)';
+        btn.style.boxShadow = '0 0 20px rgba(255, 255, 255, 0.8)';
+        setTimeout(() => {
+          btn.style.transform = '';
+          btn.style.boxShadow = '';
+        }, 1500);
+      }
+    });
+  }
+};
+
+  </script>
+
+  <script>
+    const AudioManager = {
+      audioContext: null,
+
+      init() {
+        try {
+          this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+          console.log('Web Audio API not supported');
+        }
+      },
+
+      playTone(frequency, duration, type = 'sine') {
+        if (!this.audioContext || Game.state.isMuted) return;
+        
+        try {
+          if (this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+          }
+          
+          const oscillator = this.audioContext.createOscillator();
+          const gainNode = this.audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(this.audioContext.destination);
+          
+          oscillator.frequency.value = frequency;
+          oscillator.type = type;
+          
+          gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+          
+          oscillator.start(this.audioContext.currentTime);
+          oscillator.stop(this.audioContext.currentTime + duration);
+        } catch (e) {
+          console.log('Audio playback error:', e);
+        }
+      },
+
+      playSelect() {
+        this.playTone(440, 0.1, 'sine');
+      },
+
+      playWin() {
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, i) => {
+          setTimeout(() => this.playTone(freq, 0.2, 'sine'), i * 150);
+        });
+      },
+
+      playHint() {
+        this.playTone(880, 0.15, 'triangle');
+      },
+
+      playUndo() {
+        this.playTone(330, 0.1, 'sine');
+      }
+    };
+  </script>
+
+  <script>
+    const UI = {
+      elements: {},
+
+      init() {
+        this.elements = {
+          levelDisplay: document.getElementById('levelDisplay'),
+          stepsDisplay: document.getElementById('stepsDisplay'),
+          currentColorPreview: document.getElementById('currentColorPreview'),
+          levelSelect: document.getElementById('levelSelect'),
+          muteBtn: document.getElementById('muteBtn'),
+          colorButtons: document.getElementById('colorButtons'),
+          hintBtn: document.getElementById('hintBtn'),
+          undoBtn: document.getElementById('undoBtn'),
+          resetBtn: document.getElementById('resetBtn'),
+          winModal: document.getElementById('winModal'),
+          perfectBadge: document.getElementById('perfectBadge'),
+          finalSteps: document.getElementById('finalSteps'),
+          targetSteps: document.getElementById('targetSteps'),
+          nextLevelBtn: document.getElementById('nextLevelBtn'),
+          replayBtn: document.getElementById('replayBtn')
+        };
+
+        this.bindEvents();
+        this.update();
+      },
+
+      bindEvents() {
+        this.elements.levelSelect.addEventListener('change', (e) => {
+          Game.init(parseInt(e.target.value));
+          Renderer.resize();
+          this.update();
+          AudioManager.playSelect();
+        });
+
+        this.elements.muteBtn.addEventListener('click', () => {
+          const isMuted = Game.toggleMute();
+          this.elements.muteBtn.textContent = isMuted ? '🔇' : '🔊';
+          this.elements.muteBtn.classList.toggle('active', isMuted);
+        });
+
+        this.elements.hintBtn.addEventListener('click', () => {
+          const hintColor = Game.getHint();
+          if (hintColor >= 0) {
+            Renderer.highlightHint(hintColor);
+            AudioManager.playHint();
+          }
+        });
+
+        this.elements.undoBtn.addEventListener('click', () => {
+          if (Game.undo()) {
+            Renderer.render();
+            this.update();
+            AudioManager.playUndo();
+          }
+        });
+
+        this.elements.resetBtn.addEventListener('click', () => {
+          Game.reset();
+          Renderer.resize();
+          this.update();
+          AudioManager.playSelect();
+        });
+
+        this.elements.nextLevelBtn.addEventListener('click', () => {
+          const nextLevel = Game.state.currentLevel + 1;
+          if (nextLevel <= Levels.getAllLevels().length) {
+            Game.init(nextLevel);
+            this.elements.levelSelect.value = nextLevel;
+            Renderer.resize();
+            this.update();
+          }
+          this.hideWinModal();
+        });
+
+        this.elements.replayBtn.addEventListener('click', () => {
+          Game.reset();
+          Renderer.resize();
+          this.update();
+          this.hideWinModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+            e.preventDefault();
+            if (Game.undo()) {
+              Renderer.render();
+              this.update();
+              AudioManager.playUndo();
+            }
+          }
+        });
+      },
+
+      createColorButtons() {
+        const state = Game.getState();
+        this.elements.colorButtons.innerHTML = '';
+
+        for (let i = 0; i < state.numColors; i++) {
+          const btn = document.createElement('button');
+          btn.className = 'color-btn';
+          btn.style.backgroundColor = Game.getColor(i);
+          btn.dataset.color = i;
+          
+          btn.addEventListener('click', () => this.handleColorClick(i));
+          btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            this.handleColorClick(i);
+          });
+          
+          this.elements.colorButtons.appendChild(btn);
+        }
+      },
+
+      handleColorClick(colorIndex) {
+        const result = Game.flood(colorIndex);
+        if (result) {
+          AudioManager.playSelect();
+          
+          if (result.newCells.length > 0) {
+            Renderer.animateNewCells(result.newCells);
+          } else {
+            Renderer.render();
+          }
+          
+          this.update();
+          
+          if (result.won) {
+            setTimeout(() => {
+              AudioManager.playWin();
+              this.showWinModal(result.perfect);
+            }, 300);
+          }
+        }
+      },
+
+      update() {
+        const state = Game.getState();
+        
+        this.elements.levelDisplay.textContent = state.currentLevel;
+        this.elements.stepsDisplay.textContent = `${state.steps} / ${state.maxSteps}`;
+        this.elements.currentColorPreview.style.backgroundColor = Game.getColor(state.grid[0][0]);
+        
+        this.createColorButtons();
+        
+        const buttons = this.elements.colorButtons.querySelectorAll('.color-btn');
+        const currentColor = state.grid[0][0];
+        buttons.forEach((btn, i) => {
+          btn.disabled = i === currentColor || state.isWon || state.steps >= state.maxSteps;
+        });
+      },
+
+      showWinModal(perfect) {
+        const state = Game.getState();
+        
+        this.elements.finalSteps.textContent = state.steps;
+        this.elements.targetSteps.textContent = state.maxSteps;
+        this.elements.perfectBadge.style.display = perfect ? 'inline-block' : 'none';
+        
+        const hasNextLevel = state.currentLevel < Levels.getAllLevels().length;
+        this.elements.nextLevelBtn.style.display = hasNextLevel ? 'inline-block' : 'none';
+        
+        this.elements.winModal.classList.add('show');
+      },
+
+      hideWinModal() {
+        this.elements.winModal.classList.remove('show');
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      AudioManager.init();
+      Game.init(1);
+      Renderer.init('gameCanvas');
+      UI.init();
+    });
+  </script>
+</body>
+</html>

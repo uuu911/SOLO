@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>平台跳跃游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #1a1a2e;
+            font-family: Arial, sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        #gameCanvas {
+            display: block;
+            background: linear-gradient(180deg, #16213e 0%, #1a1a2e 100%);
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 10;
+        }
+        #lives {
+            margin-bottom: 5px;
+        }
+        .heart {
+            color: #ff4757;
+            margin-right: 3px;
+        }
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 100;
+        }
+        #overlay h1 {
+            color: white;
+            font-size: 48px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px #ffd700;
+        }
+        #restartBtn {
+            padding: 15px 40px;
+            font-size: 24px;
+            background: linear-gradient(135deg, #ff6b6b, #ff4757);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        #restartBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255,71,87,0.6);
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="ui">
+            <div id="lives"></div>
+            <div id="coins">金币 0/8</div>
+        </div>
+        <div id="overlay">
+            <h1 id="overlayTitle"></h1>
+            <button id="restartBtn">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = {
+            CANVAS_WIDTH: 800,
+            CANVAS_HEIGHT: 600,
+            WORLD_WIDTH: 2400,
+            WORLD_HEIGHT: 1200,
+            GRAVITY: 0.6,
+            PLAYER_SPEED: 5,
+            JUMP_FORCE: 14,
+            PLAYER_SIZE: 32,
+            MAX_LIVES: 3,
+            TOTAL_COINS: 8
+        };
+
+        const GameState = {
+            PLAYING: 'playing',
+            WIN: 'win',
+            GAMEOVER: 'gameover'
+        };
+
+        const gameStateModule = {
+            state: GameState.PLAYING,
+            lives: CONFIG.MAX_LIVES,
+            coinsCollected: 0,
+            coins: [],
+            exitActive: false,
+            exit: null,
+
+            init() {
+                this.state = GameState.PLAYING;
+                this.lives = CONFIG.MAX_LIVES;
+                this.coinsCollected = 0;
+                this.coins = [];
+                this.exitActive = false;
+                this.exit = null;
+            },
+
+            collectCoin() {
+                this.coinsCollected++;
+                if (this.coinsCollected >= CONFIG.TOTAL_COINS) {
+                    setTimeout(() => {
+                        this.activateExit();
+                    }, 200);
+                }
+                this.updateUI();
+            },
+
+            activateExit() {
+                this.exitActive = true;
+            },
+
+            loseLife() {
+                this.lives--;
+                this.updateUI();
+                if (this.lives <= 0) {
+                    this.gameOver();
+                }
+                return this.lives > 0;
+            },
+
+            win() {
+                this.state = GameState.WIN;
+                overlayModule.show('恭喜通关！');
+            },
+
+            gameOver() {
+                this.state = GameState.GAMEOVER;
+                overlayModule.show('游戏结束');
+            },
+
+            updateUI() {
+                uiModule.update(this.lives, this.coinsCollected, CONFIG.TOTAL_COINS);
+            }
+        };
+
+        const playerModule = {
+            x: 100,
+            y: 500,
+            vx: 0,
+            vy: 0,
+            width: CONFIG.PLAYER_SIZE,
+            height: CONFIG.PLAYER_SIZE,
+            onGround: false,
+            onPlatform: null,
+            spawnX: 100,
+            spawnY: 500,
+
+            init() {
+                this.x = this.spawnX;
+                this.y = this.spawnY;
+                this.vx = 0;
+                this.vy = 0;
+                this.onGround = false;
+                this.onPlatform = null;
+            },
+
+            update(keys, platforms) {
+                if (keys.left) {
+                    this.vx = -CONFIG.PLAYER_SPEED;
+                } else if (keys.right) {
+                    this.vx = CONFIG.PLAYER_SPEED;
+                } else {
+                    this.vx = 0;
+                }
+
+                if (this.onPlatform) {
+                    this.vx += this.onPlatform.vx || 0;
+                }
+
+                if (keys.jump && this.onGround) {
+                    this.vy = -CONFIG.JUMP_FORCE;
+                    this.onGround = false;
+                    this.onPlatform = null;
+                }
+
+                this.vy += CONFIG.GRAVITY;
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                this.handleCollisions(platforms);
+
+                this.x = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - this.width, this.x));
+                
+                if (this.y > CONFIG.WORLD_HEIGHT) {
+                    this.die();
+                }
+            },
+
+            handleCollisions(platforms) {
+                this.onGround = false;
+                this.onPlatform = null;
+
+                for (const platform of platforms) {
+                    if (!platform.visible) continue;
+
+                    if (this.checkCollision(platform)) {
+                        if (this.vy > 0 && this.y + this.height - this.vy <= platform.y + 10) {
+                            this.y = platform.y - this.height;
+                            this.vy = 0;
+                            this.onGround = true;
+                            this.onPlatform = platform;
+                        }
+                        else if (this.vy < 0 && this.y - this.vy >= platform.y + platform.height - 10) {
+                            this.y = platform.y + platform.height;
+                            this.vy = 0;
+                        }
+                        else if (this.vx > 0 && this.x + this.width - this.vx <= platform.x + 5) {
+                            this.x = platform.x - this.width;
+                        }
+                        else if (this.vx < 0 && this.x - this.vx >= platform.x + platform.width - 5) {
+                            this.x = platform.x + platform.width;
+                        }
+                    }
+                }
+
+                if (this.y >= CONFIG.WORLD_HEIGHT - this.height - 50) {
+                    this.y = CONFIG.WORLD_HEIGHT - this.height - 50;
+                    this.vy = 0;
+                    this.onGround = true;
+                }
+            },
+
+            checkCollision(obj) {
+                return this.x < obj.x + obj.width &&
+                       this.x + this.width > obj.x &&
+                       this.y < obj.y + obj.height &&
+                       this.y + this.height > obj.y;
+            },
+
+            die() {
+                if (gameStateModule.loseLife()) {
+                    this.respawn();
+                }
+            },
+
+            respawn() {
+                this.x = this.spawnX;
+                this.y = this.spawnY;
+                this.vx = 0;
+                this.vy = 0;
+            },
+
+            render(ctx, cameraX, cameraY) {
+                ctx.fillStyle = '#4ecdc4';
+                ctx.fillRect(this.x - cameraX, this.y - cameraY, this.width, this.height);
+                
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(this.x - cameraX + 8, this.y - cameraY + 8, 6, 6);
+                ctx.fillRect(this.x - cameraX + 18, this.y - cameraY + 8, 6, 6);
+            }
+        };
+
+        const platformModule = {
+            platforms: [],
+
+            init() {
+                this.platforms = [];
+                
+                this.addStaticPlatform(100, 550, 200, 30);
+                this.addStaticPlatform(400, 480, 150, 30);
+                this.addStaticPlatform(700, 400, 180, 30);
+                this.addStaticPlatform(1000, 350, 160, 30);
+                this.addStaticPlatform(1400, 300, 200, 30);
+                this.addStaticPlatform(1800, 400, 150, 30);
+
+                this.addHorizontalPlatform(600, 300, 100, 25, 150, 2);
+                this.addHorizontalPlatform(1300, 200, 120, 25, 200, 2.5);
+
+                this.addVerticalPlatform(1600, 250, 100, 25, 150, 1.5);
+
+                this.addBlinkingPlatform(1100, 250, 100, 25, 3000, 2000);
+            },
+
+            addStaticPlatform(x, y, width, height) {
+                this.platforms.push({
+                    type: 'static',
+                    x, y, width, height,
+                    visible: true,
+                    vx: 0, vy: 0
+                });
+            },
+
+            addHorizontalPlatform(x, y, width, height, range, speed) {
+                this.platforms.push({
+                    type: 'horizontal',
+                    startX: x,
+                    x, y, width, height,
+                    range,
+                    speed,
+                    direction: 1,
+                    visible: true,
+                    vx: speed,
+                    vy: 0
+                });
+            },
+
+            addVerticalPlatform(x, y, width, height, range, speed) {
+                this.platforms.push({
+                    type: 'vertical',
+                    startY: y,
+                    x, y, width, height,
+                    range,
+                    speed,
+                    direction: 1,
+                    visible: true,
+                    vx: 0,
+                    vy: speed
+                });
+            },
+
+            addBlinkingPlatform(x, y, width, height, visibleTime, invisibleTime) {
+                this.platforms.push({
+                    type: 'blinking',
+                    x, y, width, height,
+                    visible: true,
+                    visibleTime,
+                    invisibleTime,
+                    timer: 0,
+                    vx: 0, vy: 0
+                });
+            },
+
+            update(deltaTime) {
+                for (const platform of this.platforms) {
+                    if (platform.type === 'horizontal') {
+                        platform.x += platform.speed * platform.direction;
+                        platform.vx = platform.speed * platform.direction;
+                        if (platform.x > platform.startX + platform.range || 
+                            platform.x < platform.startX) {
+                            platform.direction *= -1;
+                        }
+                    }
+                    else if (platform.type === 'vertical') {
+                        platform.y += platform.speed * platform.direction;
+                        platform.vy = platform.speed * platform.direction;
+                        if (platform.y > platform.startY + platform.range || 
+                            platform.y < platform.startY) {
+                            platform.direction *= -1;
+                        }
+                    }
+                    else if (platform.type === 'blinking') {
+                        platform.timer += deltaTime;
+                        if (platform.visible && platform.timer >= platform.visibleTime) {
+                            platform.visible = false;
+                            platform.timer = 0;
+                        } else if (!platform.visible && platform.timer >= platform.invisibleTime) {
+                            platform.visible = true;
+                            platform.timer = 0;
+                        }
+                    }
+                }
+            },
+
+            render(ctx, cameraX, cameraY) {
+                for (const platform of this.platforms) {
+                    if (!platform.visible) {
+                        ctx.globalAlpha = 0.3;
+                    }
+
+                    if (platform.type === 'static') {
+                        ctx.fillStyle = '#95a5a6';
+                    } else if (platform.type === 'horizontal') {
+                        ctx.fillStyle = '#3498db';
+                    } else if (platform.type === 'vertical') {
+                        ctx.fillStyle = '#9b59b6';
+                    } else if (platform.type === 'blinking') {
+                        ctx.fillStyle = '#e74c3c';
+                    }
+
+                    ctx.fillRect(
+                        platform.x - cameraX,
+                        platform.y - cameraY,
+                        platform.width,
+                        platform.height
+                    );
+
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                    ctx.fillRect(
+                        platform.x - cameraX,
+                        platform.y - cameraY,
+                        platform.width,
+                        5
+                    );
+
+                    ctx.globalAlpha = 1;
+                }
+            },
+
+            getVisiblePlatforms() {
+                return this.platforms.filter(p => p.visible !== false);
+            }
+        };
+
+        const collectibleModule = {
+            coins: [],
+            exit: null,
+
+            init() {
+                this.coins = [];
+                this.exit = {
+                    x: 2100,
+                    y: 300,
+                    width: 50,
+                    height: 70,
+                    active: false,
+                    glowPhase: 0
+                };
+
+                this.addCoin(150, 510);
+                this.addCoin(450, 440);
+                this.addCoin(750, 360);
+                this.addCoin(650, 260);
+                this.addCoin(1050, 310);
+                this.addCoin(1150, 210);
+                this.addCoin(1450, 260);
+                this.addCoin(1850, 360);
+
+                gameStateModule.coins = this.coins;
+            },
+
+            addCoin(x, y) {
+                this.coins.push({
+                    x, y,
+                    width: 20,
+                    height: 20,
+                    collected: false,
+                    bobPhase: Math.random() * Math.PI * 2
+                });
+            },
+
+            update(deltaTime) {
+                for (const coin of this.coins) {
+                    if (!coin.collected) {
+                        coin.bobPhase += deltaTime * 0.005;
+                    }
+                }
+
+                if (this.exit.active) {
+                    this.exit.glowPhase += deltaTime * 0.01;
+                }
+
+                if (gameStateModule.exitActive && !this.exit.active) {
+                    this.exit.active = true;
+                    gameStateModule.exit = this.exit;
+                }
+            },
+
+            checkCollisions(player) {
+                for (const coin of this.coins) {
+                    if (!coin.collected && player.checkCollision(coin)) {
+                        coin.collected = true;
+                        gameStateModule.collectCoin();
+                    }
+                }
+
+                if (this.exit.active && player.checkCollision(this.exit)) {
+                    setTimeout(() => {
+                        gameStateModule.win();
+                    }, 100);
+                }
+            },
+
+            render(ctx, cameraX, cameraY) {
+                for (const coin of this.coins) {
+                    if (coin.collected) continue;
+
+                    const bobY = Math.sin(coin.bobPhase) * 5;
+                    
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.beginPath();
+                    ctx.arc(
+                        coin.x - cameraX + 10,
+                        coin.y - cameraY + 10 + bobY,
+                        10,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fill();
+
+                    ctx.fillStyle = '#f39c12';
+                    ctx.beginPath();
+                    ctx.arc(
+                        coin.x - cameraX + 10,
+                        coin.y - cameraY + 10 + bobY,
+                        6,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+
+                if (this.exit.active) {
+                    const glow = Math.sin(this.exit.glowPhase) * 0.3 + 0.7;
+                    
+                    ctx.shadowColor = '#2ecc71';
+                    ctx.shadowBlur = 30 * glow;
+                    
+                    ctx.fillStyle = `rgba(46, 204, 113, ${glow})`;
+                    ctx.fillRect(
+                        this.exit.x - cameraX,
+                        this.exit.y - cameraY,
+                        this.exit.width,
+                        this.exit.height
+                    );
+
+                    ctx.fillStyle = '#27ae60';
+                    ctx.fillRect(
+                        this.exit.x - cameraX + 5,
+                        this.exit.y - cameraY + 5,
+                        this.exit.width - 10,
+                        this.exit.height - 10
+                    );
+
+                    ctx.shadowBlur = 0;
+                }
+            }
+        };
+
+        const enemyModule = {
+            enemies: [],
+
+            init() {
+                this.enemies = [];
+
+                this.addPatrolEnemy(450, 450, 40, 30, 100, 1.5);
+                this.addPatrolEnemy(1450, 270, 40, 30, 150, 1.2);
+
+                this.addFlyingEnemy(900, 250, 30, 30, 100, 1);
+                this.addFlyingEnemy(1700, 150, 35, 35, 120, 0.8);
+            },
+
+            addPatrolEnemy(x, y, width, height, patrolRange, speed) {
+                this.enemies.push({
+                    type: 'patrol',
+                    x, y, width, height,
+                    startX: x,
+                    startY: y,
+                    patrolRange,
+                    speed,
+                    direction: 1,
+                    chaseSpeed: 4,
+                    isChasing: false,
+                    chaseCooldown: 0,
+                    detectRange: 150,
+                    vy: 0,
+                    onGround: false
+                });
+            },
+
+            addFlyingEnemy(x, y, width, height, floatRange, speed) {
+                this.enemies.push({
+                    type: 'flying',
+                    x, y, width, height,
+                    startY: y,
+                    floatRange,
+                    speed,
+                    phase: 0
+                });
+            },
+
+            update(deltaTime, player, platforms) {
+                for (const enemy of this.enemies) {
+                    if (enemy.type === 'patrol') {
+                        const distToPlayer = Math.abs(player.x - enemy.x);
+                        
+                        if (enemy.chaseCooldown > 0) {
+                            enemy.chaseCooldown -= deltaTime;
+                        }
+
+                        if (distToPlayer < enemy.detectRange && 
+                            enemy.chaseCooldown <= 0 &&
+                            Math.abs(player.y - enemy.y) < 100) {
+                            enemy.isChasing = true;
+                            enemy.chaseCooldown = 2000;
+                        }
+
+                        if (enemy.isChasing) {
+                            const targetDir = player.x > enemy.x ? 1 : -1;
+                            enemy.x += enemy.chaseSpeed * targetDir;
+                            
+                            if (Math.abs(player.x - enemy.x) > enemy.detectRange * 1.5) {
+                                enemy.isChasing = false;
+                            }
+                        } else {
+                            enemy.x += enemy.speed * enemy.direction;
+                            
+                            if (enemy.x > enemy.startX + enemy.patrolRange) {
+                                enemy.x = enemy.startX + enemy.patrolRange;
+                                enemy.direction = -1;
+                            } else if (enemy.x < enemy.startX) {
+                                enemy.x = enemy.startX;
+                                enemy.direction = 1;
+                            }
+                        }
+
+                        enemy.vy += CONFIG.GRAVITY;
+                        enemy.y += enemy.vy;
+
+                        enemy.onGround = false;
+                        for (const platform of platforms) {
+                            if (!platform.visible) continue;
+
+                            if (enemy.x < platform.x + platform.width &&
+                                enemy.x + enemy.width > platform.x &&
+                                enemy.y < platform.y + platform.height &&
+                                enemy.y + enemy.height > platform.y) {
+
+                                if (enemy.vy > 0 && enemy.y + enemy.height - enemy.vy <= platform.y + 10) {
+                                    enemy.y = platform.y - enemy.height;
+                                    enemy.vy = 0;
+                                    enemy.onGround = true;
+                                }
+                                else if (enemy.vy < 0 && enemy.y - enemy.vy >= platform.y + platform.height - 10) {
+                                    enemy.y = platform.y + platform.height;
+                                    enemy.vy = 0;
+                                }
+                            }
+                        }
+
+                        if (enemy.y >= CONFIG.WORLD_HEIGHT - enemy.height - 50) {
+                            enemy.y = CONFIG.WORLD_HEIGHT - enemy.height - 50;
+                            enemy.vy = 0;
+                            enemy.onGround = true;
+                        }
+
+                        if (enemy.y > CONFIG.WORLD_HEIGHT) {
+                            enemy.y = enemy.startY !== undefined ? enemy.startY : 200;
+                            enemy.x = enemy.startX;
+                            enemy.vy = 0;
+                            enemy.isChasing = false;
+                        }
+                    }
+                    else if (enemy.type === 'flying') {
+                        enemy.phase += deltaTime * 0.003;
+                        enemy.y = enemy.startY + Math.sin(enemy.phase) * enemy.floatRange;
+                    }
+                }
+            },
+
+            checkCollisions(player) {
+                for (const enemy of this.enemies) {
+                    if (player.checkCollision(enemy)) {
+                        player.die();
+                        return;
+                    }
+                }
+            },
+
+            render(ctx, cameraX, cameraY) {
+                for (const enemy of this.enemies) {
+                    if (enemy.type === 'patrol') {
+                        ctx.fillStyle = '#e74c3c';
+                        ctx.fillRect(
+                            enemy.x - cameraX,
+                            enemy.y - cameraY,
+                            enemy.width,
+                            enemy.height
+                        );
+                        
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(enemy.x - cameraX + 8, enemy.y - cameraY + 8, 8, 8);
+                        ctx.fillRect(enemy.x - cameraX + 24, enemy.y - cameraY + 8, 8, 8);
+                        
+                        ctx.fillStyle = 'black';
+                        ctx.fillRect(enemy.x - cameraX + 10, enemy.y - cameraY + 10, 4, 4);
+                        ctx.fillRect(enemy.x - cameraX + 26, enemy.y - cameraY + 10, 4, 4);
+                    }
+                    else if (enemy.type === 'flying') {
+                        ctx.fillStyle = '#8e44ad';
+                        ctx.beginPath();
+                        ctx.arc(
+                            enemy.x - cameraX + enemy.width / 2,
+                            enemy.y - cameraY + enemy.height / 2,
+                            enemy.width / 2,
+                            0,
+                            Math.PI * 2
+                        );
+                        ctx.fill();
+
+                        ctx.fillStyle = 'white';
+                        ctx.beginPath();
+                        ctx.arc(enemy.x - cameraX + enemy.width / 2 - 6, enemy.y - cameraY + enemy.height / 2, 5, 0, Math.PI * 2);
+                        ctx.arc(enemy.x - cameraX + enemy.width / 2 + 6, enemy.y - cameraY + enemy.height / 2, 5, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.fillStyle = 'black';
+                        ctx.beginPath();
+                        ctx.arc(enemy.x - cameraX + enemy.width / 2 - 6, enemy.y - cameraY + enemy.height / 2, 2, 0, Math.PI * 2);
+                        ctx.arc(enemy.x - cameraX + enemy.width / 2 + 6, enemy.y - cameraY + enemy.height / 2, 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        };
+
+        const cameraModule = {
+            x: 0,
+            y: 0,
+
+            update(player) {
+                const targetX = player.x + player.width / 2 - CONFIG.CANVAS_WIDTH / 2;
+                const targetY = player.y + player.height / 2 - CONFIG.CANVAS_HEIGHT / 2;
+
+                this.x += (targetX - this.x) * 0.1;
+                this.y += (targetY - this.y) * 0.1;
+
+                this.x = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - CONFIG.CANVAS_WIDTH, this.x));
+                this.y = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - CONFIG.CANVAS_HEIGHT, this.y));
+            }
+        };
+
+        const uiModule = {
+            livesElement: null,
+            coinsElement: null,
+
+            init() {
+                this.livesElement = document.getElementById('lives');
+                this.coinsElement = document.getElementById('coins');
+                this.update(CONFIG.MAX_LIVES, 0, CONFIG.TOTAL_COINS);
+            },
+
+            update(lives, coins, totalCoins) {
+                let hearts = '';
+                for (let i = 0; i < lives; i++) {
+                    hearts += '<span class="heart">♥</span>';
+                }
+                this.livesElement.innerHTML = hearts;
+                this.coinsElement.textContent = `金币 ${coins}/${totalCoins}`;
+            }
+        };
+
+        const overlayModule = {
+            element: null,
+            titleElement: null,
+
+            init() {
+                this.element = document.getElementById('overlay');
+                this.titleElement = document.getElementById('overlayTitle');
+                document.getElementById('restartBtn').addEventListener('click', () => {
+                    this.restart();
+                });
+            },
+
+            show(title) {
+                this.titleElement.textContent = title;
+                this.element.style.display = 'flex';
+            },
+
+            hide() {
+                this.element.style.display = 'none';
+            },
+
+            restart() {
+                this.hide();
+                gameModule.restart();
+            }
+        };
+
+        const inputModule = {
+            keys: {
+                left: false,
+                right: false,
+                jump: false
+            },
+
+            init() {
+                window.addEventListener('keydown', (e) => this.handleKeyDown(e));
+                window.addEventListener('keyup', (e) => this.handleKeyUp(e));
+            },
+
+            handleKeyDown(e) {
+                switch(e.key.toLowerCase()) {
+                    case 'a':
+                    case 'arrowleft':
+                        this.keys.left = true;
+                        break;
+                    case 'd':
+                    case 'arrowright':
+                        this.keys.right = true;
+                        break;
+                    case 'w':
+                    case ' ':
+                    case 'arrowup':
+                        this.keys.jump = true;
+                        e.preventDefault();
+                        break;
+                }
+            },
+
+            handleKeyUp(e) {
+                switch(e.key.toLowerCase()) {
+                    case 'a':
+                    case 'arrowleft':
+                        this.keys.left = false;
+                        break;
+                    case 'd':
+                    case 'arrowright':
+                        this.keys.right = false;
+                        break;
+                    case 'w':
+                    case ' ':
+                    case 'arrowup':
+                        this.keys.jump = false;
+                        break;
+                }
+            },
+
+            getKeys() {
+                return this.keys;
+            }
+        };
+
+        const renderModule = {
+            ctx: null,
+
+            init() {
+                const canvas = document.getElementById('gameCanvas');
+                this.ctx = canvas.getContext('2d');
+            },
+
+            renderBackground() {
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, CONFIG.CANVAS_HEIGHT);
+                gradient.addColorStop(0, '#16213e');
+                gradient.addColorStop(1, '#1a1a2e');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+
+                this.ctx.fillStyle = 'rgba(255,255,255,0.05)';
+                for (let i = 0; i < 20; i++) {
+                    const x = (i * 150 - cameraModule.x * 0.3) % (CONFIG.CANVAS_WIDTH + 100) - 50;
+                    const y = 100 + (i % 3) * 150;
+                    this.ctx.fillRect(x, y, 80, 60);
+                }
+
+                this.ctx.fillStyle = '#2d3436';
+                this.ctx.fillRect(
+                    0 - cameraModule.x % 100,
+                    CONFIG.WORLD_HEIGHT - 50 - cameraModule.y,
+                    CONFIG.CANVAS_WIDTH + 100,
+                    50
+                );
+            },
+
+            render(player, platforms, collectibles, enemies, cameraX, cameraY) {
+                this.renderBackground();
+                platforms.render(this.ctx, cameraX, cameraY);
+                collectibles.render(this.ctx, cameraX, cameraY);
+                enemies.render(this.ctx, cameraX, cameraY);
+                player.render(this.ctx, cameraX, cameraY);
+            }
+        };
+
+        const gameModule = {
+            lastTime: 0,
+
+            init() {
+                gameStateModule.init();
+                playerModule.init();
+                platformModule.init();
+                collectibleModule.init();
+                enemyModule.init();
+                cameraModule.update(playerModule);
+                
+                uiModule.init();
+                overlayModule.init();
+                inputModule.init();
+                renderModule.init();
+
+                this.lastTime = performance.now();
+                this.gameLoop();
+            },
+
+            restart() {
+                const coinsCollected = gameStateModule.coinsCollected;
+                gameStateModule.init();
+                gameStateModule.coinsCollected = coinsCollected;
+                
+                playerModule.init();
+                platformModule.init();
+                collectibleModule.init();
+                collectibleModule.coins.forEach((coin, index) => {
+                    if (index < coinsCollected) {
+                        coin.collected = true;
+                    }
+                });
+                enemyModule.init();
+                cameraModule.update(playerModule);
+                
+                gameStateModule.updateUI();
+            },
+
+            gameLoop() {
+                if (gameStateModule.state !== GameState.PLAYING) {
+                    requestAnimationFrame(() => this.gameLoop());
+                    return;
+                }
+
+                const currentTime = performance.now();
+                const deltaTime = currentTime - this.lastTime;
+                this.lastTime = currentTime;
+
+                this.update(deltaTime);
+                this.render();
+
+                requestAnimationFrame(() => this.gameLoop());
+            },
+
+            update(deltaTime) {
+                platformModule.update(deltaTime);
+                playerModule.update(inputModule.getKeys(), platformModule.getVisiblePlatforms());
+                collectibleModule.update(deltaTime);
+                collectibleModule.checkCollisions(playerModule);
+                enemyModule.update(deltaTime, playerModule, platformModule.getVisiblePlatforms());
+                enemyModule.checkCollisions(playerModule);
+                cameraModule.update(playerModule);
+            },
+
+            render() {
+                renderModule.render(
+                    playerModule,
+                    platformModule,
+                    collectibleModule,
+                    enemyModule,
+                    cameraModule.x,
+                    cameraModule.y
+                );
+            }
+        };
+
+        window.addEventListener('load', () => {
+            gameModule.init();
+        });
+    </script>
+</body>
+</html>

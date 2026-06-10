@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>光线反射解谜</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .game-container {
+            background: rgba(30, 30, 50, 0.9);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5),
+                        0 0 40px rgba(100, 200, 255, 0.1);
+            max-width: 680px;
+            width: 100%;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .status-label {
+            color: #888;
+            font-size: 12px;
+        }
+
+        .status-value {
+            font-weight: 600;
+            color: #64ffda;
+            font-size: 16px;
+        }
+
+        .status-value.warning {
+            color: #ff6b6b;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .canvas-wrapper {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            background: #0d1117;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #64ffda 0%, #4fc3f7 100%);
+            color: #0d1117;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(100, 255, 218, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .level-selector {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .level-btn {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .level-btn.locked {
+            background: rgba(0, 0, 0, 0.3);
+            color: #555;
+            cursor: not-allowed;
+        }
+
+        .level-btn.current {
+            background: linear-gradient(135deg, #64ffda 0%, #4fc3f7 100%);
+            color: #0d1117;
+            box-shadow: 0 0 15px rgba(100, 255, 218, 0.5);
+        }
+
+        .level-btn.completed {
+            background: rgba(100, 255, 218, 0.2);
+            color: #64ffda;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            transform: scale(0.8);
+            transition: transform 0.3s ease;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6),
+                        0 0 60px rgba(100, 200, 255, 0.2);
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal h2 {
+            font-size: 28px;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #64ffda 0%, #4fc3f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .modal-stats {
+            margin: 24px 0;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: #888;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: #64ffda;
+        }
+
+        .feedback {
+            margin: 16px 0;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .feedback.perfect {
+            background: rgba(100, 255, 218, 0.2);
+            color: #64ffda;
+        }
+
+        .feedback.good {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 24px;
+        }
+
+        .instructions {
+            margin-top: 16px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-label">关卡</span>
+                <span class="status-value" id="levelDisplay">1/6</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">步数</span>
+                <span class="status-value" id="stepsDisplay">0</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">时间</span>
+                <span class="status-value" id="timeDisplay">00:00</span>
+            </div>
+            <div class="status-item" id="lostStatus" style="display: none;">
+                <span class="status-value warning">⚠ 光线迷失</span>
+            </div>
+        </div>
+
+        <div class="canvas-wrapper">
+            <canvas id="gameCanvas" width="600" height="600"></canvas>
+        </div>
+
+        <div class="controls">
+            <button class="btn-secondary" id="undoBtn" disabled>撤销</button>
+            <button class="btn-secondary" id="resetBtn">重置</button>
+            <button class="btn-danger" id="clearBtn">清除进度</button>
+        </div>
+
+        <div class="level-selector" id="levelSelector"></div>
+
+        <div class="instructions">
+            💡 点击镜子旋转（/ ↔ \），引导光线从光源到达目标。障碍物会阻挡光线。
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h2 id="modalTitle">🎉 恭喜过关！</h2>
+            <div class="modal-stats">
+                <div class="stat-row">
+                    <span class="stat-label">步数</span>
+                    <span class="stat-value" id="modalSteps">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">用时</span>
+                    <span class="stat-value" id="modalTime">00:00</span>
+                </div>
+            </div>
+            <div class="feedback" id="modalFeedback"></div>
+            <div class="modal-buttons">
+                <button class="btn-secondary" id="replayBtn">重玩</button>
+                <button class="btn-primary" id="nextBtn">下一关</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        const LEVELS = [
+            {
+                size: 5,
+                source: { row: 0, col: 0, direction: 'right' },
+                target: { row: 4, col: 4 },
+                mirrors: [{ row: 0, col: 4, type: '\\' }, { row: 4, col: 0, type: '/' }],
+                obstacles: [],
+                optimalSteps: 0
+            },
+            {
+                size: 5,
+                source: { row: 0, col: 0, direction: 'right' },
+                target: { row: 4, col: 0 },
+                mirrors: [{ row: 0, col: 2, type: '/' }, { row: 2, col: 2, type: '\\' }, { row: 4, col: 2, type: '/' }],
+                obstacles: [{ row: 2, col: 0 }, { row: 2, col: 1 }],
+                optimalSteps: 1
+            },
+            {
+                size: 6,
+                source: { row: 0, col: 0, direction: 'down' },
+                target: { row: 5, col: 5 },
+                mirrors: [
+                    { row: 2, col: 0, type: '/' },
+                    { row: 2, col: 3, type: '\\' },
+                    { row: 5, col: 3, type: '/' }
+                ],
+                obstacles: [{ row: 3, col: 1 }, { row: 4, col: 1 }, { row: 1, col: 3 }],
+                optimalSteps: 2
+            },
+            {
+                size: 6,
+                source: { row: 0, col: 3, direction: 'down' },
+                target: { row: 3, col: 0 },
+                mirrors: [
+                    { row: 3, col: 3, type: '/' },
+                    { row: 3, col: 5, type: '\\' },
+                    { row: 0, col: 5, type: '/' },
+                    { row: 0, col: 1, type: '\\' }
+                ],
+                obstacles: [{ row: 1, col: 3 }, { row: 2, col: 3 }, { row: 4, col: 2 }],
+                optimalSteps: 2
+            },
+            {
+                size: 7,
+                source: { row: 3, col: 0, direction: 'right' },
+                target: { row: 3, col: 6 },
+                mirrors: [
+                    { row: 3, col: 2, type: '/' },
+                    { row: 1, col: 2, type: '\\' },
+                    { row: 1, col: 4, type: '/' },
+                    { row: 5, col: 4, type: '\\' },
+                    { row: 5, col: 2, type: '/' }
+                ],
+                obstacles: [{ row: 3, col: 3 }, { row: 3, col: 4 }, { row: 2, col: 3 }, { row: 4, col: 3 }],
+                optimalSteps: 3
+            },
+            {
+                size: 8,
+                source: { row: 0, col: 0, direction: 'right' },
+                target: { row: 7, col: 7 },
+                mirrors: [
+                    { row: 0, col: 3, type: '\\' },
+                    { row: 4, col: 3, type: '/' },
+                    { row: 4, col: 7, type: '\\' },
+                    { row: 2, col: 5, type: '/' },
+                    { row: 2, col: 1, type: '\\' },
+                    { row: 6, col: 1, type: '/' }
+                ],
+                obstacles: [
+                    { row: 1, col: 1 }, { row: 1, col: 2 },
+                    { row: 3, col: 5 }, { row: 3, col: 6 },
+                    { row: 5, col: 3 }, { row: 5, col: 4 },
+                    { row: 6, col: 5 }, { row: 6, col: 6 }
+                ],
+                optimalSteps: 4
+            }
+        ];
+
+        class PuzzleCore {
+            constructor() {
+                this.listeners = [];
+                this.currentLevel = 0;
+                this.grid = [];
+                this.steps = 0;
+                this.startTime = null;
+                this.elapsedTime = 0;
+                this.timerInterval = null;
+                this.isComplete = false;
+                this.history = [];
+                this.lightPath = [];
+                this.isLightLost = false;
+                this.source = null;
+                this.target = null;
+                this.size = 0;
+            }
+
+            subscribe(listener) {
+                this.listeners.push(listener);
+            }
+
+            notify() {
+                const state = this.getState();
+                this.listeners.forEach(listener => listener(state));
+            }
+
+            loadLevel(index) {
+                if (index < 0 || index >= LEVELS.length) return;
+                
+                this.stopTimer();
+                this.currentLevel = index;
+                const level = LEVELS[index];
+                this.size = level.size;
+                this.source = { ...level.source };
+                this.target = { ...level.target };
+                this.steps = 0;
+                this.isComplete = false;
+                this.history = [];
+                this.isLightLost = false;
+                this.elapsedTime = 0;
+
+                this.grid = [];
+                for (let row = 0; row < this.size; row++) {
+                    this.grid[row] = [];
+                    for (let col = 0; col < this.size; col++) {
+                        this.grid[row][col] = { type: 'empty' };
+                    }
+                }
+
+                level.mirrors.forEach(m => {
+                    this.grid[m.row][m.col] = { type: 'mirror', orientation: m.type };
+                });
+
+                level.obstacles.forEach(o => {
+                    this.grid[o.row][o.col] = { type: 'obstacle' };
+                });
+
+                this.grid[this.source.row][this.source.col] = { type: 'source' };
+                this.grid[this.target.row][this.target.col] = { type: 'target' };
+
+                this.traceLight();
+                this.startTimer();
+                this.notify();
+            }
+
+            rotateCell(row, col) {
+                if (this.isComplete) return false;
+                if (row < 0 || row >= this.size || col < 0 || col >= this.size) return false;
+                
+                const cell = this.grid[row][col];
+                if (cell.type !== 'mirror') return false;
+
+                const snapshot = {
+                    grid: this.grid.map(r => r.map(c => ({ ...c }))),
+                    steps: this.steps
+                };
+                this.history.push(snapshot);
+
+                cell.orientation = cell.orientation === '/' ? '\\' : '/';
+                this.steps++;
+
+                this.traceLight();
+                this.notify();
+                return true;
+            }
+
+            undo() {
+                if (this.history.length === 0) return false;
+
+                const snapshot = this.history.pop();
+                this.grid = snapshot.grid;
+                this.steps = snapshot.steps;
+                this.isComplete = false;
+
+                this.traceLight();
+                this.notify();
+                return true;
+            }
+
+            reset() {
+                this.loadLevel(this.currentLevel);
+            }
+
+            startTimer() {
+                this.startTime = Date.now() - this.elapsedTime * 1000;
+                this.timerInterval = setInterval(() => {
+                    this.elapsedTime = Math.floor((Date.now() - this.startTime) / 1000);
+                    this.notify();
+                }, 1000);
+            }
+
+            stopTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+            }
+
+            traceLight() {
+                this.lightPath = [];
+                this.isLightLost = false;
+
+                const maxReflections = this.size * this.size * 2;
+                let reflections = 0;
+                let currentRow = this.source.row;
+                let currentCol = this.source.col;
+                let direction = this.source.direction;
+
+                const dirVectors = {
+                    'up': { dr: -1, dc: 0 },
+                    'down': { dr: 1, dc: 0 },
+                    'left': { dr: 0, dc: -1 },
+                    'right': { dr: 0, dc: 1 }
+                };
+
+                const reflect = (dir, mirror) => {
+                    if (mirror === '/') {
+                        if (dir === 'right') return 'up';
+                        if (dir === 'left') return 'down';
+                        if (dir === 'up') return 'right';
+                        if (dir === 'down') return 'left';
+                    } else {
+                        if (dir === 'right') return 'down';
+                        if (dir === 'left') return 'up';
+                        if (dir === 'up') return 'left';
+                        if (dir === 'down') return 'right';
+                    }
+                    return dir;
+                };
+
+                this.lightPath.push({ row: currentRow, col: currentCol, direction });
+
+                while (reflections < maxReflections) {
+                    const vec = dirVectors[direction];
+                    const nextRow = currentRow + vec.dr;
+                    const nextCol = currentCol + vec.dc;
+
+                    if (nextRow < 0 || nextRow >= this.size || nextCol < 0 || nextCol >= this.size) {
+                        break;
+                    }
+
+                    const cell = this.grid[nextRow][nextCol];
+
+                    if (cell.type === 'obstacle') {
+                        break;
+                    }
+
+                    if (cell.type === 'target') {
+                        this.lightPath.push({ row: nextRow, col: nextCol, direction });
+                        this.isComplete = true;
+                        this.stopTimer();
+                        break;
+                    }
+
+                    if (cell.type === 'mirror') {
+                        this.lightPath.push({ row: nextRow, col: nextCol, direction });
+                        direction = reflect(direction, cell.orientation);
+                        reflections++;
+                    } else {
+                        this.lightPath.push({ row: nextRow, col: nextCol, direction });
+                    }
+
+                    currentRow = nextRow;
+                    currentCol = nextCol;
+                }
+
+                if (reflections >= maxReflections) {
+                    this.isLightLost = true;
+                }
+            }
+
+            getState() {
+                return {
+                    grid: this.grid,
+                    size: this.size,
+                    source: this.source,
+                    target: this.target,
+                    currentLevel: this.currentLevel,
+                    totalLevels: LEVELS.length,
+                    steps: this.steps,
+                    elapsedTime: this.elapsedTime,
+                    isComplete: this.isComplete,
+                    canUndo: this.history.length > 0,
+                    lightPath: this.lightPath,
+                    isLightLost: this.isLightLost,
+                    optimalSteps: LEVELS[this.currentLevel].optimalSteps
+                };
+            }
+        }
+
+        class UIRenderer {
+            constructor(canvasId, core) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.core = core;
+                this.animatingMirror = null;
+                this.animationStart = 0;
+                this.animationDuration = 200;
+                this.isAnimating = false;
+                this.cellSize = 0;
+                this.offsetX = 0;
+                this.offsetY = 0;
+                this.padding = 40;
+
+                this.setupEventListeners();
+                this.core.subscribe(state => this.render(state));
+            }
+
+            setupEventListeners() {
+                this.canvas.addEventListener('click', (e) => this.handleClick(e));
+                document.getElementById('undoBtn').addEventListener('click', () => this.core.undo());
+                document.getElementById('resetBtn').addEventListener('click', () => this.core.reset());
+                document.getElementById('clearBtn').addEventListener('click', () => this.clearProgress());
+                document.getElementById('replayBtn').addEventListener('click', () => {
+                    this.hideModal();
+                    this.core.reset();
+                });
+                document.getElementById('nextBtn').addEventListener('click', () => {
+                    this.hideModal();
+                    const nextLevel = this.core.currentLevel + 1;
+                    if (nextLevel < LEVELS.length) {
+                        this.core.loadLevel(nextLevel);
+                    } else {
+                        this.showCompletionModal();
+                    }
+                });
+                document.getElementById('modalOverlay').addEventListener('click', (e) => {
+                    if (e.target.id === 'modalOverlay') this.hideModal();
+                });
+            }
+
+            handleClick(e) {
+                if (this.isAnimating) return;
+
+                const rect = this.canvas.getBoundingClientRect();
+                const scaleX = this.canvas.width / rect.width;
+                const scaleY = this.canvas.height / rect.height;
+                const x = (e.clientX - rect.left) * scaleX;
+                const y = (e.clientY - rect.top) * scaleY;
+
+                const col = Math.floor((x - this.offsetX) / this.cellSize);
+                const row = Math.floor((y - this.offsetY) / this.cellSize);
+
+                if (this.core.rotateCell(row, col)) {
+                    this.startMirrorAnimation(row, col);
+                }
+            }
+
+            startMirrorAnimation(row, col) {
+                this.isAnimating = true;
+                this.animatingMirror = { row, col, startAngle: 0 };
+                this.animationStart = performance.now();
+                this.animate();
+            }
+
+            animate() {
+                if (!this.isAnimating) return;
+
+                const elapsed = performance.now() - this.animationStart;
+                const progress = Math.min(elapsed / this.animationDuration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+
+                this.animatingMirror.angle = eased * 90;
+
+                this.render(this.core.getState(), true);
+
+                if (progress < 1) {
+                    requestAnimationFrame(() => this.animate());
+                } else {
+                    this.isAnimating = false;
+                    this.animatingMirror = null;
+                    this.render(this.core.getState());
+                }
+            }
+
+            calculateLayout(size) {
+                const maxSize = Math.min(this.canvas.width, this.canvas.height) - this.padding * 2;
+                this.cellSize = Math.floor(maxSize / size);
+                const gridSize = this.cellSize * size;
+                this.offsetX = (this.canvas.width - gridSize) / 2;
+                this.offsetY = (this.canvas.height - gridSize) / 2;
+            }
+
+            render(state, skipLight = false) {
+                this.calculateLayout(state.size);
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                this.drawGrid(state.size);
+                this.drawCells(state);
+
+                if (!skipLight && state.lightPath.length > 0) {
+                    this.drawLightPath(state.lightPath);
+                }
+
+                this.updateUI(state);
+            }
+
+            drawGrid(size) {
+                this.ctx.strokeStyle = 'rgba(100, 200, 255, 0.2)';
+                this.ctx.lineWidth = 1;
+
+                for (let i = 0; i <= size; i++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.offsetX, this.offsetY + i * this.cellSize);
+                    this.ctx.lineTo(this.offsetX + size * this.cellSize, this.offsetY + i * this.cellSize);
+                    this.ctx.stroke();
+
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.offsetX + i * this.cellSize, this.offsetY);
+                    this.ctx.lineTo(this.offsetX + i * this.cellSize, this.offsetY + size * this.cellSize);
+                    this.ctx.stroke();
+                }
+            }
+
+            drawCells(state) {
+                for (let row = 0; row < state.size; row++) {
+                    for (let col = 0; col < state.size; col++) {
+                        const cell = state.grid[row][col];
+                        const x = this.offsetX + col * this.cellSize;
+                        const y = this.offsetY + row * this.cellSize;
+                        const centerX = x + this.cellSize / 2;
+                        const centerY = y + this.cellSize / 2;
+
+                        if (cell.type === 'source') {
+                            this.drawSource(centerX, centerY);
+                        } else if (cell.type === 'target') {
+                            this.drawTarget(centerX, centerY, state.isComplete);
+                        } else if (cell.type === 'mirror') {
+                            const animAngle = this.animatingMirror && 
+                                this.animatingMirror.row === row && 
+                                this.animatingMirror.col === col 
+                                ? this.animatingMirror.angle : 0;
+                            this.drawMirror(centerX, cell.orientation, animAngle);
+                        } else if (cell.type === 'obstacle') {
+                            this.drawObstacle(x, y);
+                        }
+                    }
+                }
+            }
+
+            drawSource(x, y) {
+                const radius = this.cellSize * 0.35;
+                
+                const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
+                gradient.addColorStop(0, 'rgba(255, 230, 100, 0.8)');
+                gradient.addColorStop(0.5, 'rgba(255, 200, 50, 0.4)');
+                gradient.addColorStop(1, 'rgba(255, 150, 0, 0)');
+                
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, radius * 2, 0, Math.PI * 2);
+                this.ctx.fillStyle = gradient;
+                this.ctx.fill();
+
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+                this.ctx.fillStyle = '#ffe664';
+                this.ctx.fill();
+
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, radius * 0.5, 0, Math.PI * 2);
+                this.ctx.fillStyle = '#fff';
+                this.ctx.fill();
+            }
+
+            drawTarget(x, y, isComplete) {
+                const radius = this.cellSize * 0.35;
+                
+                const glowColor = isComplete ? 'rgba(100, 255, 218, 0.6)' : 'rgba(100, 200, 255, 0.4)';
+                const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
+                gradient.addColorStop(0, glowColor);
+                gradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.2)');
+                gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
+                
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, radius * 2, 0, Math.PI * 2);
+                this.ctx.fillStyle = gradient;
+                this.ctx.fill();
+
+                this.ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i * Math.PI / 4) - Math.PI / 8;
+                    const r = i % 2 === 0 ? radius : radius * 0.5;
+                    const px = x + r * Math.cos(angle);
+                    const py = y + r * Math.sin(angle);
+                    if (i === 0) this.ctx.moveTo(px, py);
+                    else this.ctx.lineTo(px, py);
+                }
+                this.ctx.closePath();
+                this.ctx.fillStyle = isComplete ? '#64ffda' : '#64b5f6';
+                this.ctx.fill();
+
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, radius * 0.25, 0, Math.PI * 2);
+                this.ctx.fillStyle = '#fff';
+                this.ctx.fill();
+            }
+
+            drawMirror(centerX, orientation, animAngle = 0) {
+                const halfSize = this.cellSize * 0.35;
+                const centerY = this.offsetY + (Math.floor((centerX - this.offsetX) / this.cellSize) + 0.5) * this.cellSize;
+                const col = Math.floor((centerX - this.offsetX) / this.cellSize);
+                const row = Math.floor((centerY - this.offsetY) / this.cellSize);
+                const actualCenterX = this.offsetX + col * this.cellSize + this.cellSize / 2;
+                const actualCenterY = this.offsetY + row * this.cellSize + this.cellSize / 2;
+
+                this.ctx.save();
+                this.ctx.translate(actualCenterX, actualCenterY);
+                this.ctx.rotate((animAngle * Math.PI) / 180);
+
+                this.ctx.strokeStyle = '#64ffda';
+                this.ctx.lineWidth = 4;
+                this.ctx.lineCap = 'round';
+
+                this.ctx.shadowColor = '#64ffda';
+                this.ctx.shadowBlur = 10;
+
+                this.ctx.beginPath();
+                if (orientation === '/') {
+                    this.ctx.moveTo(-halfSize, halfSize);
+                    this.ctx.lineTo(halfSize, -halfSize);
+                } else {
+                    this.ctx.moveTo(-halfSize, -halfSize);
+                    this.ctx.lineTo(halfSize, halfSize);
+                }
+                this.ctx.stroke();
+
+                this.ctx.restore();
+            }
+
+            drawObstacle(x, y) {
+                const padding = this.cellSize * 0.15;
+                this.ctx.fillStyle = '#1a1a2e';
+                this.ctx.fillRect(x + padding, y + padding, this.cellSize - padding * 2, this.cellSize - padding * 2);
+            }
+
+            drawLightPath(path) {
+                if (path.length < 2) return;
+
+                this.ctx.lineCap = 'round';
+                this.ctx.lineJoin = 'round';
+
+                for (let i = 0; i < path.length - 1; i++) {
+                    const from = path[i];
+                    const to = path[i + 1];
+                    const fromX = this.offsetX + from.col * this.cellSize + this.cellSize / 2;
+                    const fromY = this.offsetY + from.row * this.cellSize + this.cellSize / 2;
+                    const toX = this.offsetX + to.col * this.cellSize + this.cellSize / 2;
+                    const toY = this.offsetY + to.row * this.cellSize + this.cellSize / 2;
+
+                    const gradient = this.ctx.createLinearGradient(fromX, fromY, toX, toY);
+                    gradient.addColorStop(0, 'rgba(255, 200, 50, 0.9)');
+                    gradient.addColorStop(0.5, 'rgba(255, 230, 100, 1)');
+                    gradient.addColorStop(1, 'rgba(255, 200, 50, 0.9)');
+
+                    this.ctx.strokeStyle = gradient;
+                    this.ctx.lineWidth = 4;
+                    this.ctx.shadowColor = '#ffc832';
+                    this.ctx.shadowBlur = 15;
+
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(fromX, fromY);
+                    this.ctx.lineTo(toX, toY);
+                    this.ctx.stroke();
+
+                    this.drawArrow(fromX, fromY, toX, toY, to.direction);
+                }
+
+                this.ctx.shadowBlur = 0;
+            }
+
+            drawArrow(fromX, fromY, toX, toY, direction) {
+                const midX = (fromX + toX) / 2;
+                const midY = (fromY + toY) / 2;
+                const arrowSize = 8;
+
+                this.ctx.fillStyle = '#fff';
+                this.ctx.beginPath();
+
+                switch (direction) {
+                    case 'right':
+                        this.ctx.moveTo(midX + arrowSize, midY);
+                        this.ctx.lineTo(midX - arrowSize, midY - arrowSize / 2);
+                        this.ctx.lineTo(midX - arrowSize, midY + arrowSize / 2);
+                        break;
+                    case 'left':
+                        this.ctx.moveTo(midX - arrowSize, midY);
+                        this.ctx.lineTo(midX + arrowSize, midY - arrowSize / 2);
+                        this.ctx.lineTo(midX + arrowSize, midY + arrowSize / 2);
+                        break;
+                    case 'down':
+                        this.ctx.moveTo(midX, midY + arrowSize);
+                        this.ctx.lineTo(midX - arrowSize / 2, midY - arrowSize);
+                        this.ctx.lineTo(midX + arrowSize / 2, midY - arrowSize);
+                        break;
+                    case 'up':
+                        this.ctx.moveTo(midX, midY - arrowSize);
+                        this.ctx.lineTo(midX - arrowSize / 2, midY + arrowSize);
+                        this.ctx.lineTo(midX + arrowSize / 2, midY + arrowSize);
+                        break;
+                }
+                this.ctx.closePath();
+                this.ctx.fill();
+            }
+
+            updateUI(state) {
+                document.getElementById('levelDisplay').textContent = `${state.currentLevel + 1}/${state.totalLevels}`;
+                document.getElementById('stepsDisplay').textContent = state.steps;
+                
+                const minutes = Math.floor(state.elapsedTime / 60);
+                const seconds = state.elapsedTime % 60;
+                document.getElementById('timeDisplay').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+                document.getElementById('undoBtn').disabled = !state.canUndo;
+                document.getElementById('lostStatus').style.display = state.isLightLost ? 'flex' : 'none';
+
+                this.updateLevelSelector(state);
+
+                if (state.isComplete) {
+                    this.saveProgress(state);
+                    this.showWinModal(state);
+                }
+            }
+
+            updateLevelSelector(state) {
+                const container = document.getElementById('levelSelector');
+                container.innerHTML = '';
+                
+                const progress = this.loadProgress();
+                
+                for (let i = 0; i < state.totalLevels; i++) {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn-secondary level-btn';
+                    btn.textContent = i + 1;
+
+                    if (i === state.currentLevel) {
+                        btn.classList.add('current');
+                    } else if (progress.completedLevels && progress.completedLevels[i]) {
+                        btn.classList.add('completed');
+                    } else if (i > 0 && !progress.completedLevels[i - 1]) {
+                        btn.classList.add('locked');
+                        btn.disabled = true;
+                    }
+
+                    if (!btn.classList.contains('locked')) {
+                        btn.addEventListener('click', () => this.core.loadLevel(i));
+                    }
+
+                    container.appendChild(btn);
+                }
+            }
+
+            showWinModal(state) {
+                const overlay = document.getElementById('modalOverlay');
+                document.getElementById('modalTitle').textContent = '🎉 恭喜过关！';
+                document.getElementById('modalSteps').textContent = state.steps;
+                
+                const minutes = Math.floor(state.elapsedTime / 60);
+                const seconds = state.elapsedTime % 60;
+                document.getElementById('modalTime').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+                const feedback = document.getElementById('modalFeedback');
+                if (state.steps <= state.optimalSteps) {
+                    feedback.textContent = '✨ 完美！达成最优步数！';
+                    feedback.className = 'feedback perfect';
+                } else {
+                    feedback.textContent = '💡 可以更好！试试更少的步数';
+                    feedback.className = 'feedback good';
+                }
+
+                document.getElementById('nextBtn').textContent = 
+                    state.currentLevel >= state.totalLevels - 1 ? '查看总览' : '下一关';
+                
+                document.getElementById('replayBtn').style.display = 'inline-block';
+                overlay.classList.add('active');
+            }
+
+            showCompletionModal() {
+                const progress = this.loadProgress();
+                let totalSteps = 0;
+                let totalTime = 0;
+                
+                for (let i = 0; i < LEVELS.length; i++) {
+                    if (progress.levelStats && progress.levelStats[i]) {
+                        totalSteps += progress.levelStats[i].bestSteps || 0;
+                        totalTime += progress.levelStats[i].bestTime || 0;
+                    }
+                }
+
+                const overlay = document.getElementById('modalOverlay');
+                document.getElementById('modalTitle').textContent = '🏆 全部通关！';
+                document.getElementById('modalSteps').textContent = totalSteps;
+                
+                const minutes = Math.floor(totalTime / 60);
+                const seconds = totalTime % 60;
+                document.getElementById('modalTime').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+                const feedback = document.getElementById('modalFeedback');
+                feedback.textContent = '🎊 太棒了！你已完成所有关卡！';
+                feedback.className = 'feedback perfect';
+
+                document.getElementById('nextBtn').textContent = '重新开始';
+                document.getElementById('replayBtn').style.display = 'none';
+                
+                overlay.classList.add('active');
+            }
+
+            hideModal() {
+                document.getElementById('modalOverlay').classList.remove('active');
+            }
+
+            loadProgress() {
+                try {
+                    const data = localStorage.getItem('lightPuzzleProgress');
+                    return data ? JSON.parse(data) : { completedLevels: [], levelStats: {} };
+                } catch {
+                    return { completedLevels: [], levelStats: {} };
+                }
+            }
+
+            saveProgress(state) {
+                const progress = this.loadProgress();
+                if (!progress.completedLevels) progress.completedLevels = [];
+                if (!progress.levelStats) progress.levelStats = {};
+
+                progress.completedLevels[state.currentLevel] = true;
+
+                const currentStats = progress.levelStats[state.currentLevel] || { bestSteps: Infinity, bestTime: Infinity };
+                if (state.steps < currentStats.bestSteps) {
+                    currentStats.bestSteps = state.steps;
+                }
+                if (state.elapsedTime < currentStats.bestTime) {
+                    currentStats.bestTime = state.elapsedTime;
+                }
+                progress.levelStats[state.currentLevel] = currentStats;
+
+                localStorage.setItem('lightPuzzleProgress', JSON.stringify(progress));
+            }
+
+            clearProgress() {
+                localStorage.removeItem('lightPuzzleProgress');
+                this.core.loadLevel(0);
+            }
+        }
+
+        function init() {
+            const core = new PuzzleCore();
+            const renderer = new UIRenderer('gameCanvas', core);
+
+            const progress = renderer.loadProgress();
+            let startLevel = 0;
+            
+            for (let i = LEVELS.length - 1; i >= 0; i--) {
+                if (progress.completedLevels && progress.completedLevels[i]) {
+                    startLevel = Math.min(i + 1, LEVELS.length - 1);
+                    break;
+                }
+            }
+
+            core.loadLevel(startLevel);
+        }
+
+        init();
+    </script>
+</body>
+</html>

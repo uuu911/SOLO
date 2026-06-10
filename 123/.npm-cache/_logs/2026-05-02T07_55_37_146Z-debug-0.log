@@ -1,0 +1,217 @@
+0 verbose cli F:\nodejs\node.exe F:\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.9.0
+2 info using node@v24.14.0
+3 silly config load:file:F:\nodejs\node_modules\npm\npmrc
+4 silly config load:file:D:\Desktop\公司项目\Solo\auto_demo\.npmrc
+5 silly config load:file:C:\Users\27857\.npmrc
+6 silly config load:file:F:\nodejs\node_global\etc\npmrc
+7 verbose title npm install
+8 verbose argv "install"
+9 verbose logfile logs-max:10 dir:D:\Desktop\公司项目\Solo\auto_demo\.npm-cache\_logs\2026-05-02T07_55_37_146Z-
+10 verbose logfile D:\Desktop\公司项目\Solo\auto_demo\.npm-cache\_logs\2026-05-02T07_55_37_146Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 silly idealTree buildDeps
+14 silly reify moves {}
+15 silly audit bulk request {
+15 silly audit   'adler-32': [ '1.3.1' ],
+15 silly audit   asynckit: [ '0.4.0' ],
+15 silly audit   axios: [ '1.15.2' ],
+15 silly audit   'call-bind-apply-helpers': [ '1.0.2' ],
+15 silly audit   cfb: [ '1.2.2' ],
+15 silly audit   codepage: [ '1.15.0' ],
+15 silly audit   'combined-stream': [ '1.0.8' ],
+15 silly audit   'crc-32': [ '1.2.2' ],
+15 silly audit   'delayed-stream': [ '1.0.0' ],
+15 silly audit   dotenv: [ '16.6.1' ],
+15 silly audit   'dunder-proto': [ '1.0.1' ],
+15 silly audit   'es-define-property': [ '1.0.1' ],
+15 silly audit   'es-errors': [ '1.3.0' ],
+15 silly audit   'es-object-atoms': [ '1.1.1' ],
+15 silly audit   'es-set-tostringtag': [ '2.1.0' ],
+15 silly audit   'follow-redirects': [ '1.16.0' ],
+15 silly audit   'form-data': [ '4.0.5' ],
+15 silly audit   frac: [ '1.1.2' ],
+15 silly audit   'function-bind': [ '1.1.2' ],
+15 silly audit   'get-intrinsic': [ '1.3.0' ],
+15 silly audit   'get-proto': [ '1.0.1' ],
+15 silly audit   gopd: [ '1.2.0' ],
+15 silly audit   'has-symbols': [ '1.1.0' ],
+15 silly audit   'has-tostringtag': [ '1.0.2' ],
+15 silly audit   hasown: [ '2.0.3' ],
+15 silly audit   'math-intrinsics': [ '1.1.0' ],
+15 silly audit   'mime-db': [ '1.52.0' ],
+15 silly audit   'mime-types': [ '2.1.35' ],
+15 silly audit   'proxy-from-env': [ '2.1.0' ],
+15 silly audit   ssf: [ '0.11.2' ],
+15 silly audit   wmf: [ '1.0.2' ],
+15 silly audit   word: [ '0.3.0' ],
+15 silly audit   xlsx: [ '0.18.5' ]
+15 silly audit }
+16 http cache xlsx@https://registry.npmmirror.com/xlsx/-/xlsx-0.18.5.tgz 0ms (cache hit)
+17 http cache ssf@https://registry.npmmirror.com/ssf/-/ssf-0.11.2.tgz 0ms (cache hit)
+18 http cache wmf@https://registry.npmmirror.com/wmf/-/wmf-1.0.2.tgz 0ms (cache hit)
+19 http cache word@https://registry.npmmirror.com/word/-/word-0.3.0.tgz 0ms (cache hit)
+20 http cache proxy-from-env@https://registry.npmmirror.com/proxy-from-env/-/proxy-from-env-2.1.0.tgz 0ms (cache hit)
+21 http cache mime-types@https://registry.npmmirror.com/mime-types/-/mime-types-2.1.35.tgz 0ms (cache hit)
+22 http cache hasown@https://registry.npmmirror.com/hasown/-/hasown-2.0.3.tgz 0ms (cache hit)
+23 http cache mime-db@https://registry.npmmirror.com/mime-db/-/mime-db-1.52.0.tgz 0ms (cache hit)
+24 http cache math-intrinsics@https://registry.npmmirror.com/math-intrinsics/-/math-intrinsics-1.1.0.tgz 0ms (cache hit)
+25 http cache has-tostringtag@https://registry.npmmirror.com/has-tostringtag/-/has-tostringtag-1.0.2.tgz 0ms (cache hit)
+26 http cache gopd@https://registry.npmmirror.com/gopd/-/gopd-1.2.0.tgz 0ms (cache hit)
+27 http cache get-intrinsic@https://registry.npmmirror.com/get-intrinsic/-/get-intrinsic-1.3.0.tgz 0ms (cache hit)
+28 http cache function-bind@https://registry.npmmirror.com/function-bind/-/function-bind-1.1.2.tgz 0ms (cache hit)
+29 http cache has-symbols@https://registry.npmmirror.com/has-symbols/-/has-symbols-1.1.0.tgz 0ms (cache hit)
+30 http cache get-proto@https://registry.npmmirror.com/get-proto/-/get-proto-1.0.1.tgz 0ms (cache hit)
+31 http cache frac@https://registry.npmmirror.com/frac/-/frac-1.1.2.tgz 0ms (cache hit)
+32 http cache form-data@https://registry.npmmirror.com/form-data/-/form-data-4.0.5.tgz 0ms (cache hit)
+33 http cache follow-redirects@https://registry.npmmirror.com/follow-redirects/-/follow-redirects-1.16.0.tgz 0ms (cache hit)
+34 http cache es-object-atoms@https://registry.npmmirror.com/es-object-atoms/-/es-object-atoms-1.1.1.tgz 0ms (cache hit)
+35 http cache es-set-tostringtag@https://registry.npmmirror.com/es-set-tostringtag/-/es-set-tostringtag-2.1.0.tgz 0ms (cache hit)
+36 http cache es-define-property@https://registry.npmmirror.com/es-define-property/-/es-define-property-1.0.1.tgz 0ms (cache hit)
+37 http cache es-errors@https://registry.npmmirror.com/es-errors/-/es-errors-1.3.0.tgz 0ms (cache hit)
+38 http cache dotenv@https://registry.npmmirror.com/dotenv/-/dotenv-16.6.1.tgz 0ms (cache hit)
+39 http cache dunder-proto@https://registry.npmmirror.com/dunder-proto/-/dunder-proto-1.0.1.tgz 0ms (cache hit)
+40 http cache delayed-stream@https://registry.npmmirror.com/delayed-stream/-/delayed-stream-1.0.0.tgz 0ms (cache hit)
+41 http cache crc-32@https://registry.npmmirror.com/crc-32/-/crc-32-1.2.2.tgz 0ms (cache hit)
+42 http cache combined-stream@https://registry.npmmirror.com/combined-stream/-/combined-stream-1.0.8.tgz 0ms (cache hit)
+43 http cache codepage@https://registry.npmmirror.com/codepage/-/codepage-1.15.0.tgz 0ms (cache hit)
+44 http cache cfb@https://registry.npmmirror.com/cfb/-/cfb-1.2.2.tgz 0ms (cache hit)
+45 http cache asynckit@https://registry.npmmirror.com/asynckit/-/asynckit-0.4.0.tgz 0ms (cache hit)
+46 http cache call-bind-apply-helpers@https://registry.npmmirror.com/call-bind-apply-helpers/-/call-bind-apply-helpers-1.0.2.tgz 0ms (cache hit)
+47 silly tarball no local data for xlsx@https://registry.npmmirror.com/xlsx/-/xlsx-0.18.5.tgz. Extracting by manifest.
+48 http cache axios@https://registry.npmmirror.com/axios/-/axios-1.15.2.tgz 0ms (cache hit)
+49 http cache adler-32@https://registry.npmmirror.com/adler-32/-/adler-32-1.3.1.tgz 0ms (cache hit)
+50 silly tarball no local data for ssf@https://registry.npmmirror.com/ssf/-/ssf-0.11.2.tgz. Extracting by manifest.
+51 silly tarball no local data for wmf@https://registry.npmmirror.com/wmf/-/wmf-1.0.2.tgz. Extracting by manifest.
+52 silly tarball no local data for word@https://registry.npmmirror.com/word/-/word-0.3.0.tgz. Extracting by manifest.
+53 silly tarball no local data for proxy-from-env@https://registry.npmmirror.com/proxy-from-env/-/proxy-from-env-2.1.0.tgz. Extracting by manifest.
+54 silly tarball no local data for mime-types@https://registry.npmmirror.com/mime-types/-/mime-types-2.1.35.tgz. Extracting by manifest.
+55 silly tarball no local data for hasown@https://registry.npmmirror.com/hasown/-/hasown-2.0.3.tgz. Extracting by manifest.
+56 silly tarball no local data for mime-db@https://registry.npmmirror.com/mime-db/-/mime-db-1.52.0.tgz. Extracting by manifest.
+57 silly tarball no local data for math-intrinsics@https://registry.npmmirror.com/math-intrinsics/-/math-intrinsics-1.1.0.tgz. Extracting by manifest.
+58 silly tarball no local data for has-tostringtag@https://registry.npmmirror.com/has-tostringtag/-/has-tostringtag-1.0.2.tgz. Extracting by manifest.
+59 silly tarball no local data for gopd@https://registry.npmmirror.com/gopd/-/gopd-1.2.0.tgz. Extracting by manifest.
+60 silly tarball no local data for get-intrinsic@https://registry.npmmirror.com/get-intrinsic/-/get-intrinsic-1.3.0.tgz. Extracting by manifest.
+61 silly tarball no local data for function-bind@https://registry.npmmirror.com/function-bind/-/function-bind-1.1.2.tgz. Extracting by manifest.
+62 silly tarball no local data for has-symbols@https://registry.npmmirror.com/has-symbols/-/has-symbols-1.1.0.tgz. Extracting by manifest.
+63 silly tarball no local data for get-proto@https://registry.npmmirror.com/get-proto/-/get-proto-1.0.1.tgz. Extracting by manifest.
+64 silly tarball no local data for frac@https://registry.npmmirror.com/frac/-/frac-1.1.2.tgz. Extracting by manifest.
+65 silly tarball no local data for form-data@https://registry.npmmirror.com/form-data/-/form-data-4.0.5.tgz. Extracting by manifest.
+66 silly tarball no local data for follow-redirects@https://registry.npmmirror.com/follow-redirects/-/follow-redirects-1.16.0.tgz. Extracting by manifest.
+67 silly tarball no local data for es-object-atoms@https://registry.npmmirror.com/es-object-atoms/-/es-object-atoms-1.1.1.tgz. Extracting by manifest.
+68 silly tarball no local data for es-set-tostringtag@https://registry.npmmirror.com/es-set-tostringtag/-/es-set-tostringtag-2.1.0.tgz. Extracting by manifest.
+69 silly tarball no local data for es-define-property@https://registry.npmmirror.com/es-define-property/-/es-define-property-1.0.1.tgz. Extracting by manifest.
+70 silly tarball no local data for es-errors@https://registry.npmmirror.com/es-errors/-/es-errors-1.3.0.tgz. Extracting by manifest.
+71 silly tarball no local data for dotenv@https://registry.npmmirror.com/dotenv/-/dotenv-16.6.1.tgz. Extracting by manifest.
+72 silly tarball no local data for dunder-proto@https://registry.npmmirror.com/dunder-proto/-/dunder-proto-1.0.1.tgz. Extracting by manifest.
+73 silly tarball no local data for delayed-stream@https://registry.npmmirror.com/delayed-stream/-/delayed-stream-1.0.0.tgz. Extracting by manifest.
+74 silly tarball no local data for crc-32@https://registry.npmmirror.com/crc-32/-/crc-32-1.2.2.tgz. Extracting by manifest.
+75 silly tarball no local data for combined-stream@https://registry.npmmirror.com/combined-stream/-/combined-stream-1.0.8.tgz. Extracting by manifest.
+76 silly tarball no local data for codepage@https://registry.npmmirror.com/codepage/-/codepage-1.15.0.tgz. Extracting by manifest.
+77 silly tarball no local data for cfb@https://registry.npmmirror.com/cfb/-/cfb-1.2.2.tgz. Extracting by manifest.
+78 silly tarball no local data for asynckit@https://registry.npmmirror.com/asynckit/-/asynckit-0.4.0.tgz. Extracting by manifest.
+79 silly tarball no local data for call-bind-apply-helpers@https://registry.npmmirror.com/call-bind-apply-helpers/-/call-bind-apply-helpers-1.0.2.tgz. Extracting by manifest.
+80 silly tarball no local data for axios@https://registry.npmmirror.com/axios/-/axios-1.15.2.tgz. Extracting by manifest.
+81 silly tarball no local data for adler-32@https://registry.npmmirror.com/adler-32/-/adler-32-1.3.1.tgz. Extracting by manifest.
+82 http fetch POST 404 https://registry.npmmirror.com/-/npm/v1/security/advisories/bulk 229ms
+83 verbose audit error HttpErrorGeneral: 404 Not Found - POST https://registry.npmmirror.com/-/npm/v1/security/advisories/bulk - [NOT_IMPLEMENTED] /-/npm/v1/security/* not implemented yet
+83 verbose audit error     at F:\nodejs\node_modules\npm\node_modules\npm-registry-fetch\lib\check-response.js:103:15
+83 verbose audit error     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+83 verbose audit error     at async #getReport (F:\nodejs\node_modules\npm\node_modules\@npmcli\arborist\lib\audit-report.js:275:19)
+83 verbose audit error     at async AuditReport.run (F:\nodejs\node_modules\npm\node_modules\@npmcli\arborist\lib\audit-report.js:100:19) {
+83 verbose audit error   headers: [Object: null prototype] {
+83 verbose audit error     server: [ 'Tengine' ],
+83 verbose audit error     date: [ 'Sat, 02 May 2026 07:55:36 GMT' ],
+83 verbose audit error     'content-type': [ 'application/json' ],
+83 verbose audit error     'transfer-encoding': [ 'chunked' ],
+83 verbose audit error     connection: [ 'keep-alive' ],
+83 verbose audit error     'strict-transport-security': [ 'max-age=5184000' ],
+83 verbose audit error     via: [ 'kunlun7.cn9476[,404666]' ],
+83 verbose audit error     'timing-allow-origin': [ '*' ],
+83 verbose audit error     eagleid: [ '7beb210c17777085369407239e' ],
+83 verbose audit error     'x-fetch-attempts': [ '1' ]
+83 verbose audit error   },
+83 verbose audit error   statusCode: 404,
+83 verbose audit error   code: 'E404',
+83 verbose audit error   method: 'POST',
+83 verbose audit error   uri: 'https://registry.npmmirror.com/-/npm/v1/security/advisories/bulk',
+83 verbose audit error   body: {
+83 verbose audit error     error: '[NOT_IMPLEMENTED] /-/npm/v1/security/* not implemented yet'
+83 verbose audit error   },
+83 verbose audit error   pkgid: undefined
+83 verbose audit error }
+84 silly audit error [object Object]
+85 silly audit report null
+86 http fetch GET 200 https://cdn.npmmirror.com/packages/proxy-from-env/2.1.0/proxy-from-env-2.1.0.tgz 467ms (cache miss)
+87 http fetch GET 200 https://cdn.npmmirror.com/packages/word/0.3.0/word-0.3.0.tgz 467ms (cache miss)
+88 http fetch GET 200 https://cdn.npmmirror.com/packages/function-bind/1.1.2/function-bind-1.1.2.tgz 465ms (cache miss)
+89 http fetch GET 200 https://cdn.npmmirror.com/packages/has-symbols/1.1.0/has-symbols-1.1.0.tgz 465ms (cache miss)
+90 http fetch GET 200 https://cdn.npmmirror.com/packages/hasown/2.0.3/hasown-2.0.3.tgz 468ms (cache miss)
+91 http fetch GET 200 https://cdn.npmmirror.com/packages/mime-types/2.1.35/mime-types-2.1.35.tgz 470ms (cache miss)
+92 http fetch GET 200 https://cdn.npmmirror.com/packages/ssf/0.11.2/ssf-0.11.2.tgz 478ms (cache miss)
+93 http fetch GET 200 https://cdn.npmmirror.com/packages/gopd/1.2.0/gopd-1.2.0.tgz 477ms (cache miss)
+94 http fetch GET 200 https://cdn.npmmirror.com/packages/has-tostringtag/1.0.2/has-tostringtag-1.0.2.tgz 482ms (cache miss)
+95 http fetch GET 200 https://cdn.npmmirror.com/packages/math-intrinsics/1.1.0/math-intrinsics-1.1.0.tgz 502ms (cache miss)
+96 http fetch GET 200 https://cdn.npmmirror.com/packages/crc-32/1.2.2/crc-32-1.2.2.tgz 539ms (cache miss)
+97 http fetch GET 200 https://cdn.npmmirror.com/packages/get-proto/1.0.1/get-proto-1.0.1.tgz 544ms (cache miss)
+98 http fetch GET 200 https://cdn.npmmirror.com/packages/delayed-stream/1.0.0/delayed-stream-1.0.0.tgz 541ms (cache miss)
+99 http fetch GET 200 https://cdn.npmmirror.com/packages/combined-stream/1.0.8/combined-stream-1.0.8.tgz 540ms (cache miss)
+100 http fetch GET 200 https://cdn.npmmirror.com/packages/es-define-property/1.0.1/es-define-property-1.0.1.tgz 546ms (cache miss)
+101 http fetch GET 200 https://cdn.npmmirror.com/packages/follow-redirects/1.16.0/follow-redirects-1.16.0.tgz 550ms (cache miss)
+102 http fetch GET 200 https://cdn.npmmirror.com/packages/get-intrinsic/1.3.0/get-intrinsic-1.3.0.tgz 555ms (cache miss)
+103 http fetch GET 200 https://cdn.npmmirror.com/packages/mime-db/1.52.0/mime-db-1.52.0.tgz 560ms (cache miss)
+104 http fetch GET 200 https://cdn.npmmirror.com/packages/es-set-tostringtag/2.1.0/es-set-tostringtag-2.1.0.tgz 560ms (cache miss)
+105 http fetch GET 200 https://cdn.npmmirror.com/packages/call-bind-apply-helpers/1.0.2/call-bind-apply-helpers-1.0.2.tgz 573ms (cache miss)
+106 http fetch GET 200 https://cdn.npmmirror.com/packages/adler-32/1.3.1/adler-32-1.3.1.tgz 583ms (cache miss)
+107 http fetch GET 200 https://cdn.npmmirror.com/packages/es-object-atoms/1.1.1/es-object-atoms-1.1.1.tgz 593ms (cache miss)
+108 http fetch GET 200 https://cdn.npmmirror.com/packages/dunder-proto/1.0.1/dunder-proto-1.0.1.tgz 593ms (cache miss)
+109 http fetch GET 200 https://cdn.npmmirror.com/packages/dotenv/16.6.1/dotenv-16.6.1.tgz 598ms (cache miss)
+110 http fetch GET 200 https://cdn.npmmirror.com/packages/form-data/4.0.5/form-data-4.0.5.tgz 602ms (cache miss)
+111 http fetch GET 200 https://cdn.npmmirror.com/packages/es-errors/1.3.0/es-errors-1.3.0.tgz 603ms (cache miss)
+112 http fetch GET 200 https://cdn.npmmirror.com/packages/frac/1.1.2/frac-1.1.2.tgz 608ms (cache miss)
+113 http fetch GET 200 https://cdn.npmmirror.com/packages/wmf/1.0.2/wmf-1.0.2.tgz 631ms (cache miss)
+114 http fetch GET 200 https://cdn.npmmirror.com/packages/asynckit/0.4.0/asynckit-0.4.0.tgz 624ms (cache miss)
+115 http fetch GET 200 https://cdn.npmmirror.com/packages/cfb/1.2.2/cfb-1.2.2.tgz 659ms (cache miss)
+116 http fetch GET 200 https://cdn.npmmirror.com/packages/axios/1.15.2/axios-1.15.2.tgz 902ms (cache miss)
+117 http fetch GET 200 https://cdn.npmmirror.com/packages/codepage/1.15.0/codepage-1.15.0.tgz 1001ms (cache miss)
+118 http fetch GET 200 https://cdn.npmmirror.com/packages/xlsx/0.18.5/xlsx-0.18.5.tgz 1815ms (cache miss)
+119 silly ADD node_modules/xlsx
+120 silly ADD node_modules/word
+121 silly ADD node_modules/wmf
+122 silly ADD node_modules/ssf
+123 silly ADD node_modules/proxy-from-env
+124 silly ADD node_modules/mime-types
+125 silly ADD node_modules/mime-db
+126 silly ADD node_modules/math-intrinsics
+127 silly ADD node_modules/hasown
+128 silly ADD node_modules/has-tostringtag
+129 silly ADD node_modules/has-symbols
+130 silly ADD node_modules/gopd
+131 silly ADD node_modules/get-proto
+132 silly ADD node_modules/get-intrinsic
+133 silly ADD node_modules/function-bind
+134 silly ADD node_modules/frac
+135 silly ADD node_modules/form-data
+136 silly ADD node_modules/follow-redirects
+137 silly ADD node_modules/es-set-tostringtag
+138 silly ADD node_modules/es-object-atoms
+139 silly ADD node_modules/es-errors
+140 silly ADD node_modules/es-define-property
+141 silly ADD node_modules/dunder-proto
+142 silly ADD node_modules/dotenv
+143 silly ADD node_modules/delayed-stream
+144 silly ADD node_modules/crc-32
+145 silly ADD node_modules/combined-stream
+146 silly ADD node_modules/codepage
+147 silly ADD node_modules/cfb
+148 silly ADD node_modules/call-bind-apply-helpers
+149 silly ADD node_modules/axios
+150 silly ADD node_modules/asynckit
+151 silly ADD node_modules/adler-32
+152 verbose cwd D:\Desktop\公司项目\Solo\auto_demo
+153 verbose os Windows_NT 10.0.26200
+154 verbose node v24.14.0
+155 verbose npm  v11.9.0
+156 verbose exit 0
+157 info ok

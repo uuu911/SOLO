@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>太空探索者</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #000; font-family: Arial, sans-serif; touch-action: none; }
+        #gameCanvas { display: block; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        #upgradePanel {
+            position: absolute; top: 20px; right: 20px; width: 220px;
+            background: rgba(20, 30, 50, 0.85); border: 2px solid #4af;
+            border-radius: 10px; padding: 15px; color: #fff; pointer-events: auto;
+            font-size: 12px;
+        }
+        #upgradePanel h3 { text-align: center; margin-bottom: 10px; color: #4af; }
+        .upgrade-item { margin: 8px 0; padding: 8px; background: rgba(60, 80, 120, 0.5); border-radius: 5px; }
+        .upgrade-item div { margin: 3px 0; }
+        .upgrade-btn {
+            width: 100%; padding: 5px; margin-top: 5px;
+            background: linear-gradient(180deg, #4af, #28d);
+            border: none; border-radius: 4px; color: #fff;
+            cursor: pointer; font-size: 11px;
+        }
+        .upgrade-btn:disabled { background: #555; cursor: not-allowed; }
+        .upgrade-btn:hover:not(:disabled) { background: linear-gradient(180deg, #6cf, #4af); }
+        #minimap {
+            position: absolute; bottom: 20px; right: 20px; width: 200px; height: 200px;
+            background: rgba(0, 10, 30, 0.7); border: 2px solid #4af; border-radius: 8px;
+        }
+        #joystick {
+            position: absolute; bottom: 30px; left: 30px; width: 120px; height: 120px;
+            background: rgba(100, 150, 255, 0.2); border: 2px solid rgba(100, 150, 255, 0.5);
+            border-radius: 50%; display: none; pointer-events: auto;
+        }
+        #joystickKnob {
+            position: absolute; width: 50px; height: 50px;
+            background: rgba(100, 150, 255, 0.6); border-radius: 50%;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+        }
+        #scanProgress {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, 60px);
+            width: 200px; height: 20px; background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #4f8; border-radius: 10px; overflow: hidden;
+            display: none;
+        }
+        #scanBar { height: 100%; background: linear-gradient(90deg, #4f8, #8fc); width: 0%; }
+        #planetInfo {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(20, 40, 60, 0.95); border: 2px solid #4af;
+            border-radius: 10px; padding: 20px; color: #fff; display: none;
+            pointer-events: auto; min-width: 250px;
+        }
+        #planetInfo h3 { color: #4af; margin-bottom: 10px; text-align: center; }
+        #planetInfo p { margin: 5px 0; font-size: 14px; }
+        #planetInfo button {
+            margin-top: 15px; width: 100%; padding: 8px;
+            background: #4af; border: none; border-radius: 5px; color: #fff;
+            cursor: pointer;
+        }
+        #notification {
+            position: absolute; top: 100px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 200, 50, 0.9); padding: 10px 25px;
+            border-radius: 20px; color: #000; font-weight: bold;
+            display: none;
+        }
+        #anomalyEffect {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui">
+        <div id="upgradePanel">
+            <h3>🚀 飞船升级</h3>
+            <div style="text-align: center; margin-bottom: 10px; color: #fc4;">
+                资源点: <span id="resourcePoints">0</span>
+            </div>
+            <div class="upgrade-item">
+                <div>🔥 引擎推力 (Lv.<span id="engineLevel">1</span>/5)</div>
+                <div style="color: #aaa; font-size: 10px;">加速度和转向速度</div>
+                <button class="upgrade-btn" id="upgradeEngine" onclick="upgrade('engine')">
+                    升级 (需要 <span id="engineCost">10</span> 点)
+                </button>
+            </div>
+            <div class="upgrade-item">
+                <div>📡 扫描效率 (Lv.<span id="scannerLevel">1</span>/5)</div>
+                <div style="color: #aaa; font-size: 10px;">扫描时间 1.5s→0.5s</div>
+                <button class="upgrade-btn" id="upgradeScanner" onclick="upgrade('scanner')">
+                    升级 (需要 <span id="scannerCost">10</span> 点)
+                </button>
+            </div>
+            <div class="upgrade-item">
+                <div>⛽ 燃料容量 (Lv.<span id="fuelLevel">1</span>/5)</div>
+                <div style="color: #aaa; font-size: 10px;">上限 1000→3000</div>
+                <button class="upgrade-btn" id="upgradeFuel" onclick="upgrade('fuel')">
+                    升级 (需要 <span id="fuelCost">10</span> 点)
+                </button>
+            </div>
+        </div>
+        <canvas id="minimap"></canvas>
+        <div id="joystick">
+            <div id="joystickKnob"></div>
+        </div>
+        <div id="scanProgress">
+            <div id="scanBar"></div>
+        </div>
+        <div id="planetInfo">
+            <h3 id="planetName">星球信息</h3>
+            <p>类型: <span id="planetType">-</span></p>
+            <p>质量: <span id="planetMass">-</span></p>
+            <p>半径: <span id="planetRadius">-</span></p>
+            <p>表面温度: <span id="planetTemp">-</span></p>
+            <p id="planetResource" style="color: #f84; font-weight: bold;"></p>
+            <button onclick="closePlanetInfo()">关闭</button>
+        </div>
+        <div id="notification"></div>
+        <canvas id="anomalyEffect"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const minimapCanvas = document.getElementById('minimap');
+        const minimapCtx = minimapCanvas.getContext('2d');
+        const anomalyCanvas = document.getElementById('anomalyEffect');
+        const anomalyCtx = anomalyCanvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            anomalyCanvas.width = window.innerWidth;
+            anomalyCanvas.height = window.innerHeight;
+            minimapCanvas.width = 200;
+            minimapCanvas.height = 200;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        const MAP_SIZE = 8000;
+        const MAX_SPEED = 120;
+        const ZOOM_LEVELS = [0.1, 0.2, 0.4, 0.6, 1, 1.5];
+        let currentZoom = 3;
+
+        let gameState = {
+            paused: false,
+            lastTime: 0,
+            deltaTime: 0
+        };
+
+        let ship = {
+            x: MAP_SIZE / 2,
+            y: MAP_SIZE / 2,
+            vx: 0,
+            vy: 0,
+            angle: 0,
+            fuel: 1000,
+            maxFuel: 1000,
+            engineLevel: 1,
+            scannerLevel: 1,
+            fuelLevel: 1,
+            resources: 0,
+            isScanning: false,
+            scanProgress: 0,
+            scanTarget: null
+        };
+
+        let camera = {
+            x: MAP_SIZE / 2,
+            y: MAP_SIZE / 2,
+            targetX: MAP_SIZE / 2,
+            targetY: MAP_SIZE / 2
+        };
+
+        let keys = {};
+        let mouse = { dragging: false, lastX: 0, lastY: 0 };
+        let joystick = { active: false, dx: 0, dy: 0 };
+
+        const PLANET_TYPES = [
+            { name: '岩石行星', colors: ['#8b7355', '#a0826d', '#6b5344'], minR: 15, maxR: 35 },
+            { name: '气态巨行星', colors: ['#daa520', '#cd853f', '#d2691e'], minR: 50, maxR: 90 },
+            { name: '冰冻行星', colors: ['#87ceeb', '#b0e0e6', '#add8e6'], minR: 20, maxR: 45 },
+            { name: '熔岩行星', colors: ['#ff4500', '#ff6347', '#dc143c'], minR: 18, maxR: 40 }
+        ];
+
+        const RESOURCE_TYPES = ['稀有金属', '能量晶体', '暗物质', '外星科技'];
+        let planets = [];
+        let exploredAreas = new Set();
+
+        function generatePlanets() {
+            planets = [];
+            
+            for (let i = 0; i < 25; i++) {
+                let attempts = 0;
+                while (attempts < 100) {
+                    const x = 200 + Math.random() * (MAP_SIZE - 400);
+                    const y = 200 + Math.random() * (MAP_SIZE - 400);
+                    const r = 60 + Math.random() * 40;
+                    
+                    let valid = true;
+                    for (const p of planets) {
+                        const dist = Math.hypot(x - p.x, y - p.y);
+                        if (dist < r + p.radius + 100) { valid = false; break; }
+                    }
+                    
+                    if (valid) {
+                        planets.push({
+                            x, y, radius: r, type: 'star', name: `恒星-${i + 1}`,
+                            color: '#ffdd44', mass: (r / 60) * 1000,
+                            temp: 5000 + Math.random() * 3000,
+                            hasResource: false, scanned: false
+                        });
+                        break;
+                    }
+                    attempts++;
+                }
+            }
+
+            for (let i = 0; i < 550; i++) {
+                let attempts = 0;
+                while (attempts < 100) {
+                    const typeIndex = Math.floor(Math.random() * PLANET_TYPES.length);
+                    const type = PLANET_TYPES[typeIndex];
+                    const x = 100 + Math.random() * (MAP_SIZE - 200);
+                    const y = 100 + Math.random() * (MAP_SIZE - 200);
+                    const r = type.minR + Math.random() * (type.maxR - type.minR);
+                    
+                    let valid = true;
+                    for (const p of planets) {
+                        const dist = Math.hypot(x - p.x, y - p.y);
+                        const minDist = p.type === 'star' ? p.radius + r + 80 : p.radius + r + 20;
+                        if (dist < minDist) { valid = false; break; }
+                    }
+                    
+                    if (valid) {
+                        planets.push({
+                            x, y, radius: r, type: type.name,
+                            name: `${type.name}-${i + 1}`,
+                            color: type.colors[Math.floor(Math.random() * type.colors.length)],
+                            mass: Math.round(r * r * (0.5 + Math.random())),
+                            temp: typeIndex === 3 ? 800 + Math.random() * 1200 :
+                                  typeIndex === 2 ? -200 + Math.random() * 100 :
+                                  -50 + Math.random() * 250,
+                            hasResource: Math.random() < 0.15,
+                            resourceType: RESOURCE_TYPES[Math.floor(Math.random() * RESOURCE_TYPES.length)],
+                            resourceAmount: 5 + Math.floor(Math.random() * 15),
+                            scanned: false
+                        });
+                        break;
+                    }
+                    attempts++;
+                }
+            }
+        }
+
+        let anomaly = {
+            active: false,
+            triggered: false,
+            x: 0,
+            y: 0,
+            time: 0,
+            pulsePhase: 0
+        };
+
+        function initAnomaly() {
+            let maxStarDist = 0;
+            let bestX = MAP_SIZE / 2;
+            let bestY = MAP_SIZE / 2;
+            
+            const stars = planets.filter(p => p.type === 'star');
+            for (let i = 0; i < 100; i++) {
+                const x = Math.random() * MAP_SIZE;
+                const y = Math.random() * MAP_SIZE;
+                let minDist = Infinity;
+                for (const star of stars) {
+                    minDist = Math.min(minDist, Math.hypot(x - star.x, y - star.y));
+                }
+                if (minDist > maxStarDist) {
+                    maxStarDist = minDist;
+                    bestX = x;
+                    bestY = y;
+                }
+            }
+            
+            anomaly.x = bestX;
+            anomaly.y = bestY;
+        }
+
+        function checkAnomaly() {
+            if (anomaly.triggered || ship.fuel > 50) return;
+            
+            const dist = Math.hypot(ship.x - anomaly.x, ship.y - anomaly.y);
+            const speed = Math.hypot(ship.vx, ship.vy);
+            
+            if (dist < 200 && speed < 10 && ship.fuel < 30) {
+                triggerAnomaly();
+            }
+        }
+
+        function triggerAnomaly() {
+            anomaly.triggered = true;
+            anomaly.active = true;
+            anomaly.time = 0;
+            
+            ship.resources += 100;
+            ship.fuel = ship.maxFuel;
+            
+            showNotification('🌟 发现宇宙裂隙！获得 100 资源点，燃料已补满！');
+            updateUI();
+            
+            setTimeout(() => {
+                anomaly.active = false;
+            }, 5000);
+        }
+
+        function getAcceleration() {
+            return 30 + ship.engineLevel * 15;
+        }
+
+        function getTurnRate() {
+            return 2 + ship.engineLevel * 0.5;
+        }
+
+        function getScanTime() {
+            return Math.max(0.5, 1.5 - (ship.scannerLevel - 1) * 0.25);
+        }
+
+        function getMaxFuel() {
+            return 1000 + (ship.fuelLevel - 1) * 500;
+        }
+
+        const UPGRADE_COSTS = [10, 25, 50, 100, 200];
+
+        function upgrade(type) {
+            const levelKey = type + 'Level';
+            const cost = UPGRADE_COSTS[ship[levelKey] - 1];
+            
+            if (ship.resources >= cost && ship[levelKey] < 5) {
+                ship.resources -= cost;
+                ship[levelKey]++;
+                
+                if (type === 'fuel') {
+                    ship.maxFuel = getMaxFuel();
+                    ship.fuel = Math.min(ship.fuel, ship.maxFuel);
+                }
+                
+                showNotification(`升级成功！${type === 'engine' ? '引擎' : type === 'scanner' ? '扫描器' : '燃料舱'} 等级 ${ship[levelKey]}`);
+                updateUI();
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('resourcePoints').textContent = ship.resources;
+            document.getElementById('engineLevel').textContent = ship.engineLevel;
+            document.getElementById('scannerLevel').textContent = ship.scannerLevel;
+            document.getElementById('fuelLevel').textContent = ship.fuelLevel;
+            
+            const types = ['engine', 'scanner', 'fuel'];
+            types.forEach(t => {
+                const level = ship[t + 'Level'];
+                const cost = UPGRADE_COSTS[level - 1];
+                document.getElementById(t + 'Cost').textContent = level >= 5 ? 'MAX' : cost;
+                document.getElementById('upgrade' + t.charAt(0).toUpperCase() + t.slice(1)).disabled =
+                    level >= 5 || ship.resources < cost;
+            });
+        }
+
+        function showNotification(msg) {
+            const el = document.getElementById('notification');
+            el.textContent = msg;
+            el.style.display = 'block';
+            setTimeout(() => el.style.display = 'none', 3000);
+        }
+
+        function closePlanetInfo() {
+            document.getElementById('planetInfo').style.display = 'none';
+        }
+
+        function showPlanetInfo(planet) {
+            const info = document.getElementById('planetInfo');
+            document.getElementById('planetName').textContent = planet.name;
+            document.getElementById('planetType').textContent = planet.type;
+            document.getElementById('planetMass').textContent = planet.mass.toFixed(0) + ' 单位';
+            document.getElementById('planetRadius').textContent = planet.radius.toFixed(0) + ' 像素';
+            document.getElementById('planetTemp').textContent = planet.temp.toFixed(0) + ' °C';
+            
+            const resEl = document.getElementById('planetResource');
+            if (planet.hasResource) {
+                resEl.textContent = `✨ 发现 ${planet.resourceType}！+${planet.resourceAmount} 资源点`;
+                resEl.style.display = 'block';
+            } else {
+                resEl.style.display = 'none';
+            }
+            
+            info.style.display = 'block';
+        }
+
+        document.addEventListener('keydown', e => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key === ' ') {
+                e.preventDefault();
+                keys.space = true;
+            }
+        });
+
+        document.addEventListener('keyup', e => {
+            keys[e.key.toLowerCase()] = false;
+            if (e.key === ' ') {
+                keys.space = false;
+                stopScanning();
+            }
+        });
+
+        canvas.addEventListener('mousedown', e => {
+            if (e.button === 0) {
+                mouse.dragging = true;
+                mouse.lastX = e.clientX;
+                mouse.lastY = e.clientY;
+            }
+        });
+
+        document.addEventListener('mouseup', e => {
+            if (e.button === 0) mouse.dragging = false;
+        });
+
+        document.addEventListener('mousemove', e => {
+            if (mouse.dragging) {
+                camera.targetX -= (e.clientX - mouse.lastX) / ZOOM_LEVELS[currentZoom];
+                camera.targetY -= (e.clientY - mouse.lastY) / ZOOM_LEVELS[currentZoom];
+                mouse.lastX = e.clientX;
+                mouse.lastY = e.clientY;
+            }
+        });
+
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            if (e.deltaY < 0 && currentZoom < ZOOM_LEVELS.length - 1) {
+                currentZoom++;
+            } else if (e.deltaY > 0 && currentZoom > 0) {
+                currentZoom--;
+            }
+        });
+
+        const joystickEl = document.getElementById('joystick');
+        const joystickKnob = document.getElementById('joystickKnob');
+        let joystickCenter = { x: 0, y: 0 };
+
+        joystickEl.addEventListener('touchstart', e => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = joystickEl.getBoundingClientRect();
+            joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            joystick.active = true;
+            updateJoystick(touch);
+        });
+
+        joystickEl.addEventListener('touchmove', e => {
+            e.preventDefault();
+            if (joystick.active) updateJoystick(e.touches[0]);
+        });
+
+        joystickEl.addEventListener('touchend', e => {
+            e.preventDefault();
+            joystick.active = false;
+            joystick.dx = 0;
+            joystick.dy = 0;
+            joystickKnob.style.transform = 'translate(-50%, -50%)';
+        });
+
+        function updateJoystick(touch) {
+            const dx = touch.clientX - joystickCenter.x;
+            const dy = touch.clientY - joystickCenter.y;
+            const dist = Math.hypot(dx, dy);
+            const maxDist = 35;
+            
+            if (dist > maxDist) {
+                joystick.dx = (dx / dist) * maxDist;
+                joystick.dy = (dy / dist) * maxDist;
+            } else {
+                joystick.dx = dx;
+                joystick.dy = dy;
+            }
+            
+            joystickKnob.style.transform = `translate(calc(-50% + ${joystick.dx}px), calc(-50% + ${joystick.dy}px))`;
+        }
+
+        if ('ontouchstart' in window) {
+            joystickEl.style.display = 'block';
+        }
+
+        function stopScanning() {
+            ship.isScanning = false;
+            ship.scanProgress = 0;
+            ship.scanTarget = null;
+            document.getElementById('scanProgress').style.display = 'none';
+        }
+
+        function startScanning(planet) {
+            ship.isScanning = true;
+            ship.scanProgress = 0;
+            ship.scanTarget = planet;
+            document.getElementById('scanProgress').style.display = 'block';
+        }
+
+        function completeScan() {
+            const planet = ship.scanTarget;
+            planet.scanned = true;
+            
+            if (planet.hasResource) {
+                ship.resources += planet.resourceAmount;
+                if (planet.resourceType === '能量晶体') {
+                    ship.fuel = Math.min(ship.maxFuel, ship.fuel + 200);
+                }
+            }
+            
+            showPlanetInfo(planet);
+            updateUI();
+            stopScanning();
+            
+            exploredAreas.add(Math.floor(planet.x / 400) + ',' + Math.floor(planet.y / 400));
+        }
+
+        function handleCollisions() {
+            for (const planet of planets) {
+                const dist = Math.hypot(ship.x - planet.x, ship.y - planet.y);
+                const minDist = planet.radius + 12;
+                
+                if (dist < minDist) {
+                    const nx = (ship.x - planet.x) / dist;
+                    const ny = (ship.y - planet.y) / dist;
+                    
+                    ship.x = planet.x + nx * (minDist + 1);
+                    ship.y = planet.y + ny * (minDist + 1);
+                    
+                    const dot = ship.vx * nx + ship.vy * ny;
+                    ship.vx -= 1.5 * dot * nx;
+                    ship.vy -= 1.5 * dot * ny;
+                }
+            }
+        }
+
+        function updatePhysics(dt) {
+            if (gameState.paused) return;
+            
+            let ax = 0, ay = 0;
+            let turnInput = 0;
+            let thrustInput = 0;
+            
+            if (keys['a'] || keys['arrowleft']) turnInput -= 1;
+            if (keys['d'] || keys['arrowright']) turnInput += 1;
+            if (keys['w'] || keys['arrowup']) thrustInput = 1;
+            if (keys['s'] || keys['arrowdown']) thrustInput = -1;
+            
+            if (joystick.active) {
+                turnInput = joystick.dx / 35;
+                thrustInput = -joystick.dy / 35;
+            }
+            
+            ship.angle += turnInput * getTurnRate() * dt;
+            
+            if (thrustInput > 0 && ship.fuel > 0 && !ship.isScanning) {
+                const thrust = thrustInput * getAcceleration();
+                ax = Math.cos(ship.angle) * thrust;
+                ay = Math.sin(ship.angle) * thrust;
+                
+                const fuelCost = Math.abs(thrustInput) * dt * 8;
+                ship.fuel = Math.max(0, ship.fuel - fuelCost);
+            }
+            
+            ship.vx += ax * dt;
+            ship.vy += ay * dt;
+            
+            const speed = Math.hypot(ship.vx, ship.vy);
+            if (speed > MAX_SPEED) {
+                ship.vx = (ship.vx / speed) * MAX_SPEED;
+                ship.vy = (ship.vy / speed) * MAX_SPEED;
+            }
+            
+            ship.vx *= 0.998;
+            ship.vy *= 0.998;
+            
+            if (!ship.isScanning) {
+                ship.x += ship.vx * dt * 60;
+                ship.y += ship.vy * dt * 60;
+            }
+            
+            ship.x = Math.max(50, Math.min(MAP_SIZE - 50, ship.x));
+            ship.y = Math.max(50, Math.min(MAP_SIZE - 50, ship.y));
+            
+            handleCollisions();
+            
+            for (const planet of planets) {
+                if (planet.type === 'star') {
+                    const dist = Math.hypot(ship.x - planet.x, ship.y - planet.y);
+                    if (dist < planet.radius + 200) {
+                        const recharge = (1 / (dist / planet.radius)) * dt * 15;
+                        ship.fuel = Math.min(ship.maxFuel, ship.fuel + recharge);
+                    }
+                }
+            }
+            
+            if (keys.space && !ship.isScanning) {
+                let nearest = null;
+                let nearestDist = Infinity;
+                
+                for (const planet of planets) {
+                    if (planet.scanned) continue;
+                    const dist = Math.hypot(ship.x - planet.x, ship.y - planet.y);
+                    const scanRange = planet.radius + 60;
+                    if (dist < scanRange && dist < nearestDist) {
+                        nearest = planet;
+                        nearestDist = dist;
+                    }
+                }
+                
+                if (nearest) {
+                    startScanning(nearest);
+                    ship.vx *= 0.1;
+                    ship.vy *= 0.1;
+                }
+            }
+            
+            if (ship.isScanning && ship.scanTarget) {
+                const dist = Math.hypot(ship.x - ship.scanTarget.x, ship.y - ship.scanTarget.y);
+                const range = ship.scanTarget.radius + 80;
+                
+                if (dist > range || !keys.space) {
+                    stopScanning();
+                } else {
+                    ship.scanProgress += dt;
+                    
+                    const fuelCost = dt * 5;
+                    ship.fuel = Math.max(0, ship.fuel - fuelCost);
+                    
+                    document.getElementById('scanBar').style.width =
+                        (ship.scanProgress / getScanTime() * 100) + '%';
+                    
+                    if (ship.scanProgress >= getScanTime()) {
+                        completeScan();
+                    }
+                }
+            }
+            
+            if (!mouse.dragging) {
+                camera.targetX = ship.x;
+                camera.targetY = ship.y;
+            }
+            
+            camera.x += (camera.targetX - camera.x) * 0.08;
+            camera.y += (camera.targetY - camera.y) * 0.08;
+            
+            checkAnomaly();
+        }
+
+        let starsBg = [];
+        for (let i = 0; i < 300; i++) {
+            starsBg.push({
+                x: Math.random() * MAP_SIZE,
+                y: Math.random() * MAP_SIZE,
+                size: Math.random() * 2 + 0.5,
+                brightness: Math.random()
+            });
+        }
+
+        function render() {
+            const zoom = ZOOM_LEVELS[currentZoom];
+            const camX = camera.x - canvas.width / 2 / zoom;
+            const camY = camera.y - canvas.height / 2 / zoom;
+            
+            ctx.fillStyle = '#050510';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.save();
+            ctx.scale(zoom, zoom);
+            ctx.translate(-camX, -camY);
+            
+            for (const star of starsBg) {
+                if (star.x >= camX - 10 && star.x <= camX + canvas.width / zoom + 10 &&
+                    star.y >= camY - 10 && star.y <= camY + canvas.height / zoom + 10) {
+                    ctx.globalAlpha = 0.3 + star.brightness * 0.5;
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            ctx.globalAlpha = 1;
+            
+            const visiblePlanets = planets.filter(p =>
+                p.x >= camX - p.radius - 50 && p.x <= camX + canvas.width / zoom + p.radius + 50 &&
+                p.y >= camY - p.radius - 50 && p.y <= camY + canvas.height / zoom + p.radius + 50
+            );
+            
+            visiblePlanets.sort((a, b) => (a.type === 'star' ? 1 : -1));
+            
+            for (const planet of visiblePlanets) {
+                if (planet.type === 'star') {
+                    const gradient = ctx.createRadialGradient(
+                        planet.x, planet.y, 0,
+                        planet.x, planet.y, planet.radius * 2.5
+                    );
+                    gradient.addColorStop(0, 'rgba(255, 255, 200, 0.9)');
+                    gradient.addColorStop(0.3, 'rgba(255, 220, 100, 0.5)');
+                    gradient.addColorStop(0.6, 'rgba(255, 150, 50, 0.2)');
+                    gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(planet.x, planet.y, planet.radius * 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = planet.color;
+                    ctx.beginPath();
+                    ctx.arc(planet.x, planet.y, planet.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = planet.color;
+                    ctx.beginPath();
+                    ctx.arc(planet.x, planet.y, planet.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = planet.scanned ? '#4f8' : 'rgba(255,255,255,0.2)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(planet.x, planet.y, planet.radius, 0, Math.PI * 2);
+                    ctx.stroke();
+                    
+                    if (planet.scanned && planet.hasResource) {
+                        ctx.fillStyle = '#f84';
+                        ctx.font = '16px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('✨', planet.x, planet.y - planet.radius - 10);
+                    }
+                }
+            }
+            
+            ctx.save();
+            ctx.translate(ship.x, ship.y);
+            ctx.rotate(ship.angle);
+            
+            ctx.fillStyle = '#4af';
+            ctx.beginPath();
+            ctx.moveTo(20, 0);
+            ctx.lineTo(-15, -10);
+            ctx.lineTo(-10, 0);
+            ctx.lineTo(-15, 10);
+            ctx.closePath();
+            ctx.fill();
+            
+            if (keys['w'] && ship.fuel > 0 && !ship.isScanning) {
+                ctx.fillStyle = '#f84';
+                ctx.beginPath();
+                ctx.moveTo(-10, 0);
+                ctx.lineTo(-25 - Math.random() * 10, -5);
+                ctx.lineTo(-30 - Math.random() * 15, 0);
+                ctx.lineTo(-25 - Math.random() * 10, 5);
+                ctx.closePath();
+                ctx.fill();
+            }
+            
+            ctx.restore();
+            
+            const speed = Math.hypot(ship.vx, ship.vy);
+            if (speed > 5) {
+                ctx.strokeStyle = 'rgba(100, 255, 100, 0.6)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(ship.x, ship.y);
+                ctx.lineTo(ship.x + ship.vx * 2, ship.y + ship.vy * 2);
+                ctx.stroke();
+                
+                const arrowAngle = Math.atan2(ship.vy, ship.vx);
+                ctx.beginPath();
+                ctx.moveTo(ship.x + ship.vx * 2, ship.y + ship.vy * 2);
+                ctx.lineTo(
+                    ship.x + ship.vx * 2 - 8 * Math.cos(arrowAngle - 0.4),
+                    ship.y + ship.vy * 2 - 8 * Math.sin(arrowAngle - 0.4)
+                );
+                ctx.moveTo(ship.x + ship.vx * 2, ship.y + ship.vy * 2);
+                ctx.lineTo(
+                    ship.x + ship.vx * 2 - 8 * Math.cos(arrowAngle + 0.4),
+                    ship.y + ship.vy * 2 - 8 * Math.sin(arrowAngle + 0.4)
+                );
+                ctx.stroke();
+            }
+            
+            ctx.restore();
+            
+            const fuelAngle = (ship.fuel / ship.maxFuel) * Math.PI * 1.5;
+            const centerX = 80;
+            const centerY = canvas.height - 80;
+            
+            ctx.strokeStyle = 'rgba(100, 100, 100, 0.5)';
+            ctx.lineWidth = 15;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 50, Math.PI * 0.75, Math.PI * 2.25);
+            ctx.stroke();
+            
+            ctx.strokeStyle = ship.fuel < ship.maxFuel * 0.2 ? '#f44' : '#4af';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 50, Math.PI * 0.75, Math.PI * 0.75 + fuelAngle);
+            ctx.stroke();
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('⛽', centerX, centerY);
+            ctx.font = '12px Arial';
+            ctx.fillText(Math.floor(ship.fuel) + '/' + ship.maxFuel, centerX, centerY + 18);
+            
+            let nearestResource = null;
+            let nearestDist = Infinity;
+            for (const p of planets) {
+                if (p.hasResource && !p.scanned) {
+                    const dist = Math.hypot(ship.x - p.x, ship.y - p.y);
+                    if (dist < nearestDist) {
+                        nearestDist = dist;
+                        nearestResource = p;
+                    }
+                }
+            }
+            
+            if (nearestResource) {
+                const screenX = (nearestResource.x - camera.x) * zoom + canvas.width / 2;
+                const screenY = (nearestResource.y - camera.y) * zoom + canvas.height / 2;
+                
+                if (screenX < 50 || screenX > canvas.width - 50 ||
+                    screenY < 50 || screenY > canvas.height - 50) {
+                    const angle = Math.atan2(
+                        nearestResource.y - ship.y,
+                        nearestResource.x - ship.x
+                    );
+                    
+                    const indicatorX = canvas.width / 2 + Math.cos(angle) * 150;
+                    const indicatorY = canvas.height / 2 + Math.sin(angle) * 150;
+                    
+                    ctx.save();
+                    ctx.translate(indicatorX, indicatorY);
+                    ctx.rotate(angle);
+                    
+                    ctx.fillStyle = 'rgba(255, 150, 50, 0.8)';
+                    ctx.beginPath();
+                    ctx.moveTo(15, 0);
+                    ctx.lineTo(-5, -8);
+                    ctx.lineTo(-5, 8);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    ctx.restore();
+                    
+                    ctx.fillStyle = '#fa4';
+                    ctx.font = '11px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(Math.floor(nearestDist) + 'px', indicatorX, indicatorY + 20);
+                }
+            }
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(`速度: ${speed.toFixed(1)} / ${MAX_SPEED}`, 20, 30);
+            ctx.fillText(`缩放: ${(zoom * 100).toFixed(0)}%`, 20, 50);
+            ctx.fillText(`已扫描: ${planets.filter(p => p.scanned).length} / ${planets.length}`, 20, 70);
+        }
+
+        function renderMinimap() {
+            minimapCtx.fillStyle = 'rgba(0, 10, 30, 0.9)';
+            minimapCtx.fillRect(0, 0, 200, 200);
+            
+            const scale = 200 / MAP_SIZE;
+            
+            minimapCtx.fillStyle = 'rgba(50, 100, 150, 0.3)';
+            for (const area of exploredAreas) {
+                const [gx, gy] = area.split(',').map(Number);
+                minimapCtx.fillRect(gx * 400 * scale, gy * 400 * scale, 400 * scale, 400 * scale);
+            }
+            
+            minimapCtx.fillStyle = '#ff0';
+            for (const p of planets) {
+                if (p.type === 'star') {
+                    minimapCtx.beginPath();
+                    minimapCtx.arc(p.x * scale, p.y * scale, 3, 0, Math.PI * 2);
+                    minimapCtx.fill();
+                }
+            }
+            
+            minimapCtx.fillStyle = '#4af';
+            minimapCtx.beginPath();
+            minimapCtx.arc(ship.x * scale, ship.y * scale, 4, 0, Math.PI * 2);
+            minimapCtx.fill();
+            
+            const viewW = canvas.width / ZOOM_LEVELS[currentZoom] * scale;
+            const viewH = canvas.height / ZOOM_LEVELS[currentZoom] * scale;
+            minimapCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            minimapCtx.lineWidth = 1;
+            minimapCtx.strokeRect(
+                (camera.x - canvas.width / 2 / ZOOM_LEVELS[currentZoom]) * scale,
+                (camera.y - canvas.height / 2 / ZOOM_LEVELS[currentZoom]) * scale,
+                viewW, viewH
+            );
+        }
+
+        function renderAnomaly(dt) {
+            if (!anomaly.active) return;
+            
+            anomaly.time += dt;
+            anomaly.pulsePhase += dt * 3;
+            
+            const alpha = Math.max(0, 1 - anomaly.time / 5);
+            
+            anomalyCtx.clearRect(0, 0, anomalyCanvas.width, anomalyCanvas.height);
+            
+            const cx = anomalyCanvas.width / 2;
+            const cy = anomalyCanvas.height / 2;
+            
+            for (let i = 0; i < 5; i++) {
+                const r = 100 + i * 80 + Math.sin(anomaly.pulsePhase + i) * 30;
+                const gradient = anomalyCtx.createRadialGradient(cx, cy, 0, cx, cy, r);
+                gradient.addColorStop(0, `rgba(200, 100, 255, ${alpha * 0.3})`);
+                gradient.addColorStop(0.5, `rgba(100, 150, 255, ${alpha * 0.2})`);
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                
+                anomalyCtx.fillStyle = gradient;
+                anomalyCtx.beginPath();
+                anomalyCtx.arc(cx, cy, r, 0, Math.PI * 2);
+                anomalyCtx.fill();
+            }
+            
+            for (let i = 0; i < 30; i++) {
+                const angle = (i / 30) * Math.PI * 2 + anomaly.pulsePhase;
+                const dist = 150 + Math.sin(anomaly.pulsePhase * 2 + i) * 50;
+                const x = cx + Math.cos(angle) * dist;
+                const y = cy + Math.sin(angle) * dist;
+                
+                anomalyCtx.fillStyle = `rgba(255, 255, 255, ${alpha * (0.3 + Math.random() * 0.3)})`;
+                anomalyCtx.beginPath();
+                anomalyCtx.arc(x, y, 2 + Math.random() * 3, 0, Math.PI * 2);
+                anomalyCtx.fill();
+            }
+        }
+
+        function gameLoop(timestamp) {
+            if (!gameState.lastTime) gameState.lastTime = timestamp;
+            gameState.deltaTime = Math.min((timestamp - gameState.lastTime) / 1000, 0.1);
+            gameState.lastTime = timestamp;
+            
+            if (!gameState.paused) {
+                updatePhysics(gameState.deltaTime);
+            }
+            
+            render();
+            renderMinimap();
+            renderAnomaly(gameState.deltaTime);
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            gameState.paused = document.hidden;
+        });
+
+        window.addEventListener('blur', () => {
+            gameState.paused = true;
+        });
+
+        window.addEventListener('focus', () => {
+            gameState.paused = false;
+            gameState.lastTime = 0;
+        });
+
+        generatePlanets();
+        initAnomaly();
+        updateUI();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>

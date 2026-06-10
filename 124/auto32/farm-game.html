@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>农场模拟游戏</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Microsoft YaHei', sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        .header {
+            background: rgba(255,255,255,0.95);
+            padding: 15px 25px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .header-left { display: flex; gap: 30px; align-items: center; }
+        .stat { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; }
+        .stat-icon { font-size: 24px; }
+        .coin { color: #f39c12; }
+        .day { color: #3498db; }
+        .weather { color: #27ae60; }
+        
+        .main-content { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        
+        .panel {
+            background: rgba(255,255,255,0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .panel-title {
+            font-size: 20px; font-weight: 700; margin-bottom: 15px;
+            color: #2c3e50; border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        .farm-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 5px;
+        }
+        .plot {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 24px;
+            border: 2px solid #bdc3c7;
+            position: relative;
+        }
+        .plot:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .plot-empty { background: #8B4513; }
+        .plot-planted { background: #90EE90; }
+        .plot-watered { background: #87CEEB; }
+        .plot-fertilized { background: #DDA0DD; }
+        .plot-ready { background: #FFD700; animation: pulse 1s infinite; }
+        .plot-withered { background: #696969; }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .plot-label {
+            font-size: 10px;
+            position: absolute;
+            bottom: 2px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+        .plot-fertility {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            font-size: 8px;
+            background: #27ae60;
+            color: white;
+            padding: 1px 3px;
+            border-radius: 3px;
+        }
+        
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .tool-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .tool-btn.active {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .tool-btn.plant { background: #27ae60; color: white; }
+        .tool-btn.water { background: #3498db; color: white; }
+        .tool-btn.fertilize { background: #9b59b6; color: white; }
+        .tool-btn.harvest { background: #f39c12; color: white; }
+        .tool-btn.clear { background: #e74c3c; color: white; }
+        
+        .seed-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #ecf0f1;
+            border-radius: 8px;
+        }
+        .seed-btn {
+            padding: 6px 12px;
+            border: 2px solid #bdc3c7;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            background: white;
+            transition: all 0.3s;
+        }
+        .seed-btn:hover { border-color: #3498db; }
+        .seed-btn.active { background: #3498db; color: white; border-color: #3498db; }
+        
+        .animal-section {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .animal-card {
+            background: #ecf0f1;
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+        }
+        .animal-icon { font-size: 36px; margin-bottom: 8px; }
+        .animal-name { font-weight: 700; margin-bottom: 5px; }
+        .animal-count { font-size: 14px; color: #7f8c8d; margin-bottom: 8px; }
+        .animal-mood {
+            height: 6px;
+            background: #bdc3c7;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        .animal-mood-bar {
+            height: 100%;
+            background: #27ae60;
+            transition: width 0.3s;
+        }
+        .animal-btn {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 2px;
+        }
+        .animal-btn.feed { background: #f39c12; color: white; }
+        .animal-btn.clean { background: #3498db; color: white; }
+        .animal-btn.collect { background: #27ae60; color: white; }
+        
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .action-btn {
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 700;
+            color: white;
+            transition: all 0.3s;
+        }
+        .action-btn:hover { transform: scale(1.02); }
+        .action-btn.inventory { background: #9b59b6; }
+        .action-btn.market { background: #e67e22; }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 700px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-title { font-size: 22px; font-weight: 700; color: #2c3e50; }
+        .modal-close {
+            width: 30px; height: 30px;
+            border: none;
+            background: #e74c3c;
+            color: white;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        
+        .inventory-grid, .market-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+        }
+        .item-card {
+            background: #ecf0f1;
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+        }
+        .item-icon { font-size: 32px; margin-bottom: 5px; }
+        .item-name { font-weight: 600; font-size: 13px; margin-bottom: 3px; }
+        .item-quantity { font-size: 12px; color: #7f8c8d; margin-bottom: 5px; }
+        .item-quality { font-size: 11px; padding: 2px 6px; border-radius: 3px; display: inline-block; }
+        .quality-normal { background: #95a5a6; color: white; }
+        .quality-good { background: #3498db; color: white; }
+        .quality-excellent { background: #f39c12; color: white; }
+        .item-price { font-size: 13px; font-weight: 700; color: #27ae60; margin: 5px 0; }
+        .item-btn {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .item-btn.sell { background: #e74c3c; color: white; }
+        .item-btn.buy { background: #27ae60; color: white; }
+        
+        .market-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .market-tab {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: #ecf0f1;
+            font-weight: 600;
+        }
+        .market-tab.active { background: #3498db; color: white; }
+        
+        .weather-info {
+            padding: 10px;
+            background: #ecf0f1;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .weather-icon { font-size: 32px; margin-bottom: 5px; }
+        .weather-desc { font-size: 14px; color: #7f8c8d; }
+        
+        .message {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            z-index: 2000;
+            animation: slideDown 0.3s ease;
+        }
+        .message.success { background: #27ae60; }
+        .message.error { background: #e74c3c; }
+        .message.warning { background: #f39c12; }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        
+        .log-panel {
+            max-height: 150px;
+            overflow-y: auto;
+            background: #ecf0f1;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 15px;
+        }
+        .log-entry {
+            font-size: 12px;
+            padding: 4px 0;
+            border-bottom: 1px solid #bdc3c7;
+        }
+        .log-time { color: #7f8c8d; margin-right: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <div class="stat">
+                    <span class="stat-icon coin">💰</span>
+                    <span id="coins">100.0</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-icon day">📅</span>
+                    第 <span id="day">1</span> 天
+                </div>
+                <div class="stat">
+                    <span class="stat-icon weather" id="weatherIcon">☀️</span>
+                    <span id="weatherName">晴天</span>
+                </div>
+            </div>
+            <div style="font-size: 14px; color: #7f8c8d;">
+                当前模式: <span id="gameMode">基础模式</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="panel">
+                <div class="panel-title">🌾 农田 (8×6)</div>
+                
+                <div class="toolbar">
+                    <button class="tool-btn plant active" data-tool="plant">🌱 种植</button>
+                    <button class="tool-btn water" data-tool="water">💧 浇水</button>
+                    <button class="tool-btn fertilize" data-tool="fertilize">💩 施肥</button>
+                    <button class="tool-btn harvest" data-tool="harvest">✂️ 收获</button>
+                    <button class="tool-btn clear" data-tool="clear">🗑️ 清除</button>
+                </div>
+                
+                <div class="seed-selector" id="seedSelector">
+                </div>
+                
+                <div class="farm-grid" id="farmGrid">
+                </div>
+                
+                <div class="log-panel" id="logPanel">
+                    <div class="log-entry"><span class="log-time">[第1天]</span> 欢迎来到农场！开始你的种植之旅吧~</div>
+                </div>
+            </div>
+
+            <div>
+                <div class="panel">
+                    <div class="panel-title">🐔 牲畜棚</div>
+                    
+                    <div class="weather-info">
+                        <div class="weather-icon" id="weatherIcon2">☀️</div>
+                        <div class="weather-desc" id="weatherEffect">天气效果: 正常生长</div>
+                    </div>
+                    
+                    <div class="animal-section" id="animalSection">
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <button class="action-btn inventory" onclick="openInventory()">🎒 背包</button>
+                        <button class="action-btn market" onclick="openMarket()">🏪 市场</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="inventoryModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">🎒 背包</div>
+                <button class="modal-close" onclick="closeInventory()">×</button>
+            </div>
+            <div class="inventory-grid" id="inventoryGrid">
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="marketModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">🏪 市场 (每日价格波动±30%)</div>
+                <button class="modal-close" onclick="closeMarket()">×</button>
+            </div>
+            <div class="market-tabs">
+                <button class="market-tab active" data-tab="seeds" onclick="switchMarketTab('seeds')">种子</button>
+                <button class="market-tab" data-tab="animals" onclick="switchMarketTab('animals')">动物</button>
+                <button class="market-tab" data-tab="products" onclick="switchMarketTab('products')">产品</button>
+            </div>
+            <div class="market-grid" id="marketGrid">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 定点小数运算工具 ====================
+        const FixedMath = {
+            add(a, b) { return Math.round((a + b) * 10) / 10; },
+            sub(a, b) { return Math.round((a - b) * 10) / 10; },
+            mul(a, b) { return Math.round(a * b * 10) / 10; },
+            div(a, b) { return Math.round((a / b) * 10) / 10; },
+            round(a) { return Math.round(a * 10) / 10; }
+        };
+
+        // ==================== 服务定位器 ====================
+        class ServiceLocator {
+            constructor() {
+                this.services = {};
+            }
+            
+            register(name, service) {
+                this.services[name] = service;
+            }
+            
+            get(name) {
+                return this.services[name];
+            }
+        }
+
+        const serviceLocator = new ServiceLocator();
+
+        // ==================== 作物类型定义 ====================
+        const CROPS = {
+            wheat: { name: '小麦', icon: '🌾', growTime: 3, basePrice: 10, seedPrice: 5 },
+            carrot: { name: '胡萝卜', icon: '🥕', growTime: 2, basePrice: 15, seedPrice: 8 },
+            corn: { name: '玉米', icon: '🌽', growTime: 4, basePrice: 20, seedPrice: 10 },
+            tomato: { name: '番茄', icon: '🍅', growTime: 3, basePrice: 25, seedPrice: 12 },
+            strawberry: { name: '草莓', icon: '🍓', growTime: 5, basePrice: 35, seedPrice: 18 }
+        };
+
+        // ==================== 动物类型定义 ====================
+        const ANIMALS = {
+            chicken: { name: '鸡', icon: '🐔', product: 'egg', productName: '鸡蛋', productIcon: '🥚', price: 50, productBasePrice: 8 },
+            cow: { name: '牛', icon: '🐄', product: 'milk', productName: '牛奶', productIcon: '🥛', price: 150, productBasePrice: 20 },
+            sheep: { name: '羊', icon: '🐑', product: 'wool', productName: '羊毛', productIcon: '🧶', price: 100, productBasePrice: 15 }
+        };
+
+        // ==================== 天气类型定义 ====================
+        const WEATHER_TYPES = {
+            sunny: { name: '晴天', icon: '☀️', growthMultiplier: 1.0, canFertilize: true, damageChance: 0 },
+            rainy: { name: '雨天', icon: '🌧️', growthMultiplier: 1.5, canFertilize: false, damageChance: 0 },
+            cloudy: { name: '阴天', icon: '☁️', growthMultiplier: 0.8, canFertilize: true, damageChance: 0 },
+            drought: { name: '干旱', icon: '🏜️', growthMultiplier: 0.5, canFertilize: true, damageChance: 0.1 },
+            storm: { name: '暴风雨', icon: '⛈️', growthMultiplier: 0.3, canFertilize: false, damageChance: 0.2 }
+        };
+
+        // ==================== 品质计算 ====================
+        function calculateQuality(factor) {
+            if (factor >= 0.9) return { level: 'excellent', name: '极品', multiplier: 2.0 };
+            if (factor >= 0.7) return { level: 'good', name: '优质', multiplier: 1.5 };
+            return { level: 'normal', name: '普通', multiplier: 1.0 };
+        }
+
+        // ==================== IPlantService 接口 ====================
+        class BasicPlantService {
+            constructor(gameState) {
+                this.gameState = gameState;
+            }
+            
+            plant(plotIndex, cropType) {
+                const plot = this.gameState.plots[plotIndex];
+                if (plot.crop) return { success: false, message: '该格子已有作物' };
+                
+                const seed = this.gameState.inventory.find(i => i.type === 'seed' && i.cropType === cropType);
+                if (!seed || seed.quantity <= 0) return { success: false, message: '没有该种子' };
+                
+                seed.quantity--;
+                if (seed.quantity <= 0) {
+                    const idx = this.gameState.inventory.indexOf(seed);
+                    this.gameState.inventory.splice(idx, 1);
+                }
+                
+                plot.crop = cropType;
+                plot.growth = 0;
+                plot.watered = false;
+                plot.fertilized = false;
+                plot.maxGrowth = CROPS[cropType].growTime;
+                
+                return { success: true, message: `种植了${CROPS[cropType].name}` };
+            }
+            
+            water(plotIndex) {
+                const plot = this.gameState.plots[plotIndex];
+                if (!plot.crop) return { success: false, message: '该格子没有作物' };
+                
+                plot.watered = true;
+                return { success: true, message: '浇水成功' };
+            }
+            
+            fertilize(plotIndex) {
+                const plot = this.gameState.plots[plotIndex];
+                if (!plot.crop) return { success: false, message: '该格子没有作物' };
+                if (plot.fertilized) return { success: false, message: '已经施肥过了' };
+                
+                const weather = this.gameState.currentWeather;
+                if (!WEATHER_TYPES[weather].canFertilize) {
+                    return { success: false, message: '当前天气无法施肥，肥料会被冲刷' };
+                }
+                
+                plot.fertilized = true;
+                plot.fertility = FixedMath.add(plot.fertility, 0.3);
+                if (plot.fertility > 1.0) plot.fertility = 1.0;
+                
+                return { success: true, message: '施肥成功，土壤肥力提升' };
+            }
+            
+            harvest(plotIndex) {
+                const plot = this.gameState.plots[plotIndex];
+                if (!plot.crop) return { success: false, message: '该格子没有作物' };
+                if (plot.growth < plot.maxGrowth) return { success: false, message: '作物尚未成熟' };
+                
+                const crop = CROPS[plot.crop];
+                const fertilityFactor = plot.fertility;
+                const quality = calculateQuality(fertilityFactor);
+                
+                const baseQuantity = 2;
+                const bonusQuantity = Math.floor(fertilityFactor * 2);
+                const quantity = baseQuantity + bonusQuantity;
+                
+                const existing = this.gameState.inventory.find(i => 
+                    i.type === 'crop' && i.cropType === plot.crop && i.quality === quality.level
+                );
+                
+                if (existing) {
+                    existing.quantity += quantity;
+                } else {
+                    this.gameState.inventory.push({
+                        type: 'crop',
+                        cropType: plot.crop,
+                        name: crop.name,
+                        icon: crop.icon,
+                        quantity: quantity,
+                        quality: quality.level,
+                        qualityName: quality.name,
+                        basePrice: crop.basePrice,
+                        priceMultiplier: quality.multiplier
+                    });
+                }
+                
+                const cropName = plot.crop;
+                plot.crop = null;
+                plot.growth = 0;
+                plot.watered = false;
+                plot.fertilized = false;
+                
+                return { 
+                    success: true, 
+                    message: `收获了${quantity}个${quality.name}${crop.name}`,
+                    quantity,
+                    quality: quality.name
+                };
+            }
+            
+            clear(plotIndex) {
+                const plot = this.gameState.plots[plotIndex];
+                if (!plot.crop) return { success: false, message: '该格子为空' };
+                
+                plot.crop = null;
+                plot.growth = 0;
+                plot.watered = false;
+                plot.fertilized = false;
+                plot.withered = false;
+                
+                return { success: true, message: '已清除' };
+            }
+            
+            grow() {
+                const weather = WEATHER_TYPES[this.gameState.currentWeather];
+                
+                this.gameState.plots.forEach((plot, idx) => {
+                    if (!plot.crop) return;
+                    
+                    if (Math.random() < weather.damageChance) {
+                        plot.withered = true;
+                        this.addLog(`第${this.gameState.day}天: 第${idx+1}格作物因恶劣天气枯萎了`);
+                        return;
+                    }
+                    
+                    if (plot.withered) return;
+                    
+                    let growthRate = weather.growthMultiplier;
+                    if (plot.watered) growthRate = FixedMath.mul(growthRate, 1.3);
+                    if (plot.fertilized) growthRate = FixedMath.mul(growthRate, 1.2);
+                    growthRate = FixedMath.mul(growthRate, plot.fertility);
+                    
+                    const growthAmount = FixedMath.mul(1, growthRate);
+                    plot.growth = FixedMath.add(plot.growth, growthAmount);
+                    
+                    if (plot.growth > plot.maxGrowth) plot.growth = plot.maxGrowth;
+                    
+                    plot.watered = false;
+                    plot.fertilized = false;
+                });
+            }
+            
+            addLog(msg) {
+                const logPanel = document.getElementById('logPanel');
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                entry.innerHTML = `<span class="log-time">[第${this.gameState.day}天]</span> ${msg}`;
+                logPanel.insertBefore(entry, logPanel.firstChild);
+                if (logPanel.children.length > 20) logPanel.removeChild(logPanel.lastChild);
+            }
+        }
+
+        class FastPlantService extends BasicPlantService {
+            constructor(gameState) {
+                super(gameState);
+            }
+            
+            grow() {
+                const weather = WEATHER_TYPES[this.gameState.currentWeather];
+                
+                this.gameState.plots.forEach((plot, idx) => {
+                    if (!plot.crop) return;
+                    
+                    if (Math.random() < weather.damageChance * 0.5) {
+                        plot.withered = true;
+                        this.addLog(`第${this.gameState.day}天: 第${idx+1}格作物因恶劣天气枯萎了`);
+                        return;
+                    }
+                    
+                    if (plot.withered) return;
+                    
+                    let growthRate = FixedMath.mul(weather.growthMultiplier, 1.5);
+                    if (plot.watered) growthRate = FixedMath.mul(growthRate, 1.3);
+                    if (plot.fertilized) growthRate = FixedMath.mul(growthRate, 1.2);
+                    growthRate = FixedMath.mul(growthRate, plot.fertility);
+                    
+                    const growthAmount = FixedMath.mul(1, growthRate);
+                    plot.growth = FixedMath.add(plot.growth, growthAmount);
+                    
+                    if (plot.growth > plot.maxGrowth) plot.growth = plot.maxGrowth;
+                    
+                    plot.watered = false;
+                    plot.fertilized = false;
+                });
+            }
+        }
+
+        // ==================== IAnimalService 接口 ====================
+        class BasicAnimalService {
+            constructor(gameState) {
+                this.gameState = gameState;
+            }
+            
+            feed(animalType) {
+                const animal = this.gameState.animals[animalType];
+                if (!animal || animal.count <= 0) return { success: false, message: '没有该动物' };
+                if (animal.fed) return { success: false, message: '今天已经喂过了' };
+                
+                const cost = FixedMath.mul(animal.count, 2);
+                if (this.gameState.coins < cost) return { success: false, message: '金币不足' };
+                
+                this.gameState.coins = FixedMath.sub(this.gameState.coins, cost);
+                animal.fed = true;
+                animal.happiness = FixedMath.add(animal.happiness, 0.2);
+                if (animal.happiness > 1.0) animal.happiness = 1.0;
+                
+                return { success: true, message: `喂养了${ANIMALS[animalType].name}` };
+            }
+            
+            clean(animalType) {
+                const animal = this.gameState.animals[animalType];
+                if (!animal || animal.count <= 0) return { success: false, message: '没有该动物' };
+                if (animal.cleaned) return { success: false, message: '今天已经清洁过了' };
+                
+                animal.cleaned = true;
+                animal.happiness = FixedMath.add(animal.happiness, 0.15);
+                if (animal.happiness > 1.0) animal.happiness = 1.0;
+                
+                return { success: true, message: `清洁了${ANIMALS[animalType].name}的圈舍` };
+            }
+            
+            collect(animalType) {
+                const animal = this.gameState.animals[animalType];
+                if (!animal || animal.count <= 0) return { success: false, message: '没有该动物' };
+                if (animal.collected) return { success: false, message: '今天已经收集过产品了' };
+                
+                const animalDef = ANIMALS[animalType];
+                const happiness = animal.happiness;
+                const quality = calculateQuality(happiness);
+                
+                const baseQuantity = Math.ceil(animal.count * 0.8);
+                const bonusQuantity = Math.floor(happiness * animal.count * 0.5);
+                const quantity = baseQuantity + bonusQuantity;
+                
+                const existing = this.gameState.inventory.find(i => 
+                    i.type === 'animalProduct' && i.productType === animalDef.product && i.quality === quality.level
+                );
+                
+                if (existing) {
+                    existing.quantity += quantity;
+                } else {
+                    this.gameState.inventory.push({
+                        type: 'animalProduct',
+                        productType: animalDef.product,
+                        name: animalDef.productName,
+                        icon: animalDef.productIcon,
+                        quantity: quantity,
+                        quality: quality.level,
+                        qualityName: quality.name,
+                        basePrice: animalDef.productBasePrice,
+                        priceMultiplier: quality.multiplier
+                    });
+                }
+                
+                animal.collected = true;
+                
+                return { 
+                    success: true, 
+                    message: `收集了${quantity}个${quality.name}${animalDef.productName}`,
+                    quantity,
+                    quality: quality.name
+                };
+            }
+            
+            buyAnimal(animalType) {
+                const animalDef = ANIMALS[animalType];
+                if (this.gameState.coins < animalDef.price) {
+                    return { success: false, message: '金币不足' };
+                }
+                
+                this.gameState.coins = FixedMath.sub(this.gameState.coins, animalDef.price);
+                
+                if (!this.gameState.animals[animalType]) {
+                    this.gameState.animals[animalType] = {
+                        count: 1,
+                        happiness: 0.5,
+                        fed: false,
+                        cleaned: false,
+                        collected: false
+                    };
+                } else {
+                    this.gameState.animals[animalType].count++;
+                }
+                
+                return { success: true, message: `购买了${animalDef.name}` };
+            }
+            
+            dailyReset() {
+                Object.keys(this.gameState.animals).forEach(type => {
+                    const animal = this.gameState.animals[type];
+                    animal.fed = false;
+                    animal.cleaned = false;
+                    animal.collected = false;
+                    animal.happiness = FixedMath.sub(animal.happiness, 0.1);
+                    if (animal.happiness < 0.2) animal.happiness = 0.2;
+                });
+            }
+        }
+
+        class HappyAnimalService extends BasicAnimalService {
+            constructor(gameState) {
+                super(gameState);
+            }
+            
+            feed(animalType) {
+                const result = super.feed(animalType);
+                if (result.success) {
+                    const animal = this.gameState.animals[animalType];
+                    animal.happiness = FixedMath.add(animal.happiness, 0.1);
+                    if (animal.happiness > 1.0) animal.happiness = 1.0;
+                }
+                return result;
+            }
+            
+            collect(animalType) {
+                const animal = this.gameState.animals[animalType];
+                if (!animal || animal.count <= 0) return { success: false, message: '没有该动物' };
+                if (animal.collected) return { success: false, message: '今天已经收集过产品了' };
+                
+                const animalDef = ANIMALS[animalType];
+                const happiness = animal.happiness;
+                const quality = calculateQuality(FixedMath.add(happiness, 0.2));
+                
+                const baseQuantity = Math.ceil(animal.count * 1.0);
+                const bonusQuantity = Math.floor(happiness * animal.count * 0.7);
+                const quantity = baseQuantity + bonusQuantity;
+                
+                const existing = this.gameState.inventory.find(i => 
+                    i.type === 'animalProduct' && i.productType === animalDef.product && i.quality === quality.level
+                );
+                
+                if (existing) {
+                    existing.quantity += quantity;
+                } else {
+                    this.gameState.inventory.push({
+                        type: 'animalProduct',
+                        productType: animalDef.product,
+                        name: animalDef.productName,
+                        icon: animalDef.productIcon,
+                        quantity: quantity,
+                        quality: quality.level,
+                        qualityName: quality.name,
+                        basePrice: animalDef.productBasePrice,
+                        priceMultiplier: quality.multiplier
+                    });
+                }
+                
+                animal.collected = true;
+                
+                return { 
+                    success: true, 
+                    message: `收集了${quantity}个${quality.name}${animalDef.productName}`,
+                    quantity,
+                    quality: quality.name
+                };
+            }
+        }
+
+        // ==================== IWeatherService 接口 ====================
+        class BasicWeatherService {
+            constructor(gameState) {
+                this.gameState = gameState;
+            }
+            
+            getWeather() {
+                return this.gameState.currentWeather;
+            }
+            
+            nextDay() {
+                const weathers = ['sunny', 'sunny', 'rainy', 'cloudy', 'cloudy'];
+                this.gameState.currentWeather = weathers[Math.floor(Math.random() * weathers.length)];
+                return this.gameState.currentWeather;
+            }
+            
+            getEffects() {
+                const weather = WEATHER_TYPES[this.gameState.currentWeather];
+                return {
+                    growthMultiplier: weather.growthMultiplier,
+                    canFertilize: weather.canFertilize,
+                    damageChance: weather.damageChance
+                };
+            }
+        }
+
+        class ExtremeWeatherService extends BasicWeatherService {
+            constructor(gameState) {
+                super(gameState);
+            }
+            
+            nextDay() {
+                const weathers = ['sunny', 'rainy', 'cloudy', 'drought', 'storm'];
+                const weights = [0.35, 0.25, 0.2, 0.1, 0.1];
+                const rand = Math.random();
+                let cumulative = 0;
+                
+                for (let i = 0; i < weathers.length; i++) {
+                    cumulative += weights[i];
+                    if (rand < cumulative) {
+                        this.gameState.currentWeather = weathers[i];
+                        break;
+                    }
+                }
+                
+                return this.gameState.currentWeather;
+            }
+        }
+
+        // ==================== IMarketService 接口 ====================
+        class BasicMarketService {
+            constructor(gameState) {
+                this.gameState = gameState;
+                this.priceMultipliers = {};
+                this.refreshPrices();
+            }
+            
+            refreshPrices() {
+                Object.keys(CROPS).forEach(crop => {
+                    this.priceMultipliers[`crop_${crop}`] = this.randomPriceFactor();
+                });
+                Object.keys(ANIMALS).forEach(animal => {
+                    this.priceMultipliers[`animal_${animal}`] = this.randomPriceFactor();
+                    this.priceMultipliers[`product_${ANIMALS[animal].product}`] = this.randomPriceFactor();
+                });
+                Object.keys(CROPS).forEach(crop => {
+                    this.priceMultipliers[`seed_${crop}`] = this.randomPriceFactor();
+                });
+            }
+            
+            randomPriceFactor() {
+                return FixedMath.round(0.7 + Math.random() * 0.6);
+            }
+            
+            getBuyPrice(item) {
+                const basePrice = item.basePrice || item.price;
+                const multiplier = this.priceMultipliers[`${item.type}_${item.cropType || item.animalType || item.productType}`] || 1.0;
+                return FixedMath.mul(basePrice, multiplier);
+            }
+            
+            getSellPrice(item) {
+                const basePrice = FixedMath.mul(item.basePrice, item.priceMultiplier || 1.0);
+                const multiplier = this.priceMultipliers[`${item.type}_${item.cropType || item.productType}`] || 1.0;
+                return FixedMath.mul(basePrice, FixedMath.mul(multiplier, 0.8));
+            }
+            
+            buy(item) {
+                const price = this.getBuyPrice(item);
+                if (this.gameState.coins < price) {
+                    return { success: false, message: '金币不足' };
+                }
+                
+                this.gameState.coins = FixedMath.sub(this.gameState.coins, price);
+                
+                if (item.type === 'seed') {
+                    const existing = this.gameState.inventory.find(i => 
+                        i.type === 'seed' && i.cropType === item.cropType
+                    );
+                    if (existing) {
+                        existing.quantity++;
+                    } else {
+                        this.gameState.inventory.push({
+                            type: 'seed',
+                            cropType: item.cropType,
+                            name: `${CROPS[item.cropType].name}种子`,
+                            icon: '🌱',
+                            quantity: 1,
+                            basePrice: CROPS[item.cropType].seedPrice
+                        });
+                    }
+                    return { success: true, message: `购买了${CROPS[item.cropType].name}种子` };
+                }
+                
+                if (item.type === 'animal') {
+                    return serviceLocator.get('animalService').buyAnimal(item.animalType);
+                }
+                
+                return { success: false, message: '无法购买该物品' };
+            }
+            
+            sell(item, index) {
+                const price = this.getSellPrice(item);
+                this.gameState.coins = FixedMath.add(this.gameState.coins, price);
+                
+                item.quantity--;
+                if (item.quantity <= 0) {
+                    this.gameState.inventory.splice(index, 1);
+                }
+                
+                return { success: true, message: `卖出了${item.name}，获得${price}金币` };
+            }
+        }
+
+        class DynamicMarketService extends BasicMarketService {
+            constructor(gameState) {
+                super(gameState);
+            }
+            
+            randomPriceFactor() {
+                return FixedMath.round(0.5 + Math.random() * 1.0);
+            }
+        }
+
+        // ==================== 游戏状态 ====================
+        const gameState = {
+            day: 1,
+            coins: 100.0,
+            currentWeather: 'sunny',
+            plots: [],
+            animals: {
+                chicken: { count: 2, happiness: 0.6, fed: false, cleaned: false, collected: false },
+                cow: { count: 0, happiness: 0.5, fed: false, cleaned: false, collected: false },
+                sheep: { count: 0, happiness: 0.5, fed: false, cleaned: false, collected: false }
+            },
+            inventory: [
+                { type: 'seed', cropType: 'wheat', name: '小麦种子', icon: '🌱', quantity: 5, basePrice: 5 },
+                { type: 'seed', cropType: 'carrot', name: '胡萝卜种子', icon: '🌱', quantity: 5, basePrice: 8 }
+            ],
+            selectedTool: 'plant',
+            selectedSeed: 'wheat'
+        };
+
+        // ==================== 初始化游戏 ====================
+        function initGame() {
+            for (let i = 0; i < 48; i++) {
+                gameState.plots.push({
+                    crop: null,
+                    growth: 0,
+                    maxGrowth: 0,
+                    watered: false,
+                    fertilized: false,
+                    withered: false,
+                    fertility: 0.6
+                });
+            }
+            
+            serviceLocator.register('plantService', new FastPlantService(gameState));
+            serviceLocator.register('animalService', new HappyAnimalService(gameState));
+            serviceLocator.register('weatherService', new ExtremeWeatherService(gameState));
+            serviceLocator.register('marketService', new DynamicMarketService(gameState));
+            
+            renderFarm();
+            renderSeedSelector();
+            renderAnimals();
+            updateUI();
+            
+            setInterval(advanceDay, 5000);
+        }
+
+        function advanceDay() {
+            gameState.day++;
+            
+            const weatherService = serviceLocator.get('weatherService');
+            const oldWeather = gameState.currentWeather;
+            weatherService.nextDay();
+            
+            if (oldWeather !== gameState.currentWeather) {
+                addLog(`天气变为${WEATHER_TYPES[gameState.currentWeather].name}`);
+            }
+            
+            serviceLocator.get('plantService').grow();
+            serviceLocator.get('animalService').dailyReset();
+            serviceLocator.get('marketService').refreshPrices();
+            
+            updateUI();
+            renderFarm();
+            renderAnimals();
+            
+            if (document.getElementById('marketModal').classList.contains('active')) {
+                renderMarket();
+            }
+        }
+
+        // ==================== 渲染函数 ====================
+        function renderFarm() {
+            const grid = document.getElementById('farmGrid');
+            grid.innerHTML = '';
+            
+            gameState.plots.forEach((plot, idx) => {
+                const div = document.createElement('div');
+                div.className = 'plot';
+                div.onclick = () => handlePlotClick(idx);
+                
+                if (!plot.crop) {
+                    div.classList.add('plot-empty');
+                    div.innerHTML = '➕';
+                } else if (plot.withered) {
+                    div.classList.add('plot-withered');
+                    div.innerHTML = '💀';
+                } else if (plot.growth >= plot.maxGrowth) {
+                    div.classList.add('plot-ready');
+                    div.innerHTML = CROPS[plot.crop].icon;
+                    div.innerHTML += '<div class="plot-label">可收获</div>';
+                } else {
+                    div.classList.add('plot-planted');
+                    if (plot.watered) div.classList.add('plot-watered');
+                    if (plot.fertilized) div.classList.add('plot-fertilized');
+                    div.innerHTML = CROPS[plot.crop].icon;
+                    const progress = Math.floor((plot.growth / plot.maxGrowth) * 100);
+                    div.innerHTML += `<div class="plot-label">${progress}%</div>`;
+                }
+                
+                div.innerHTML += `<div class="plot-fertility">${Math.floor(plot.fertility * 100)}%</div>`;
+                grid.appendChild(div);
+            });
+        }
+
+        function renderSeedSelector() {
+            const selector = document.getElementById('seedSelector');
+            selector.innerHTML = '';
+            
+            const seeds = gameState.inventory.filter(i => i.type === 'seed');
+            
+            seeds.forEach(seed => {
+                const btn = document.createElement('button');
+                btn.className = 'seed-btn';
+                if (seed.cropType === gameState.selectedSeed) btn.classList.add('active');
+                btn.innerHTML = `${CROPS[seed.cropType].icon} ${CROPS[seed.cropType].name} (${seed.quantity})`;
+                btn.onclick = () => {
+                    gameState.selectedSeed = seed.cropType;
+                    document.querySelectorAll('.seed-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                };
+                selector.appendChild(btn);
+            });
+        }
+
+        function renderAnimals() {
+            const section = document.getElementById('animalSection');
+            section.innerHTML = '';
+            
+            Object.keys(ANIMALS).forEach(type => {
+                const def = ANIMALS[type];
+                const animal = gameState.animals[type] || { count: 0, happiness: 0 };
+                
+                const card = document.createElement('div');
+                card.className = 'animal-card';
+                card.innerHTML = `
+                    <div class="animal-icon">${def.icon}</div>
+                    <div class="animal-name">${def.name}</div>
+                    <div class="animal-count">${animal.count} 只</div>
+                    <div class="animal-mood">
+                        <div class="animal-mood-bar" style="width: ${animal.happiness * 100}%"></div>
+                    </div>
+                    <div style="font-size: 11px; color: #7f8c8d; margin-bottom: 8px;">
+                        心情: ${Math.floor(animal.happiness * 100)}%
+                    </div>
+                    <button class="animal-btn feed" onclick="feedAnimal('${type}')">🍖 喂养</button>
+                    <button class="animal-btn clean" onclick="cleanAnimal('${type}')">🧹 清洁</button>
+                    <button class="animal-btn collect" onclick="collectProduct('${type}')">📦 收集</button>
+                `;
+                section.appendChild(card);
+            });
+        }
+
+        function renderInventory() {
+            const grid = document.getElementById('inventoryGrid');
+            grid.innerHTML = '';
+            
+            if (gameState.inventory.length === 0) {
+                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #7f8c8d; padding: 40px;">背包是空的</div>';
+                return;
+            }
+            
+            gameState.inventory.forEach((item, idx) => {
+                const card = document.createElement('div');
+                card.className = 'item-card';
+                
+                let qualityHtml = '';
+                if (item.quality) {
+                    const qualityClass = `quality-${item.quality}`;
+                    qualityHtml = `<div class="item-quality ${qualityClass}">${item.qualityName}</div>`;
+                }
+                
+                const sellPrice = serviceLocator.get('marketService').getSellPrice(item);
+                
+                card.innerHTML = `
+                    <div class="item-icon">${item.icon}</div>
+                    <div class="item-name">${item.name}</div>
+                    <div class="item-quantity">×${item.quantity}</div>
+                    ${qualityHtml}
+                    <div class="item-price">${sellPrice} 💰</div>
+                    <button class="item-btn sell" onclick="sellItem(${idx})">卖出</button>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function renderMarket() {
+            const grid = document.getElementById('marketGrid');
+            grid.innerHTML = '';
+            const activeTab = document.querySelector('.market-tab.active').dataset.tab;
+            const marketService = serviceLocator.get('marketService');
+            
+            if (activeTab === 'seeds') {
+                Object.keys(CROPS).forEach(cropType => {
+                    const crop = CROPS[cropType];
+                    const item = { type: 'seed', cropType, basePrice: crop.seedPrice };
+                    const price = marketService.getBuyPrice(item);
+                    
+                    const card = document.createElement('div');
+                    card.className = 'item-card';
+                    card.innerHTML = `
+                        <div class="item-icon">🌱</div>
+                        <div class="item-name">${crop.name}种子</div>
+                        <div class="item-price">${price} 💰</div>
+                        <button class="item-btn buy" onclick="buySeed('${cropType}')">购买</button>
+                    `;
+                    grid.appendChild(card);
+                });
+            } else if (activeTab === 'animals') {
+                Object.keys(ANIMALS).forEach(animalType => {
+                    const animal = ANIMALS[animalType];
+                    const item = { type: 'animal', animalType, basePrice: animal.price };
+                    const price = marketService.getBuyPrice(item);
+                    
+                    const card = document.createElement('div');
+                    card.className = 'item-card';
+                    card.innerHTML = `
+                        <div class="item-icon">${animal.icon}</div>
+                        <div class="item-name">${animal.name}</div>
+                        <div class="item-price">${price} 💰</div>
+                        <button class="item-btn buy" onclick="buyAnimal('${animalType}')">购买</button>
+                    `;
+                    grid.appendChild(card);
+                });
+            } else if (activeTab === 'products') {
+                Object.keys(CROPS).forEach(cropType => {
+                    const crop = CROPS[cropType];
+                    const card = document.createElement('div');
+                    card.className = 'item-card';
+                    card.innerHTML = `
+                        <div class="item-icon">${crop.icon}</div>
+                        <div class="item-name">${crop.name}</div>
+                        <div class="item-price">基准 ${crop.basePrice} 💰</div>
+                        <div style="font-size: 11px; color: #7f8c8d; margin-top: 5px;">(卖出时计算品质)</div>
+                    `;
+                    grid.appendChild(card);
+                });
+                
+                Object.keys(ANIMALS).forEach(animalType => {
+                    const animal = ANIMALS[animalType];
+                    const card = document.createElement('div');
+                    card.className = 'item-card';
+                    card.innerHTML = `
+                        <div class="item-icon">${animal.productIcon}</div>
+                        <div class="item-name">${animal.productName}</div>
+                        <div class="item-price">基准 ${animal.productBasePrice} 💰</div>
+                    `;
+                    grid.appendChild(card);
+                });
+            }
+        }
+
+        // ==================== 交互处理 ====================
+        function handlePlotClick(idx) {
+            const tool = gameState.selectedTool;
+            const plantService = serviceLocator.get('plantService');
+            let result;
+            
+            switch (tool) {
+                case 'plant':
+                    result = plantService.plant(idx, gameState.selectedSeed);
+                    break;
+                case 'water':
+                    result = plantService.water(idx);
+                    break;
+                case 'fertilize':
+                    result = plantService.fertilize(idx);
+                    break;
+                case 'harvest':
+                    result = plantService.harvest(idx);
+                    break;
+                case 'clear':
+                    result = plantService.clear(idx);
+                    break;
+            }
+            
+            if (result) {
+                showMessage(result.message, result.success ? 'success' : 'error');
+                if (result.success) addLog(result.message);
+            }
+            
+            renderFarm();
+            renderSeedSelector();
+            updateUI();
+        }
+
+        function selectTool(tool) {
+            gameState.selectedTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.tool-btn.${tool}`).classList.add('active');
+        }
+
+        function feedAnimal(type) {
+            const result = serviceLocator.get('animalService').feed(type);
+            showMessage(result.message, result.success ? 'success' : 'error');
+            if (result.success) addLog(result.message);
+            renderAnimals();
+            updateUI();
+        }
+
+        function cleanAnimal(type) {
+            const result = serviceLocator.get('animalService').clean(type);
+            showMessage(result.message, result.success ? 'success' : 'error');
+            if (result.success) addLog(result.message);
+            renderAnimals();
+        }
+
+        function collectProduct(type) {
+            const result = serviceLocator.get('animalService').collect(type);
+            showMessage(result.message, result.success ? 'success' : 'error');
+            if (result.success) addLog(result.message);
+            renderAnimals();
+        }
+
+        function sellItem(idx) {
+            const item = gameState.inventory[idx];
+            const result = serviceLocator.get('marketService').sell(item, idx);
+            showMessage(result.message, result.success ? 'success' : 'error');
+            if (result.success) addLog(result.message);
+            renderInventory();
+            updateUI();
+        }
+
+        function buySeed(cropType) {
+            const item = { type: 'seed', cropType, basePrice: CROPS[cropType].seedPrice };
+            const result = serviceLocator.get('marketService').buy(item);
+            showMessage(result.message, result.success ? 'success' : 'error');
+            if (result.success) addLog(result.message);
+            renderMarket();
+            renderSeedSelector();
+            updateUI();
+        }
+
+        function buyAnimal(animalType) {
+            const item = { type: 'animal', animalType, basePrice: ANIMALS[animalType].price };
+            const result = serviceLocator.get('marketService').buy(item);
+            showMessage(result.message, result.success ? 'success' : 'error');
+            if (result.success) addLog(result.message);
+            renderMarket();
+            renderAnimals();
+            updateUI();
+        }
+
+        function openInventory() {
+            document.getElementById('inventoryModal').classList.add('active');
+            renderInventory();
+        }
+
+        function closeInventory() {
+            document.getElementById('inventoryModal').classList.remove('active');
+        }
+
+        function openMarket() {
+            document.getElementById('marketModal').classList.add('active');
+            renderMarket();
+        }
+
+        function closeMarket() {
+            document.getElementById('marketModal').classList.remove('active');
+        }
+
+        function switchMarketTab(tab) {
+            document.querySelectorAll('.market-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.market-tab[data-tab="${tab}"]`).classList.add('active');
+            renderMarket();
+        }
+
+        function updateUI() {
+            document.getElementById('coins').textContent = gameState.coins.toFixed(1);
+            document.getElementById('day').textContent = gameState.day;
+            document.getElementById('weatherIcon').textContent = WEATHER_TYPES[gameState.currentWeather].icon;
+            document.getElementById('weatherIcon2').textContent = WEATHER_TYPES[gameState.currentWeather].icon;
+            document.getElementById('weatherName').textContent = WEATHER_TYPES[gameState.currentWeather].name;
+            
+            const weather = WEATHER_TYPES[gameState.currentWeather];
+            let effectText = `生长速度×${weather.growthMultiplier}`;
+            if (!weather.canFertilize) effectText += ' | 无法施肥';
+            if (weather.damageChance > 0) effectText += ` | 损毁概率${weather.damageChance * 100}%`;
+            document.getElementById('weatherEffect').textContent = effectText;
+        }
+
+        function showMessage(text, type = 'success') {
+            const msg = document.createElement('div');
+            msg.className = `message ${type}`;
+            msg.textContent = text;
+            document.body.appendChild(msg);
+            
+            setTimeout(() => msg.remove(), 3000);
+        }
+
+        function addLog(msg) {
+            const logPanel = document.getElementById('logPanel');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[第${gameState.day}天]</span> ${msg}`;
+            logPanel.insertBefore(entry, logPanel.firstChild);
+            if (logPanel.children.length > 20) logPanel.removeChild(logPanel.lastChild);
+        }
+
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => selectTool(btn.dataset.tool));
+        });
+
+        initGame();
+    </script>
+</body>
+</html>

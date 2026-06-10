@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星象卡牌对战</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .game-info {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .info-item {
+            text-align: center;
+        }
+        .info-label {
+            font-size: 0.9em;
+            color: #aaa;
+            margin-bottom: 5px;
+        }
+        .info-value {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        .aspect-fire { color: #ff6b6b; }
+        .aspect-ice { color: #74b9ff; }
+        .aspect-storm { color: #a29bfe; }
+        .hand-area {
+            margin-bottom: 30px;
+        }
+        .hand-title {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .cards-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .card {
+            width: 180px;
+            height: 250px;
+            border-radius: 15px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .card:hover {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+        .card-attack {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+            border: 3px solid #ff4757;
+        }
+        .card-defense {
+            background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+            border: 3px solid #0652DD;
+        }
+        .card-spell {
+            background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+            border: 3px solid #5f27cd;
+        }
+        .card-name {
+            font-size: 1.1em;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 10px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        .card-type {
+            text-align: center;
+            font-size: 0.8em;
+            opacity: 0.8;
+            margin-bottom: 15px;
+        }
+        .card-value {
+            text-align: center;
+            font-size: 2.5em;
+            font-weight: bold;
+            margin: 20px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .card-desc {
+            font-size: 0.8em;
+            text-align: center;
+            background: rgba(0,0,0,0.2);
+            padding: 8px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .aspect-effect {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 0.7em;
+            background: rgba(0,0,0,0.5);
+            padding: 3px 8px;
+            border-radius: 10px;
+        }
+        .result-area {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            min-height: 100px;
+        }
+        .result-title {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            color: #4ecdc4;
+        }
+        .result-item {
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .debug-section {
+            background: rgba(0,0,0,0.3);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .debug-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .debug-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        .debug-log {
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 0.85em;
+            display: none;
+        }
+        .debug-log.visible {
+            display: block;
+        }
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 5px;
+            border-left: 3px solid;
+            padding-left: 10px;
+        }
+        .log-aspect { border-color: #ff6b6b; color: #ff6b6b; }
+        .log-card { border-color: #4ecdc4; color: #4ecdc4; }
+        .log-info { border-color: #ffeaa7; color: #ffeaa7; }
+        .log-time {
+            color: #888;
+            font-size: 0.8em;
+        }
+        .game-over {
+            text-align: center;
+            font-size: 1.5em;
+            color: #ffeaa7;
+            padding: 30px;
+            background: rgba(255,234,167,0.1);
+            border-radius: 15px;
+            display: none;
+        }
+        .game-over.visible {
+            display: block;
+        }
+        .history-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .history-title {
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            color: #a29bfe;
+        }
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .history-item {
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⭐ 星象卡牌对战 ⭐</h1>
+        </div>
+
+        <div class="game-info">
+            <div class="info-item">
+                <div class="info-label">当前回合</div>
+                <div class="info-value" id="turn-count">1</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">当前星象</div>
+                <div class="info-value" id="current-aspect">-</div>
+            </div>
+        </div>
+
+        <div class="hand-area">
+            <div class="hand-title">🃏 手牌区域</div>
+            <div class="cards-container" id="cards-container"></div>
+        </div>
+
+        <div class="game-over" id="game-over">
+            🎴 手牌已用完，请刷新重新开始
+        </div>
+
+        <div class="result-area">
+            <div class="result-title">📊 出牌结果</div>
+            <div id="result-content">
+                <p style="color: #888;">点击卡牌出牌...</p>
+            </div>
+        </div>
+
+        <div class="history-section">
+            <div class="history-title">📜 出牌历史</div>
+            <div class="history-list" id="history-list"></div>
+        </div>
+
+        <div class="debug-section">
+            <div class="debug-header">
+                <input type="checkbox" class="debug-checkbox" id="debug-toggle">
+                <label for="debug-toggle">🔧 切换到调试模式</label>
+            </div>
+            <div class="debug-log" id="debug-log"></div>
+        </div>
+    </div>
+
+    <script>
+        var GameCore = GameCore || {};
+    </script>
+
+    <script>
+        GameCore.Aspects = GameCore.Aspects || {};
+
+        GameCore.Aspects.AspectInterface = {
+            getName: function() {
+                throw new Error('必须实现 getName 方法');
+            },
+            getAttackModifier: function() {
+                throw new Error('必须实现 getAttackModifier 方法');
+            },
+            getDefenseModifier: function() {
+                throw new Error('必须实现 getDefenseModifier 方法');
+            },
+            getSpellModifier: function() {
+                throw new Error('必须实现 getSpellModifier 方法');
+            },
+            getEffectDescription: function(cardType) {
+                return '';
+            }
+        };
+    </script>
+
+    <script>
+        (function() {
+            function FireAspect() {
+                this.name = '烈焰星象';
+                this.cssClass = 'aspect-fire';
+            }
+
+            FireAspect.prototype = Object.create(GameCore.Aspects.AspectInterface);
+            FireAspect.prototype.constructor = FireAspect;
+
+            FireAspect.prototype.getName = function() {
+                return this.name;
+            };
+
+            FireAspect.prototype.getAttackModifier = function() {
+                return 1.5;
+            };
+
+            FireAspect.prototype.getDefenseModifier = function() {
+                return 0.7;
+            };
+
+            FireAspect.prototype.getSpellModifier = function() {
+                return 1.2;
+            };
+
+            FireAspect.prototype.getEffectDescription = function(cardType) {
+                if (cardType === 'attack') {
+                    return '🔥 灼烧+';
+                } else if (cardType === 'spell') {
+                    return '🔥 炎爆';
+                }
+                return '🔥 烈焰';
+            };
+
+            GameCore.Aspects.FireAspect = FireAspect;
+        })();
+    </script>
+
+    <script>
+        (function() {
+            function IceAspect() {
+                this.name = '寒冰星象';
+                this.cssClass = 'aspect-ice';
+            }
+
+            IceAspect.prototype = Object.create(GameCore.Aspects.AspectInterface);
+            IceAspect.prototype.constructor = IceAspect;
+
+            IceAspect.prototype.getName = function() {
+                return this.name;
+            };
+
+            IceAspect.prototype.getAttackModifier = function() {
+                return 0.8;
+            };
+
+            IceAspect.prototype.getDefenseModifier = function() {
+                return 1.6;
+            };
+
+            IceAspect.prototype.getSpellModifier = function() {
+                return 1.1;
+            };
+
+            IceAspect.prototype.getEffectDescription = function(cardType) {
+                if (cardType === 'defense') {
+                    return '❄️ 冰封+';
+                } else if (cardType === 'spell') {
+                    return '❄️ 冰冻';
+                }
+                return '❄️ 寒冰';
+            };
+
+            GameCore.Aspects.IceAspect = IceAspect;
+        })();
+    </script>
+
+    <script>
+        (function() {
+            function StormAspect() {
+                this.name = '暴风星象';
+                this.cssClass = 'aspect-storm';
+            }
+
+            StormAspect.prototype = Object.create(GameCore.Aspects.AspectInterface);
+            StormAspect.prototype.constructor = StormAspect;
+
+            StormAspect.prototype.getName = function() {
+                return this.name;
+            };
+
+            StormAspect.prototype.getAttackModifier = function() {
+                return 1.1;
+            };
+
+            StormAspect.prototype.getDefenseModifier = function() {
+                return 0.9;
+            };
+
+            StormAspect.prototype.getSpellModifier = function() {
+                return 1.8;
+            };
+
+            StormAspect.prototype.getEffectDescription = function(cardType) {
+                if (cardType === 'spell') {
+                    return '⚡ 雷击+';
+                } else if (cardType === 'attack') {
+                    return '⚡ 风刃';
+                }
+                return '⚡ 暴风';
+            };
+
+            GameCore.Aspects.StormAspect = StormAspect;
+        })();
+    </script>
+
+    <script>
+        (function() {
+            function AspectManager() {
+                this.aspects = [
+                    new GameCore.Aspects.FireAspect(),
+                    new GameCore.Aspects.IceAspect(),
+                    new GameCore.Aspects.StormAspect()
+                ];
+                this.currentAspect = null;
+                this.lastAspectIndex = -1;
+                this.initialize();
+            }
+
+            AspectManager.prototype.initialize = function() {
+                var randomIndex = Math.floor(Math.random() * this.aspects.length);
+                this.currentAspect = this.aspects[randomIndex];
+                this.lastAspectIndex = randomIndex;
+            };
+
+            AspectManager.prototype.getCurrentAspect = function() {
+                return this.currentAspect;
+            };
+
+            AspectManager.prototype.switchAspect = function() {
+                var newIndex;
+                do {
+                    newIndex = Math.floor(Math.random() * this.aspects.length);
+                } while (newIndex === this.lastAspectIndex);
+
+                var oldAspect = this.currentAspect;
+                this.currentAspect = this.aspects[newIndex];
+                this.lastAspectIndex = newIndex;
+
+                return {
+                    from: oldAspect,
+                    to: this.currentAspect
+                };
+            };
+
+            GameCore.AspectManager = new AspectManager();
+        })();
+    </script>
+
+    <script>
+        (function() {
+            function Card(name, type, baseValue, description) {
+                this.name = name;
+                this.type = type;
+                this.baseValue = baseValue;
+                this.description = description;
+            }
+
+            Card.prototype.getName = function() {
+                return this.name;
+            };
+
+            Card.prototype.getType = function() {
+                return this.type;
+            };
+
+            Card.prototype.getBaseValue = function() {
+                return this.baseValue;
+            };
+
+            Card.prototype.getDescription = function() {
+                return this.description;
+            };
+
+            Card.prototype.calculateFinalValue = function(aspect) {
+                var modifier;
+                switch (this.type) {
+                    case 'attack':
+                        modifier = aspect.getAttackModifier();
+                        break;
+                    case 'defense':
+                        modifier = aspect.getDefenseModifier();
+                        break;
+                    case 'spell':
+                        modifier = aspect.getSpellModifier();
+                        break;
+                    default:
+                        modifier = 1.0;
+                }
+                return Math.floor(this.baseValue * modifier);
+            };
+
+            Card.prototype.getModifier = function(aspect) {
+                switch (this.type) {
+                    case 'attack':
+                        return aspect.getAttackModifier();
+                    case 'defense':
+                        return aspect.getDefenseModifier();
+                    case 'spell':
+                        return aspect.getSpellModifier();
+                    default:
+                        return 1.0;
+                }
+            };
+
+            GameCore.Card = Card;
+        })();
+    </script>
+
+    <script>
+        (function() {
+            var turnCount = 1;
+            var hand = [];
+            var history = [];
+            var debugMode = false;
+
+            function initializeHand() {
+                hand = [
+                    new GameCore.Card('烈焰斩', 'attack', 20, '强力的火焰攻击'),
+                    new GameCore.Card('铁壁', 'defense', 15, '坚固的防御'),
+                    new GameCore.Card('火球术', 'spell', 25, '召唤火球攻击'),
+                    new GameCore.Card('冰霜刺', 'attack', 18, '冰冷的刺击'),
+                    new GameCore.Card('魔法盾', 'defense', 20, '魔法护盾')
+                ];
+            }
+
+            function getTypeName(type) {
+                var types = {
+                    'attack': '攻击',
+                    'defense': '防御',
+                    'spell': '法术'
+                };
+                return types[type] || type;
+            }
+
+            function renderCards() {
+                var container = document.getElementById('cards-container');
+                container.innerHTML = '';
+
+                var currentAspect = GameCore.AspectManager.getCurrentAspect();
+
+                hand.forEach(function(card, index) {
+                    var cardEl = document.createElement('div');
+                    cardEl.className = 'card card-' + card.getType();
+                    cardEl.dataset.index = index;
+
+                    var finalValue = card.calculateFinalValue(currentAspect);
+                    var effectDesc = currentAspect.getEffectDescription(card.getType());
+
+                    cardEl.innerHTML = `
+                        <div class="aspect-effect">${effectDesc}</div>
+                        <div class="card-name">${card.getName()}</div>
+                        <div class="card-type">${getTypeName(card.getType())}</div>
+                        <div class="card-value">${finalValue}</div>
+                        <div class="card-desc">${card.getDescription()}</div>
+                    `;
+
+                    cardEl.addEventListener('click', function() {
+                        playCard(index);
+                    });
+
+                    container.appendChild(cardEl);
+                });
+
+                if (hand.length === 0) {
+                    document.getElementById('game-over').classList.add('visible');
+                }
+            }
+
+            function updateAspectDisplay() {
+                var aspect = GameCore.AspectManager.getCurrentAspect();
+                var aspectEl = document.getElementById('current-aspect');
+                aspectEl.textContent = aspect.getName();
+                aspectEl.className = 'info-value ' + aspect.cssClass;
+            }
+
+            function updateTurnDisplay() {
+                document.getElementById('turn-count').textContent = turnCount;
+            }
+
+            function addLog(type, message) {
+                if (!debugMode) return;
+
+                var logContainer = document.getElementById('debug-log');
+                var entry = document.createElement('div');
+                entry.className = 'log-entry log-' + type;
+
+                var time = new Date().toLocaleTimeString();
+                entry.innerHTML = `
+                    <span class="log-time">[${time}]</span>
+                    <span>${message}</span>
+                `;
+
+                logContainer.appendChild(entry);
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+
+            function playCard(index) {
+                if (index >= hand.length) return;
+
+                var card = hand[index];
+                var currentAspect = GameCore.AspectManager.getCurrentAspect();
+                var finalValue = card.calculateFinalValue(currentAspect);
+                var modifier = card.getModifier(currentAspect);
+
+                var resultContent = document.getElementById('result-content');
+                resultContent.innerHTML = `
+                    <div class="result-item">
+                        <strong>🎴 ${card.getName()}</strong> (${getTypeName(card.getType())})<br>
+                        基础数值: ${card.getBaseValue()}<br>
+                        修正系数: ×${modifier.toFixed(1)}<br>
+                        <strong style="font-size: 1.3em;">最终数值: ${finalValue}</strong>
+                    </div>
+                `;
+
+                history.push({
+                    turn: turnCount,
+                    card: card.getName(),
+                    baseValue: card.getBaseValue(),
+                    modifier: modifier,
+                    finalValue: finalValue,
+                    aspect: currentAspect.getName()
+                });
+
+                addLog('card', `出牌: ${card.getName()} | 基值 ${card.getBaseValue()} × ${modifier.toFixed(1)} = ${finalValue} (星象: ${currentAspect.getName()})`);
+
+                updateHistory();
+
+                hand.splice(index, 1);
+
+                turnCount++;
+
+                var switchResult = GameCore.AspectManager.switchAspect();
+                addLog('aspect', `星象切换: ${switchResult.from.getName()} → ${switchResult.to.getName()}`);
+
+                updateTurnDisplay();
+                updateAspectDisplay();
+                renderCards();
+            }
+
+            function updateHistory() {
+                var historyList = document.getElementById('history-list');
+                historyList.innerHTML = '';
+
+                history.slice().reverse().forEach(function(item) {
+                    var historyItem = document.createElement('div');
+                    historyItem.className = 'history-item';
+                    historyItem.innerHTML = `
+                        <strong>回合 ${item.turn}</strong> [${item.aspect}] - ${item.card}: 
+                        ${item.baseValue} × ${item.modifier.toFixed(1)} = <strong>${item.finalValue}</strong>
+                    `;
+                    historyList.appendChild(historyItem);
+                });
+            }
+
+            function init() {
+                initializeHand();
+                updateAspectDisplay();
+                updateTurnDisplay();
+                renderCards();
+
+                addLog('info', '游戏初始化完成，初始星象: ' + GameCore.AspectManager.getCurrentAspect().getName());
+
+                document.getElementById('debug-toggle').addEventListener('change', function(e) {
+                    debugMode = e.target.checked;
+                    document.getElementById('debug-log').classList.toggle('visible', debugMode);
+                    if (debugMode) {
+                        addLog('info', '调试模式已开启');
+                    }
+                });
+            }
+
+            document.addEventListener('DOMContentLoaded', init);
+        })();
+    </script>
+</body>
+</html>

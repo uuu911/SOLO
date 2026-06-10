@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPS射击训练场</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            overflow: hidden; 
+            background: #1a1a1a; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            font-family: 'Courier New', monospace;
+        }
+        #gameCanvas { 
+            border: 2px solid #333; 
+            cursor: crosshair;
+            background: #2d4a3e;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 14px;
+            text-align: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+        #stats {
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        #ammo {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        #warning {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff4444;
+            font-size: 24px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            margin-left: 10px;
+            font-size: 12px;
+        }
+        .badge-gold { background: linear-gradient(45deg, #ffd700, #ffaa00); color: #333; }
+        .badge-red { background: #ff4444; color: white; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div id="stats">
+            <span>命中: <span id="hits">0</span></span> |
+            <span>脱靶: <span id="misses">0</span></span> |
+            <span>爆头: <span id="headshots">0</span></span> |
+            <span>命中率: <span id="accuracy">0%</span></span>
+            <span id="accuracyBadge"></span> |
+            <span>连击: <span id="combo">0</span>
+        </div>
+    </div>
+    <div id="ammo">30 / 150</div>
+    <div id="warning">换弹中无法射击!</div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+    // ==================== 接口定义 ====================
+    const IAmmo = {
+        getCurrent: () => {},
+        getReserve: () => {},
+        consume: () => {},
+        startReload: () => {},
+        isReloading: () => {},
+        update: (dt) => {}
+    };
+
+    const IWeapon = {
+        fire: (x, y) => {},
+        reload: () => {},
+        getAmmo: () => {},
+        isReady: () => {},
+        update: (dt) => {},
+        render: (ctx) => {}
+    };
+
+    const ISwitchable = {
+        switchTo: (index) => {},
+        isSwitching: () => {},
+        getCurrent: () => {}
+    };
+
+    // ==================== 音效系统 ====================
+    class AudioSystem {
+        constructor() {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        playShoot() {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.1);
+        }
+
+        playReload() {
+            const times = [0, 0.2, 0.4, 0.6];
+            times.forEach((t, i) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800 + i * 200, this.ctx.currentTime + t);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime + t);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + t + 0.08);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(this.ctx.currentTime + t);
+                osc.stop(this.ctx.currentTime + t + 0.08);
+            });
+        }
+
+        playEmpty() {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.05);
+            gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.05);
+        }
+
+        playHit() {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1200, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.08);
+            gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.08);
+        }
+
+        playMiss() {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(100, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.15);
+        }
+    }
+
+    // ==================== 弹药系统 ====================
+    class AmmoSystem {
+        constructor(magSize, initialReserve) {
+            this.magSize = magSize;
+            this.current = magSize;
+            this.reserve = initialReserve;
+            this.reloading = false;
+            this.reloadTime = 0;
+            this.reloadDuration = 2300;
+        }
+
+        getCurrent() { return this.current; }
+        getReserve() { return this.reserve; }
+        isReloading() { return this.reloading; }
+
+        consume() {
+            if (this.current > 0 && !this.reloading) {
+                this.current--;
+                return true;
+            }
+            return false;
+        }
+
+        startReload() {
+            if (this.reloading || this.current === this.magSize || this.reserve === 0) return false;
+            this.reloading = true;
+            this.reloadTime = 0;
+            return true;
+        }
+
+        update(dt) {
+            if (this.reloading) {
+                this.reloadTime += dt;
+                if (this.reloadTime >= this.reloadDuration) {
+                    const needed = this.magSize - this.current;
+                    const available = Math.min(needed, this.reserve);
+                    this.current += available;
+                    this.reserve -= available;
+                    this.reloading = false;
+                }
+            }
+        }
+    }
+
+    // ==================== 靶子系统 ====================
+    class Target {
+        constructor(x, y, distance, radius) {
+            this.x = x;
+            this.y = y;
+            this.distance = distance;
+            this.radius = radius;
+            this.headRadius = radius * 0.35;
+            this.hitFlash = 0;
+            this.damageNumbers = [];
+        }
+
+        checkHit(cx, cy) {
+            const dx = cx - this.x;
+            const dy = cy - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist <= this.radius) {
+                const isHeadshot = dist <= this.headRadius;
+                return { hit: true, isHeadshot, damage: isHeadshot ? 50 : 25 };
+            }
+            return { hit: false };
+        }
+
+        showDamage(damage, isHeadshot) {
+            this.damageNumbers.push({
+                value: damage,
+                x: this.x + (Math.random() - 0.5) * 30,
+                y: this.y - 20,
+                life: 1000,
+                isHeadshot
+            });
+            this.hitFlash = 200;
+        }
+
+        update(dt) {
+            if (this.hitFlash > 0) this.hitFlash -= dt;
+            this.damageNumbers = this.damageNumbers.filter(d => {
+                d.life -= dt;
+                d.y -= dt * 0.05;
+                return d.life > 0;
+            });
+        }
+
+        render(ctx) {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = this.hitFlash > 0 ? '#ff4444' : '#ffffff';
+            ctx.fill();
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.headRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = '#ff6600';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            this.damageNumbers.forEach(d => {
+                const alpha = d.life / 1000;
+                ctx.font = `bold ${d.isHeadshot ? 20 : 16}px Arial`;
+                ctx.fillStyle = d.isHeadshot ? `rgba(255, 215, 0, ${alpha})` : `rgba(255, 255, 255, ${alpha})`;
+                ctx.textAlign = 'center';
+                ctx.fillText(d.value, d.x, d.y);
+            });
+        }
+    }
+
+    // ==================== 武器系统 - 突击步枪 ====================
+    class AssaultRifle {
+        constructor(ammoSystem, audioSystem) {
+            this.ammo = ammoSystem;
+            this.audio = audioSystem;
+            this.fireRate = 600;
+            this.fireInterval = 60000 / this.fireRate;
+            this.lastFire = 0;
+            this.recoil = 0;
+            this.recoilRecovery = 3;
+            this.maxRecoil = 15;
+            this.weaponBob = 0;
+            this.switchAnimation = 0;
+            this.isSwitchingIn = false;
+            this.particles = [];
+        }
+
+        getAmmo() { return this.ammo; }
+        isReady() { return !this.ammo.isReloading() && this.switchAnimation <= 0; }
+
+        fire(timestamp, crosshairX, crosshairY) {
+            if (!this.isReady()) {
+                if (this.ammo.isReloading()) {
+                    console.warn('换弹中无法射击');
+                    this.audio.playEmpty();
+                }
+                return null;
+            }
+
+            if (timestamp - this.lastFire < this.fireInterval) return null;
+
+            if (this.ammo.getCurrent() <= 0) {
+                this.audio.playEmpty();
+                return null;
+            }
+
+            this.ammo.consume();
+            this.lastFire = timestamp;
+            this.audio.playShoot();
+            
+            this.recoil = Math.min(this.recoil + 2 + Math.random() * 3, this.maxRecoil);
+            
+            for (let i = 0; i < Game.maxParticles; i++) {
+                this.particles.push({
+                    x: 0,
+                    y: 0,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 200,
+                    size: 3 + Math.random() * 5
+                });
+            }
+
+            return { x: crosshairX, y: crosshairY - this.recoil };
+        }
+
+        reload() {
+            if (this.ammo.startReload()) {
+                this.audio.playReload();
+            }
+        }
+
+        playSwitchIn() {
+            this.isSwitchingIn = true;
+            this.switchAnimation = 300;
+        }
+
+        update(dt) {
+            this.ammo.update(dt);
+            
+            if (this.recoil > 0) {
+                this.recoil = Math.max(0, this.recoil - this.recoilRecovery * dt / 16);
+            }
+
+            if (this.switchAnimation > 0) {
+                this.switchAnimation -= dt;
+            }
+
+            this.weaponBob += dt * 0.01;
+            this.particles = this.particles.filter(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= dt;
+                p.size *= 0.95;
+                return p.life > 0;
+            });
+        }
+
+        render(ctx) {
+            const w = ctx.canvas.width;
+            const h = ctx.canvas.height;
+            const baseX = w * 0.65;
+            const baseY = h * 0.7;
+            
+            let offsetY = this.recoil;
+            if (this.switchAnimation > 0) {
+                const progress = this.switchAnimation / 300;
+                offsetY += Math.sin(progress * Math.PI) * 100;
+            }
+            
+            const bobX = Math.sin(this.weaponBob) * 3;
+            const bobY = Math.cos(this.weaponBob * 2) * 2;
+
+            ctx.save();
+            ctx.translate(baseX + bobX, baseY + offsetY + bobY);
+
+            ctx.fillStyle = '#4a3728';
+            ctx.beginPath();
+            ctx.moveTo(-20, 80);
+            ctx.lineTo(30, 100);
+            ctx.lineTo(50, 60);
+            ctx.lineTo(0, 40);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#2a2a2a';
+            ctx.fillRect(-40, 10, 180, 35);
+            
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(100, 15, 80, 12);
+
+            ctx.fillStyle = '#3a3a3a';
+            ctx.fillRect(20, 45, 25, 50);
+
+            ctx.fillStyle = '#4a4a4a';
+            ctx.beginPath();
+            ctx.moveTo(-30, 10);
+            ctx.lineTo(-50, 50);
+            ctx.lineTo(-20, 45);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#ffaa00';
+            this.particles.forEach(p => {
+                ctx.globalAlpha = p.life / 200;
+                ctx.beginPath();
+                ctx.arc(180 + p.x, 21 + p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+
+            ctx.restore();
+        }
+    }
+
+    // ==================== 武器切换系统 ====================
+    class WeaponSwitcher {
+        constructor() {
+            this.weapons = {};
+            this.currentIndex = 1;
+            this.switching = false;
+        }
+
+        addWeapon(index, weapon) {
+            this.weapons[index] = weapon;
+            if (index === this.currentIndex) {
+                weapon.playSwitchIn();
+            }
+        }
+
+        switchTo(index) {
+            if (this.weapons[index] && index !== this.currentIndex) {
+                this.currentIndex = index;
+                this.weapons[index].playSwitchIn();
+                this.switching = true;
+                setTimeout(() => this.switching = false, 300);
+            }
+        }
+
+        isSwitching() { return this.switching; }
+        getCurrent() { return this.weapons[this.currentIndex]; }
+    }
+
+    // ==================== 准星系统 ====================
+    class Crosshair {
+        constructor() {
+            this.spread = 0;
+            this.maxSpread = 40;
+            this.minSpread = 8;
+            this.spreadPerShot = 4;
+            this.recoveryRate = 30;
+            this.moveSpread = 0;
+        }
+
+        onFire() {
+            this.spread = Math.min(this.spread + this.spreadPerShot, this.maxSpread);
+        }
+
+        onMove() {
+            this.moveSpread = Math.min(this.moveSpread + 2, this.maxSpread * 0.5);
+        }
+
+        update(dt) {
+            const recovery = this.recoveryRate * dt / 1000;
+            this.spread = Math.max(this.minSpread, this.spread - recovery);
+            this.moveSpread = Math.max(0, this.moveSpread - recovery * 1.5);
+        }
+
+        getCurrentSpread() {
+            return this.spread + this.moveSpread;
+        }
+
+        render(ctx, x, y) {
+            const s = this.getCurrentSpread();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.moveTo(x - s - 10, y);
+            ctx.lineTo(x - 10, y);
+            ctx.moveTo(x + 10, y);
+            ctx.lineTo(x + s + 10, y);
+            ctx.moveTo(x, y - s - 10);
+            ctx.lineTo(x, y - 10);
+            ctx.moveTo(x, y + 10);
+            ctx.lineTo(x, y + s + 10);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(x, y, 2, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+        }
+    }
+
+    // ==================== 统计系统 ====================
+    class Stats {
+        constructor() {
+            this.hits = 0;
+            this.misses = 0;
+            this.headshots = 0;
+            this.combo = 0;
+            this.maxCombo = 0;
+            this.shakeIntensity = 0;
+            this.shakeDuration = 0;
+        }
+
+        addHit(isHeadshot) {
+            this.hits++;
+            if (isHeadshot) this.headshots++;
+            this.combo++;
+            this.maxCombo = Math.max(this.maxCombo, this.combo);
+        }
+
+        addMiss() {
+            this.misses++;
+            if (this.combo > 0) {
+                this.triggerShake(10, 300);
+            }
+            this.combo = 0;
+        }
+
+        triggerShake(intensity, duration) {
+            this.shakeIntensity = intensity;
+            this.shakeDuration = duration;
+        }
+
+        getAccuracy() {
+            const total = this.hits + this.misses;
+            return total === 0 ? 0 : Math.round((this.hits / total) * 100);
+        }
+
+        update(dt) {
+            if (this.shakeDuration > 0) {
+                this.shakeDuration -= dt;
+            }
+        }
+
+        getShakeOffset() {
+            if (this.shakeDuration <= 0) return { x: 0, y: 0 };
+            return {
+                x: (Math.random() - 0.5) * this.shakeIntensity,
+                y: (Math.random() - 0.5) * this.shakeIntensity
+            };
+        }
+
+        updateUI() {
+            document.getElementById('hits').textContent = this.hits;
+            document.getElementById('misses').textContent = this.misses;
+            document.getElementById('headshots').textContent = this.headshots;
+            document.getElementById('combo').textContent = this.combo;
+            
+            const acc = this.getAccuracy();
+            const accEl = document.getElementById('accuracy');
+            const badgeEl = document.getElementById('accuracyBadge');
+            
+            accEl.textContent = acc + '%';
+            
+            if (acc < 40) {
+                accEl.style.color = '#ff4444';
+                badgeEl.innerHTML = '<span class="badge badge-red">警告</span>';
+            } else if (acc >= 85) {
+                accEl.style.color = '#ffd700';
+                badgeEl.innerHTML = '<span class="badge badge-gold">精英</span>';
+            } else {
+                accEl.style.color = '#ffffff';
+                badgeEl.innerHTML = '';
+            }
+        }
+    }
+
+    // ==================== 主游戏类 ====================
+    class Game {
+        static maxParticles = 12;
+        
+        constructor() {
+            this.canvas = document.getElementById('gameCanvas');
+            this.ctx = this.canvas.getContext('2d');
+            this.resize();
+            
+            this.audio = new AudioSystem();
+            this.ammo = new AmmoSystem(30, 150);
+            this.rifle = new AssaultRifle(this.ammo, this.audio);
+            this.switcher = new WeaponSwitcher();
+            this.switcher.addWeapon(1, this.rifle);
+            this.crosshair = new Crosshair();
+            this.stats = new Stats();
+            
+            this.initTargets();
+            
+            this.mouseX = this.canvas.width / 2;
+            this.mouseY = this.canvas.height / 2;
+            this.mouseDown = false;
+            
+            this.lastTime = 0;
+            this.frameCount = 0;
+            this.fpsTime = 0;
+            this.currentFPS = 60;
+            this.lowFPSTime = 0;
+            this.recoveryTime = 0;
+            
+            this.setupEvents();
+            this.loop = this.loop.bind(this);
+            requestAnimationFrame(this.loop);
+        }
+
+        resize() {
+            const size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.9, 1200);
+            this.canvas.width = size;
+            this.canvas.height = size * 0.6;
+        }
+
+        initTargets() {
+            const w = this.canvas.width;
+            const h = this.canvas.height;
+            
+            this.targets = [
+                new Target(w * 0.25, h * 0.45, 1, 45),
+                new Target(w * 0.5, h * 0.35, 2, 30),
+                new Target(w * 0.75, h * 0.3, 3, 20)
+            ];
+        }
+
+        setupEvents() {
+            window.addEventListener('resize', () => {
+                this.resize();
+                this.initTargets();
+            });
+
+            this.canvas.addEventListener('mousemove', (e) => {
+                const rect = this.canvas.getBoundingClientRect();
+                this.mouseX = e.clientX - rect.left;
+                this.mouseY = e.clientY - rect.top;
+                this.crosshair.onMove();
+            });
+
+            this.canvas.addEventListener('mousedown', (e) => {
+                if (e.button === 0) {
+                    this.mouseDown = true;
+                    if (this.audio.ctx.state === 'suspended') {
+                        this.audio.ctx.resume();
+                    }
+                }
+            });
+
+            this.canvas.addEventListener('mouseup', (e) => {
+                if (e.button === 0) this.mouseDown = false;
+            });
+
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'r' || e.key === 'R') {
+                    this.switcher.getCurrent()?.reload();
+                }
+                if (e.key === '1') this.switcher.switchTo(1);
+                if (e.key === '2') this.switcher.switchTo(2);
+            });
+        }
+
+        checkHit(x, y) {
+            for (const target of this.targets) {
+                const result = target.checkHit(x, y);
+                if (result.hit) {
+                    target.showDamage(result.damage, result.isHeadshot);
+                    this.audio.playHit();
+                    this.stats.addHit(result.isHeadshot);
+                    return;
+                }
+            }
+            this.audio.playMiss();
+            this.stats.addMiss();
+        }
+
+        updateFPS(dt) {
+            this.frameCount++;
+            this.fpsTime += dt;
+            
+            if (this.fpsTime >= 1000) {
+                this.currentFPS = Math.round((this.frameCount / this.fpsTime) * 1000);
+                this.frameCount = 0;
+                this.fpsTime = 0;
+
+                if (this.currentFPS < 54) {
+                    this.lowFPSTime += 1000;
+                    if (this.lowFPSTime >= 1000) {
+                        Game.maxParticles = Math.max(2, Game.maxParticles / 2);
+                        this.lowFPSTime = 0;
+                    }
+                } else {
+                    this.lowFPSTime = 0;
+                }
+
+                if (this.currentFPS >= 60) {
+                    this.recoveryTime += 1000;
+                    if (this.recoveryTime >= 5000) {
+                        Game.maxParticles = Math.min(12, Game.maxParticles * 2);
+                        this.recoveryTime = 0;
+                    }
+                } else {
+                    this.recoveryTime = 0;
+                }
+            }
+        }
+
+        loop(timestamp) {
+            const dt = timestamp - this.lastTime;
+            this.lastTime = timestamp;
+
+            this.updateFPS(dt);
+
+            const weapon = this.switcher.getCurrent();
+            if (this.mouseDown && weapon) {
+                const result = weapon.fire(timestamp, this.mouseX, this.mouseY);
+                if (result) {
+                    this.crosshair.onFire();
+                    this.checkHit(result.x, result.y);
+                }
+            }
+
+            weapon?.update(dt);
+            this.crosshair.update(dt);
+            this.stats.update(dt);
+            this.targets.forEach(t => t.update(dt));
+
+            this.stats.updateUI();
+            document.getElementById('ammo').textContent = 
+                `${this.ammo.getCurrent()} / ${this.ammo.getReserve()}`;
+
+            this.render();
+            requestAnimationFrame(this.loop);
+        }
+
+        render() {
+            const shake = this.stats.getShakeOffset();
+            this.ctx.save();
+            this.ctx.translate(shake.x, shake.y);
+
+            this.ctx.fillStyle = '#2d4a3e';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+            this.ctx.fillStyle = '#1a3328';
+            this.ctx.fillRect(0, this.canvas.height * 0.6, this.canvas.width, this.canvas.height * 0.4);
+
+            this.targets.forEach(t => t.render(this.ctx));
+
+            this.crosshair.render(this.ctx, this.mouseX, this.mouseY);
+
+            this.switcher.getCurrent()?.render(this.ctx);
+
+            this.ctx.restore();
+        }
+    }
+
+    window.onload = () => new Game();
+    </script>
+</body>
+</html>

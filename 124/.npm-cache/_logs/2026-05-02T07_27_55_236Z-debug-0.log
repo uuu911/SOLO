@@ -1,0 +1,18 @@
+0 verbose cli F:\nodejs\node.exe F:\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.9.0
+2 info using node@v24.14.0
+3 silly config load:file:F:\nodejs\node_modules\npm\npmrc
+4 silly config load:file:D:\Desktop\公司项目\Solo\auto_demo\.npmrc
+5 silly config load:file:C:\Users\27857\.npmrc
+6 silly config load:file:F:\nodejs\node_global\etc\npmrc
+7 verbose title npm insatll
+8 verbose argv "insatll"
+9 verbose logfile logs-max:10 dir:D:\Desktop\公司项目\Solo\auto_demo\.npm-cache\_logs\2026-05-02T07_27_55_236Z-
+10 verbose logfile D:\Desktop\公司项目\Solo\auto_demo\.npm-cache\_logs\2026-05-02T07_27_55_236Z-debug-0.log
+11 silly logfile done cleaning log files
+12 verbose cwd D:\Desktop\公司项目\Solo\auto_demo
+13 verbose os Windows_NT 10.0.26200
+14 verbose node v24.14.0
+15 verbose npm  v11.9.0
+16 verbose exit 1
+17 verbose code 1

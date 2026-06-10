@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPG角色装备系统</title>
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --secondary: #00b894;
+            --danger: #d63031;
+            --warning: #fdcb6e;
+            --dark: #2d3436;
+            --light: #dfe6e9;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+        }
+
+        .panel h2 {
+            color: var(--dark);
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 10px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .level-display {
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, var(--primary), #a29bfe);
+            border-radius: 12px;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .level-display .level-num {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .slot {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+
+        .slot:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .slot.equipped {
+            border-color: var(--secondary);
+            background: linear-gradient(135deg, rgba(0, 184, 148, 0.1), rgba(0, 184, 148, 0.05));
+        }
+
+        .slot-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .slot-name {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .item-name {
+            color: var(--primary);
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .item-stats {
+            font-size: 0.85rem;
+            color: #636e72;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .btn-equip {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-equip:hover {
+            background: #5a4bd1;
+            transform: scale(1.05);
+        }
+
+        .btn-unequip {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-unequip:hover {
+            background: #b72b2c;
+            transform: scale(1.05);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .equipment-library {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .library-item {
+            background: white;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+            border: 1px solid #e9ecef;
+            transition: all 0.2s ease;
+        }
+
+        .library-item:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(108, 92, 231, 0.15);
+        }
+
+        .library-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .library-item-name {
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .library-item-slot {
+            font-size: 0.8rem;
+            background: var(--primary);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 12px;
+        }
+
+        .library-item-stats {
+            font-size: 0.85rem;
+            color: #636e72;
+            margin-bottom: 10px;
+        }
+
+        .library-item-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .level-req {
+            font-size: 0.75rem;
+            color: var(--danger);
+            margin-top: 4px;
+        }
+
+        .level-req.met {
+            color: var(--secondary);
+        }
+
+        .final-stats {
+            background: linear-gradient(135deg, var(--primary), #a29bfe);
+            color: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .final-stats .stat-row {
+            border-bottom-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .final-stats .stat-label,
+        .final-stats .stat-value {
+            color: white;
+        }
+
+        .validation-panel {
+            margin-top: 30px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+        }
+
+        .validation-panel h2 {
+            color: var(--dark);
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            border-bottom: 2px solid var(--secondary);
+            padding-bottom: 10px;
+        }
+
+        .formula {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 12px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .formula-label {
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 8px;
+        }
+
+        .formula-content {
+            color: var(--primary);
+        }
+
+        .formula-result {
+            color: var(--secondary);
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-top: 8px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            color: var(--dark);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #636e72;
+        }
+
+        .modal-item {
+            padding: 12px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .modal-item:hover {
+            border-color: var(--primary);
+            background: rgba(108, 92, 231, 0.05);
+        }
+
+        .modal-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .empty-slot {
+            color: #b2bec3;
+            font-style: italic;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .conflict-warning {
+            background: var(--warning);
+            color: var(--dark);
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+
+        .stat-diff {
+            font-size: 0.8rem;
+            margin-left: 8px;
+        }
+
+        .stat-diff.positive {
+            color: var(--secondary);
+        }
+
+        .stat-diff.negative {
+            color: var(--danger);
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚔️ RPG 角色装备系统</h1>
+        
+        <div class="grid">
+            <div class="panel">
+                <h2>📊 角色基础属性</h2>
+                <div class="level-display">
+                    <div>等级</div>
+                    <div class="level-num" id="player-level">1</div>
+                </div>
+                <div id="base-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">基础攻击</span>
+                        <span class="stat-value" id="base-atk">10</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">基础防御</span>
+                        <span class="stat-value" id="base-def">10</span>
+                    </div>
+                </div>
+                
+                <div class="final-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">总攻击力</span>
+                        <span class="stat-value" id="total-atk">10</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">总防御力</span>
+                        <span class="stat-value" id="total-def">10</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>🎒 装备槽位</h2>
+                <div id="slots-container"></div>
+            </div>
+
+            <div class="panel">
+                <h2>🏪 装备库</h2>
+                <div class="equipment-library" id="equipment-library"></div>
+            </div>
+        </div>
+
+        <div class="validation-panel">
+            <h2>🔍 属性校验区域</h2>
+            <div id="validation-content"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="equip-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>选择装备</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="modal-items"></div>
+        </div>
+    </div>
+
+    <script>
+    (function(global) {
+        'use strict';
+
+        const SlotTypes = {
+            MAIN_HAND: '主手',
+            OFF_HAND: '副手',
+            HEAD: '头部',
+            BODY: '身体',
+            ACCESSORY: '饰品'
+        };
+
+        const WeaponTypes = {
+            ONE_HANDED: '单手',
+            TWO_HANDED: '双手'
+        };
+
+        global.EquipmentModule = {
+            SlotTypes,
+            WeaponTypes
+        };
+
+    })(window);
+    </script>
+
+    <script>
+    (function(global) {
+        'use strict';
+
+        const { SlotTypes, WeaponTypes } = global.EquipmentModule;
+
+        const equipmentDatabase = [
+            {
+                id: 'iron_sword',
+                name: '铁剑',
+                slot: SlotTypes.MAIN_HAND,
+                weaponType: WeaponTypes.ONE_HANDED,
+                stats: { atk: 15, def: 0 },
+                requiredLevel: 1
+            },
+            {
+                id: 'steel_sword',
+                name: '钢剑',
+                slot: SlotTypes.MAIN_HAND,
+                weaponType: WeaponTypes.ONE_HANDED,
+                stats: { atk: 25, def: 2 },
+                requiredLevel: 5
+            },
+            {
+                id: 'greatsword',
+                name: '巨剑',
+                slot: SlotTypes.MAIN_HAND,
+                weaponType: WeaponTypes.TWO_HANDED,
+                stats: { atk: 45, def: 5 },
+                requiredLevel: 10
+            },
+            {
+                id: 'wooden_shield',
+                name: '木盾',
+                slot: SlotTypes.OFF_HAND,
+                weaponType: WeaponTypes.ONE_HANDED,
+                stats: { atk: 0, def: 10 },
+                requiredLevel: 1
+            },
+            {
+                id: 'iron_helmet',
+                name: '铁头盔',
+                slot: SlotTypes.HEAD,
+                stats: { atk: 0, def: 12 },
+                requiredLevel: 3
+            },
+            {
+                id: 'leather_armor',
+                name: '皮甲',
+                slot: SlotTypes.BODY,
+                stats: { atk: 3, def: 18 },
+                requiredLevel: 1
+            },
+            {
+                id: 'power_ring',
+                name: '力量戒指',
+                slot: SlotTypes.ACCESSORY,
+                stats: { atk: 10, def: 5 },
+                requiredLevel: 5
+            },
+            {
+                id: 'iron_plate',
+                name: '铁甲',
+                slot: SlotTypes.BODY,
+                stats: { atk: 5, def: 30 },
+                requiredLevel: 8
+            }
+        ];
+
+        function getEquipmentBySlot(slot) {
+            return equipmentDatabase.filter(item => item.slot === slot);
+        }
+
+        function getEquipmentById(id) {
+            return equipmentDatabase.find(item => item.id === id);
+        }
+
+        function getAllEquipment() {
+            return [...equipmentDatabase];
+        }
+
+        global.EquipmentDatabase = {
+            getEquipmentBySlot,
+            getEquipmentById,
+            getAllEquipment
+        };
+
+    })(window);
+    </script>
+
+    <script>
+    (function(global) {
+        'use strict';
+
+        const { SlotTypes, WeaponTypes } = global.EquipmentModule;
+        const { getEquipmentById } = global.EquipmentDatabase;
+
+        function createCharacter(level = 1, baseAtk = 10, baseDef = 10) {
+            const state = {
+                level,
+                baseAtk,
+                baseDef,
+                equipment: {},
+                messages: []
+            };
+
+            Object.values(SlotTypes).forEach(slot => {
+                state.equipment[slot] = null;
+            });
+
+            function checkConflict(newItem) {
+                if (newItem.weaponType === WeaponTypes.TWO_HANDED) {
+                    if (state.equipment[SlotTypes.OFF_HAND]) {
+                        return { conflict: true, message: '双手武器无法与副手装备共存，将卸下副手装备。' };
+                    }
+                }
+                
+                if (newItem.slot === SlotTypes.OFF_HAND) {
+                    const mainHand = state.equipment[SlotTypes.MAIN_HAND];
+                    if (mainHand && mainHand.weaponType === WeaponTypes.TWO_HANDED) {
+                        return { conflict: true, message: '副手装备无法与双手武器共存，将卸下主手双手武器。' };
+                    }
+                }
+
+                return { conflict: false };
+            }
+
+            function equip(itemId) {
+                const item = getEquipmentById(itemId);
+                if (!item) return { success: false, message: '装备不存在' };
+
+                state.messages = [];
+
+                if (item.requiredLevel && state.level < item.requiredLevel) {
+                    const penalty = 0.5;
+                    state.messages.push(`⚠️ 等级不足！需要等级 ${item.requiredLevel}，当前等级 ${state.level}。装备属性将减免 50%。`);
+                }
+
+                const conflictCheck = checkConflict(item);
+                if (conflictCheck.conflict) {
+                    state.messages.push(conflictCheck.message);
+                    if (item.weaponType === WeaponTypes.TWO_HANDED) {
+                        unequip(SlotTypes.OFF_HAND);
+                    }
+                    if (item.slot === SlotTypes.OFF_HAND) {
+                        unequip(SlotTypes.MAIN_HAND);
+                    }
+                }
+
+                const oldItem = state.equipment[item.slot];
+                if (oldItem) {
+                    state.messages.push(`已卸下 ${oldItem.name}`);
+                }
+
+                state.equipment[item.slot] = { ...item };
+                state.messages.push(`成功装备 ${item.name}`);
+
+                return { success: true, messages: state.messages };
+            }
+
+            function unequip(slot) {
+                const item = state.equipment[slot];
+                if (!item) return { success: false, message: '该槽位没有装备' };
+
+                state.equipment[slot] = null;
+                return { success: true, message: `已卸下 ${item.name}` };
+            }
+
+            function getItemEffectiveStats(item) {
+                if (!item) return { atk: 0, def: 0 };
+                
+                let multiplier = 1;
+                if (item.requiredLevel && state.level < item.requiredLevel) {
+                    multiplier = 0.5;
+                }
+
+                return {
+                    atk: Math.floor(item.stats.atk * multiplier),
+                    def: Math.floor(item.stats.def * multiplier)
+                };
+            }
+
+            function calculateTotalStats() {
+                let totalAtk = state.baseAtk;
+                let totalDef = state.baseDef;
+                let breakdown = { atk: [], def: [] };
+
+                Object.values(state.equipment).forEach(item => {
+                    if (item) {
+                        const effectiveStats = getItemEffectiveStats(item);
+                        totalAtk += effectiveStats.atk;
+                        totalDef += effectiveStats.def;
+                        
+                        if (effectiveStats.atk > 0) {
+                            breakdown.atk.push({ name: item.name, value: effectiveStats.atk });
+                        }
+                        if (effectiveStats.def > 0) {
+                            breakdown.def.push({ name: item.name, value: effectiveStats.def });
+                        }
+                    }
+                });
+
+                return {
+                    totalAtk,
+                    totalDef,
+                    baseAtk: state.baseAtk,
+                    baseDef: state.baseDef,
+                    breakdown
+                };
+            }
+
+            function getState() {
+                return {
+                    level: state.level,
+                    baseAtk: state.baseAtk,
+                    baseDef: state.baseDef,
+                    equipment: { ...state.equipment }
+                };
+            }
+
+            function setLevel(newLevel) {
+                state.level = newLevel;
+                return { success: true };
+            }
+
+            return {
+                equip,
+                unequip,
+                calculateTotalStats,
+                getState,
+                setLevel,
+                getItemEffectiveStats
+            };
+        }
+
+        global.CharacterModule = {
+            createCharacter
+        };
+
+    })(window);
+    </script>
+
+    <script>
+    (function(global) {
+        'use strict';
+
+        const { SlotTypes } = global.EquipmentModule;
+        const { getAllEquipment, getEquipmentBySlot, getEquipmentById } = global.EquipmentDatabase;
+        const { createCharacter } = global.CharacterModule;
+
+        const player = createCharacter(5, 10, 10);
+        let currentEquipSlot = null;
+
+        function init() {
+            renderAll();
+        }
+
+        function renderAll() {
+            renderBaseStats();
+            renderSlots();
+            renderEquipmentLibrary();
+            renderValidation();
+        }
+
+        function renderBaseStats() {
+            const state = player.getState();
+            const stats = player.calculateTotalStats();
+
+            document.getElementById('player-level').textContent = state.level;
+            document.getElementById('base-atk').textContent = state.baseAtk;
+            document.getElementById('base-def').textContent = state.baseDef;
+            document.getElementById('total-atk').textContent = stats.totalAtk;
+            document.getElementById('total-def').textContent = stats.totalDef;
+        }
+
+        function renderSlots() {
+            const state = player.getState();
+            const container = document.getElementById('slots-container');
+            container.innerHTML = '';
+
+            Object.values(SlotTypes).forEach(slot => {
+                const equippedItem = state.equipment[slot];
+                const slotEl = document.createElement('div');
+                slotEl.className = `slot ${equippedItem ? 'equipped' : ''}`;
+
+                if (equippedItem) {
+                    const effectiveStats = player.getItemEffectiveStats(equippedItem);
+                    slotEl.innerHTML = `
+                        <div class="slot-header">
+                            <span class="slot-name">${slot}</span>
+                            <span class="stat-diff positive">已装备</span>
+                        </div>
+                        <div class="item-name">${equippedItem.name}</div>
+                        <div class="item-stats">
+                            攻击 +${effectiveStats.atk} | 防御 +${effectiveStats.def}
+                            ${equippedItem.requiredLevel && state.level < equippedItem.requiredLevel ? 
+                                '<span class="level-req">（属性减免50%）</span>' : ''}
+                        </div>
+                        <button class="btn btn-unequip" onclick="handleUnequip('${slot}')">卸下</button>
+                    `;
+                } else {
+                    slotEl.innerHTML = `
+                        <div class="slot-header">
+                            <span class="slot-name">${slot}</span>
+                        </div>
+                        <div class="empty-slot">空</div>
+                        <button class="btn btn-equip" onclick="openEquipModal('${slot}')">装备</button>
+                    `;
+                }
+
+                container.appendChild(slotEl);
+            });
+        }
+
+        function renderEquipmentLibrary() {
+            const state = player.getState();
+            const container = document.getElementById('equipment-library');
+            const allEquipment = getAllEquipment();
+
+            container.innerHTML = '';
+
+            allEquipment.forEach(item => {
+                const meetsLevel = !item.requiredLevel || state.level >= item.requiredLevel;
+                const itemEl = document.createElement('div');
+                itemEl.className = 'library-item';
+
+                itemEl.innerHTML = `
+                    <div class="library-item-header">
+                        <span class="library-item-name">${item.name}</span>
+                        <span class="library-item-slot">${item.slot}</span>
+                    </div>
+                    <div class="library-item-stats">
+                        攻击 +${item.stats.atk} | 防御 +${item.stats.def}
+                    </div>
+                    ${item.requiredLevel ? 
+                        `<div class="level-req ${meetsLevel ? 'met' : ''}">需要等级: ${item.requiredLevel}</div>` : ''}
+                    <div class="library-item-actions">
+                        <button class="btn btn-equip" onclick="handleDirectEquip('${item.id}')">直接装备</button>
+                    </div>
+                `;
+
+                container.appendChild(itemEl);
+            });
+        }
+
+        function renderValidation() {
+            const stats = player.calculateTotalStats();
+            const container = document.getElementById('validation-content');
+
+            let atkFormula = `基础攻击 ${stats.baseAtk}`;
+            let defFormula = `基础防御 ${stats.baseDef}`;
+
+            stats.breakdown.atk.forEach(item => {
+                atkFormula += ` + ${item.name} ${item.value}`;
+            });
+
+            stats.breakdown.def.forEach(item => {
+                defFormula += ` + ${item.name} ${item.value}`;
+            });
+
+            atkFormula += ` = ${stats.totalAtk}`;
+            defFormula += ` = ${stats.totalDef}`;
+
+            container.innerHTML = `
+                <div class="formula">
+                    <div class="formula-label">📐 攻击力计算公式：</div>
+                    <div class="formula-content">${atkFormula}</div>
+                    <div class="formula-result">最终攻击力 = ${stats.totalAtk}</div>
+                </div>
+                <div class="formula">
+                    <div class="formula-label">📐 防御力计算公式：</div>
+                    <div class="formula-content">${defFormula}</div>
+                    <div class="formula-result">最终防御力 = ${stats.totalDef}</div>
+                </div>
+            `;
+        }
+
+        function openEquipModal(slot) {
+            currentEquipSlot = slot;
+            const state = player.getState();
+            const items = getEquipmentBySlot(slot);
+            const modal = document.getElementById('equip-modal');
+            const modalItems = document.getElementById('modal-items');
+
+            modalItems.innerHTML = '';
+
+            items.forEach(item => {
+                const meetsLevel = !item.requiredLevel || state.level >= item.requiredLevel;
+                const itemEl = document.createElement('div');
+                itemEl.className = `modal-item ${!meetsLevel ? 'disabled' : ''}`;
+
+                itemEl.innerHTML = `
+                    <div style="font-weight: 600; margin-bottom: 6px;">${item.name}</div>
+                    <div style="font-size: 0.85rem; color: #636e72;">
+                        攻击 +${item.stats.atk} | 防御 +${item.stats.def}
+                    </div>
+                    ${item.requiredLevel ? 
+                        `<div class="level-req ${meetsLevel ? 'met' : ''}">需要等级: ${item.requiredLevel}</div>` : ''}
+                `;
+
+                itemEl.onclick = () => {
+                    handleEquipFromModal(item.id);
+                };
+
+                modalItems.appendChild(itemEl);
+            });
+
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('equip-modal');
+            modal.classList.remove('active');
+            currentEquipSlot = null;
+        }
+
+        function handleEquipFromModal(itemId) {
+            const result = player.equip(itemId);
+            if (result.success) {
+                closeModal();
+                renderAll();
+                
+                if (result.messages && result.messages.length > 1) {
+                    setTimeout(() => {
+                        alert(result.messages.join('\n'));
+                    }, 100);
+                }
+            }
+        }
+
+        function handleDirectEquip(itemId) {
+            const result = player.equip(itemId);
+            if (result.success) {
+                renderAll();
+                
+                if (result.messages && result.messages.length > 1) {
+                    setTimeout(() => {
+                        alert(result.messages.join('\n'));
+                    }, 100);
+                }
+            }
+        }
+
+        function handleUnequip(slot) {
+            const result = player.unequip(slot);
+            if (result.success) {
+                renderAll();
+            }
+        }
+
+        global.openEquipModal = openEquipModal;
+        global.closeModal = closeModal;
+        global.handleEquipFromModal = handleEquipFromModal;
+        global.handleDirectEquip = handleDirectEquip;
+        global.handleUnequip = handleUnequip;
+
+        document.addEventListener('DOMContentLoaded', init);
+
+    })(window);
+    </script>
+</body>
+</html>

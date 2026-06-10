@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>田径百米赛跑模拟</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            display: flex;
+            flex-direction: column;
+            color: #fff;
+        }
+
+        .header {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .btn {
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-ready {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .btn-ready:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            color: white;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.4);
+        }
+
+        .btn-start:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.6);
+        }
+
+        .btn-reset {
+            background: linear-gradient(135deg, #2196F3, #1976D2);
+            color: white;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.4);
+        }
+
+        .btn-reset:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.6);
+        }
+
+        .status-bar {
+            text-align: center;
+            padding: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            min-height: 35px;
+        }
+
+        .status-ready {
+            color: #4CAF50;
+        }
+
+        .status-racing {
+            color: #ff9800;
+        }
+
+        .status-finished {
+            color: #2196F3;
+        }
+
+        .countdown {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 120px;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+            z-index: 100;
+            display: none;
+        }
+
+        .countdown.show {
+            display: block;
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        .track-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: 
+                repeating-linear-gradient(
+                    90deg,
+                    #4a7c3f 0px,
+                    #4a7c3f 50px,
+                    #3d6b34 50px,
+                    #3d6b34 100px
+                );
+            border: 4px solid #8B4513;
+        }
+
+        .track {
+            position: absolute;
+            top: 50%;
+            left: 20px;
+            right: 20px;
+            transform: translateY(-50%);
+            height: 320px;
+            background: 
+                linear-gradient(90deg, #8B7355 0%, #A0826D 50%, #8B7355 100%);
+            border-radius: 4px;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .lane {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 40px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .lane-1 { top: 0; }
+        .lane-2 { top: 40px; }
+        .lane-3 { top: 80px; }
+        .lane-4 { top: 120px; }
+        .lane-5 { top: 160px; }
+        .lane-6 { top: 200px; }
+        .lane-7 { top: 240px; }
+        .lane-8 { top: 280px; border-bottom: none; }
+
+        .start-line {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 6px;
+            background: #fff;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .finish-line {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 8px;
+            background: 
+                repeating-linear-gradient(
+                    0deg,
+                    #fff 0px,
+                    #fff 8px,
+                    #000 8px,
+                    #000 16px
+                );
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+        }
+
+        .runner {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+            transition: box-shadow 0.3s ease;
+            z-index: 10;
+        }
+
+        .runner.racing {
+            animation: bounce 0.3s ease-in-out infinite alternate;
+        }
+
+        @keyframes bounce {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-5px); }
+        }
+
+        .audience {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .cheer {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+            opacity: 0;
+            animation: cheerAnim 1s ease-out forwards;
+        }
+
+        @keyframes cheerAnim {
+            0% { opacity: 0; transform: translateY(0) scale(0.5); }
+            50% { opacity: 1; transform: translateY(-20px) scale(1.2); }
+            100% { opacity: 0; transform: translateY(-40px) scale(1); }
+        }
+
+        .results-panel {
+            position: fixed;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 280px;
+            background: rgba(0, 0, 0, 0.85);
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 50;
+        }
+
+        .results-panel h3 {
+            text-align: center;
+            color: #ffd700;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .result-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .result-item.gold {
+            background: linear-gradient(90deg, rgba(255, 215, 0, 0.4), rgba(255, 215, 0, 0.1));
+            border: 1px solid #ffd700;
+        }
+
+        .result-item.silver {
+            background: linear-gradient(90deg, rgba(192, 192, 192, 0.4), rgba(192, 192, 192, 0.1));
+            border: 1px solid #c0c0c0;
+        }
+
+        .result-item.bronze {
+            background: linear-gradient(90deg, rgba(205, 127, 50, 0.4), rgba(205, 127, 50, 0.1));
+            border: 1px solid #cd7f32;
+        }
+
+        .rank {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+
+        .gold .rank {
+            background: #ffd700;
+            color: #000;
+        }
+
+        .silver .rank {
+            background: #c0c0c0;
+            color: #000;
+        }
+
+        .bronze .rank {
+            background: #cd7f32;
+            color: #fff;
+        }
+
+        .result-info {
+            flex: 1;
+        }
+
+        .result-name {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .result-country {
+            font-size: 11px;
+            color: #aaa;
+        }
+
+        .result-time {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .export-btn {
+            width: 100%;
+            margin-top: 10px;
+            padding: 8px;
+            background: #9c27b0;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .export-btn:hover {
+            background: #7b1fa2;
+        }
+
+        .shortcuts {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+
+        .shortcuts span {
+            margin-right: 15px;
+        }
+
+        .shortcuts kbd {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏃 田径百米赛跑模拟器 🏃</h1>
+    </div>
+
+    <div class="controls">
+        <button class="btn btn-ready" id="btnReady">选手上道</button>
+        <button class="btn btn-start" id="btnStart" disabled>发令枪响</button>
+        <button class="btn btn-reset" id="btnReset">重置比赛 (R)</button>
+    </div>
+
+    <div class="status-bar" id="statusBar">点击"选手上道"准备比赛</div>
+
+    <div class="countdown" id="countdown"></div>
+
+    <div class="track-container">
+        <div class="track" id="track">
+            <div class="lane lane-1"></div>
+            <div class="lane lane-2"></div>
+            <div class="lane lane-3"></div>
+            <div class="lane lane-4"></div>
+            <div class="lane lane-5"></div>
+            <div class="lane lane-6"></div>
+            <div class="lane lane-7"></div>
+            <div class="lane lane-8"></div>
+            <div class="start-line"></div>
+            <div class="finish-line"></div>
+        </div>
+        <div class="audience" id="audience"></div>
+    </div>
+
+    <div class="results-panel" id="resultsPanel">
+        <h3>🏆 比赛结果 🏆</h3>
+        <div id="resultsList"></div>
+        <button class="export-btn" id="exportBtn" style="display: none;">导出成绩 (JSON)</button>
+    </div>
+
+    <div class="shortcuts">
+        <span><kbd>空格</kbd> 发令枪响</span>
+        <span><kbd>R</kbd> 重置比赛</span>
+    </div>
+
+    <script>
+    (function() {
+        window.RaceConstants = {
+            TRACK_WIDTH: 0,
+            RUNNER_SIZE: 30,
+            MIN_TIME: 9.5,
+            MAX_TIME: 11.0,
+            MAX_HISTORY: 10,
+            LANE_COUNT: 8,
+            LANE_HEIGHT: 40
+        };
+
+        window.RunnerStatus = {
+            READY: 'ready',
+            RACING: 'racing',
+            FINISHED: 'finished'
+        };
+    })();
+    </script>
+
+    <script>
+    (function() {
+        const runnersData = Object.freeze([
+            Object.freeze({ id: 1, name: '苏炳添', country: '中国', bestTime: 9.83, status: window.RunnerStatus.READY, color: '#ff4444' }),
+            Object.freeze({ id: 2, name: 'Bolt', country: '牙买加', bestTime: 9.58, status: window.RunnerStatus.READY, color: '#ffbb33' }),
+            Object.freeze({ id: 3, name: 'Gatlin', country: '美国', bestTime: 9.74, status: window.RunnerStatus.READY, color: '#00C851' }),
+            Object.freeze({ id: 4, name: 'Coleman', country: '美国', bestTime: 9.76, status: window.RunnerStatus.READY, color: '#33b5e5' }),
+            Object.freeze({ id: 5, name: 'De Grasse', country: '加拿大', bestTime: 9.82, status: window.RunnerStatus.READY, color: '#aa66cc' }),
+            Object.freeze({ id: 6, name: 'Omanyala', country: '肯尼亚', bestTime: 9.77, status: window.RunnerStatus.READY, color: '#ff8800' }),
+            Object.freeze({ id: 7, name: 'Simbine', country: '南非', bestTime: 9.84, status: window.RunnerStatus.READY, color: '#00cccc' }),
+            Object.freeze({ id: 8, name: 'Abdul Hakim', country: '日本', bestTime: 9.95, status: window.RunnerStatus.READY, color: '#cc00cc' })
+        ]);
+
+        window.RunnersModule = {
+            getRunners: function() {
+                return runnersData.map(r => ({ ...r }));
+            },
+
+            getRunnerColor: function(id) {
+                return runnersData.find(r => r.id === id)?.color || '#ffffff';
+            }
+        };
+    })();
+    </script>
+
+    <script>
+    (function() {
+        let gameState = {
+            isReady: false,
+            isRacing: false,
+            isFinished: false,
+            runners: [],
+            startTime: 0,
+            results: [],
+            animationId: null
+        };
+
+        function calculateSpeed(bestTime) {
+            const variance = (Math.random() - 0.5) * 0.4;
+            const actualTime = Math.max(window.RaceConstants.MIN_TIME, 
+                Math.min(window.RaceConstants.MAX_TIME, bestTime + variance));
+            return actualTime;
+        }
+
+        function updateRunnerPosition(runner, currentTime, trackWidth) {
+            if (runner.status === window.RunnerStatus.FINISHED) return;
+
+            const elapsed = (currentTime - gameState.startTime) / 1000;
+            const progress = Math.min(1, elapsed / runner.actualTime);
+            const maxPosition = trackWidth - window.RaceConstants.RUNNER_SIZE;
+            
+            runner.position = progress * maxPosition;
+
+            if (progress >= 1) {
+                runner.status = window.RunnerStatus.FINISHED;
+                runner.finalTime = runner.actualTime;
+                gameState.results.push({
+                    id: runner.id,
+                    name: runner.name,
+                    country: runner.country,
+                    time: parseFloat(runner.finalTime.toFixed(2))
+                });
+            }
+        }
+
+        function checkRaceComplete() {
+            return gameState.runners.every(r => r.status === window.RunnerStatus.FINISHED);
+        }
+
+        function saveToHistory() {
+            const history = JSON.parse(localStorage.getItem('raceHistory') || '[]');
+            const top3 = gameState.results.slice(0, 3).map(r => r.id);
+            
+            history.push({
+                timestamp: Date.now(),
+                results: [...gameState.results],
+                top3: top3
+            });
+
+            if (history.length > window.RaceConstants.MAX_HISTORY) {
+                history.shift();
+            }
+
+            localStorage.setItem('raceHistory', JSON.stringify(history));
+        }
+
+        window.RaceModule = {
+            init: function() {
+                gameState = {
+                    isReady: false,
+                    isRacing: false,
+                    isFinished: false,
+                    runners: [],
+                    startTime: 0,
+                    results: [],
+                    animationId: null
+                };
+            },
+
+            readyRunners: function() {
+                gameState.runners = window.RunnersModule.getRunners().map((r, index) => ({
+                    ...r,
+                    lane: index,
+                    position: 0,
+                    actualTime: calculateSpeed(r.bestTime),
+                    status: window.RunnerStatus.READY
+                }));
+                gameState.isReady = true;
+                gameState.results = [];
+                return gameState.runners;
+            },
+
+            startRace: function(callback, onProgress, onComplete) {
+                gameState.isRacing = true;
+                gameState.startTime = performance.now();
+                gameState.results = [];
+                
+                gameState.runners.forEach(r => {
+                    r.status = window.RunnerStatus.RACING;
+                    r.position = 0;
+                });
+
+                function animate(currentTime) {
+                    const trackElement = document.getElementById('track');
+                    const trackWidth = trackElement.offsetWidth;
+
+                    gameState.runners.forEach(runner => {
+                        updateRunnerPosition(runner, currentTime, trackWidth);
+                    });
+
+                    onProgress(gameState.runners);
+
+                    if (checkRaceComplete()) {
+                        gameState.isRacing = false;
+                        gameState.isFinished = true;
+                        gameState.results.sort((a, b) => a.time - b.time);
+                        saveToHistory();
+                        onComplete(gameState.results);
+                        callback(gameState.results);
+                    } else {
+                        gameState.animationId = requestAnimationFrame(animate);
+                    }
+                }
+
+                gameState.animationId = requestAnimationFrame(animate);
+            },
+
+            resetRace: function() {
+                if (gameState.animationId) {
+                    cancelAnimationFrame(gameState.animationId);
+                }
+                this.init();
+            },
+
+            getState: function() {
+                return { ...gameState };
+            },
+
+            getResults: function() {
+                return [...gameState.results];
+            },
+
+            restoreLastRace: function() {
+                const history = JSON.parse(localStorage.getItem('raceHistory') || '[]');
+                if (history.length > 0) {
+                    const lastRace = history[history.length - 1];
+                    gameState.results = lastRace.results;
+                    gameState.isFinished = true;
+                    gameState.isReady = true;
+                    return lastRace;
+                }
+                return null;
+            },
+
+            exportResults: function() {
+                const exportData = {
+                    timestamp: new Date().toISOString(),
+                    raceResults: gameState.results
+                };
+                console.log('比赛成绩JSON:', JSON.stringify(exportData, null, 2));
+                return exportData;
+            }
+        };
+    })();
+    </script>
+
+    <script>
+    (function() {
+        const btnReady = document.getElementById('btnReady');
+        const btnStart = document.getElementById('btnStart');
+        const btnReset = document.getElementById('btnReset');
+        const statusBar = document.getElementById('statusBar');
+        const countdownEl = document.getElementById('countdown');
+        const resultsList = document.getElementById('resultsList');
+        const exportBtn = document.getElementById('exportBtn');
+        const track = document.getElementById('track');
+        const audience = document.getElementById('audience');
+
+        let runnerElements = [];
+
+        function updateStatus(text, type) {
+            statusBar.textContent = text;
+            statusBar.className = 'status-bar status-' + type;
+        }
+
+        function showCountdown(text) {
+            countdownEl.textContent = text;
+            countdownEl.classList.add('show');
+            setTimeout(() => {
+                countdownEl.classList.remove('show');
+            }, 500);
+        }
+
+        function createRunnerElements(runners) {
+            runnerElements.forEach(el => el.remove());
+            runnerElements = [];
+
+            runners.forEach((runner, index) => {
+                const el = document.createElement('div');
+                el.className = 'runner';
+                el.style.backgroundColor = runner.color;
+                el.style.top = (index * window.RaceConstants.LANE_HEIGHT + 5) + 'px';
+                el.style.left = '0px';
+                el.textContent = runner.id;
+                el.id = 'runner-' + runner.id;
+                track.appendChild(el);
+                runnerElements.push(el);
+            });
+        }
+
+        function updateRunnerPositions(runners) {
+            runners.forEach((runner, index) => {
+                const el = document.getElementById('runner-' + runner.id);
+                if (el) {
+                    el.style.left = runner.position + 'px';
+                    if (runner.status === window.RunnerStatus.RACING) {
+                        el.classList.add('racing');
+                    } else {
+                        el.classList.remove('racing');
+                    }
+                }
+            });
+
+            if (Math.random() < 0.05) {
+                showAudienceCheer();
+            }
+        }
+
+        function showAudienceCheer() {
+            const cheers = ['👏', '🎉', '💪', '🚀', '⚡', '🔥', 'GO!', '冲刺!'];
+            const cheer = document.createElement('div');
+            cheer.className = 'cheer';
+            cheer.textContent = cheers[Math.floor(Math.random() * cheers.length)];
+            cheer.style.left = (Math.random() * 80 + 10) + '%';
+            cheer.style.top = (Math.random() * 80 + 10) + '%';
+            cheer.style.color = ['#ff4444', '#ffbb33', '#00C851', '#33b5e5', '#aa66cc'][Math.floor(Math.random() * 5)];
+            audience.appendChild(cheer);
+            setTimeout(() => cheer.remove(), 1000);
+        }
+
+        function displayResults(results) {
+            resultsList.innerHTML = '';
+            
+            results.forEach((result, index) => {
+                const item = document.createElement('div');
+                let medalClass = '';
+                
+                if (index === 0) medalClass = 'gold';
+                else if (index === 1) medalClass = 'silver';
+                else if (index === 2) medalClass = 'bronze';
+
+                item.className = 'result-item ' + medalClass;
+                item.innerHTML = `
+                    <div class="rank">${index + 1}</div>
+                    <div class="result-info">
+                        <div class="result-name">${result.name}</div>
+                        <div class="result-country">${result.country}</div>
+                    </div>
+                    <div class="result-time">${result.time.toFixed(2)}s</div>
+                `;
+                resultsList.appendChild(item);
+            });
+
+            exportBtn.style.display = 'block';
+        }
+
+        function startCountdown(callback) {
+            let count = 3;
+            
+            function tick() {
+                if (count > 0) {
+                    showCountdown(count);
+                    count--;
+                    setTimeout(tick, 1000);
+                } else {
+                    showCountdown('GO!');
+                    setTimeout(callback, 500);
+                }
+            }
+            
+            tick();
+        }
+
+        function disableButtons() {
+            btnReady.disabled = true;
+            btnStart.disabled = true;
+        }
+
+        function handleReady() {
+            const runners = window.RaceModule.readyRunners();
+            createRunnerElements(runners);
+            btnReady.disabled = true;
+            btnStart.disabled = false;
+            updateStatus('选手已就绪，按空格键或点击"发令枪响"开始比赛！', 'ready');
+        }
+
+        function handleStart() {
+            if (!window.RaceModule.getState().isReady) return;
+            
+            disableButtons();
+            updateStatus('比赛即将开始...', 'racing');
+            
+            startCountdown(() => {
+                updateStatus('比赛进行中...', 'racing');
+                window.RaceModule.startRace(
+                    (results) => {
+                        updateStatus('比赛结束！', 'finished');
+                        displayResults(results);
+                        btnReset.disabled = false;
+                    },
+                    updateRunnerPositions,
+                    () => {}
+                );
+            });
+        }
+
+        function handleReset() {
+            window.RaceModule.resetRace();
+            runnerElements.forEach(el => el.remove());
+            runnerElements = [];
+            resultsList.innerHTML = '';
+            exportBtn.style.display = 'none';
+            btnReady.disabled = false;
+            btnStart.disabled = true;
+            btnReset.disabled = false;
+            updateStatus('点击"选手上道"准备比赛', 'ready');
+        }
+
+        function handleExport() {
+            window.RaceModule.exportResults();
+            alert('成绩已导出到控制台，请按F12查看！');
+        }
+
+        function checkRestore() {
+            const lastRace = window.RaceModule.restoreLastRace();
+            if (lastRace) {
+                const runners = window.RaceModule.readyRunners();
+                createRunnerElements(runners);
+                
+                const trackWidth = track.offsetWidth;
+                runners.forEach((runner, index) => {
+                    const result = lastRace.results.find(r => r.id === runner.id);
+                    if (result) {
+                        const maxPosition = trackWidth - window.RaceConstants.RUNNER_SIZE;
+                        const progress = Math.min(1, result.time / 11);
+                        runner.position = progress * maxPosition;
+                        runner.finalTime = result.time;
+                    }
+                });
+                updateRunnerPositions(runners);
+                
+                displayResults(lastRace.results);
+                updateStatus('已恢复上一场比赛结果', 'finished');
+                btnReady.disabled = true;
+                btnStart.disabled = true;
+            }
+        }
+
+        btnReady.addEventListener('click', handleReady);
+        btnStart.addEventListener('click', handleStart);
+        btnReset.addEventListener('click', handleReset);
+        exportBtn.addEventListener('click', handleExport);
+
+        document.addEventListener('keydown', function(e) {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (!btnStart.disabled) {
+                    handleStart();
+                }
+            } else if (e.code === 'KeyR') {
+                e.preventDefault();
+                handleReset();
+            }
+        });
+
+        window.addEventListener('load', function() {
+            checkRestore();
+        });
+
+        window.RaceModule.init();
+    })();
+    </script>
+</body>
+</html>
